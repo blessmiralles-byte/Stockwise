@@ -47,7 +47,8 @@ export default function OnboardingPage() {
       await supabase.auth.updateUser({ data: { onboarding_complete: true } })
 
       setDone(true)
-      setTimeout(() => router.push('/dashboard'), 1500)
+      // Full page reload so the updated session cookie is picked up by the proxy
+      setTimeout(() => { window.location.href = '/dashboard' }, 1500)
     } catch {
       setError('Network error — please try again.')
     } finally {
