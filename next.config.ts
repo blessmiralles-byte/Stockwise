@@ -14,4 +14,6 @@ export default withSentryConfig(nextConfig, {
   disableLogger: true,
   // Only upload source maps when SENTRY_AUTH_TOKEN is present (i.e. production CI)
   sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+  // Don't auto-wrap middleware — it crashes when Sentry DSN is not configured
+  autoInstrumentMiddleware: false,
 })
