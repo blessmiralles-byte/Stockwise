@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+:root {
+  /* Suite design tokens — matches CrewSync / JobLedger */
+  --color-primary:    #4F46E5; /* indigo-600 */
+  --color-accent:     #4F46E5; /* indigo-600 */
+  --color-sidebar-bg: #0F172A; /* slate-950  */
+
+  --background: #ffffff;
+  --foreground: #0f172a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0f172a;
+    --foreground: #f8fafc;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+}
+
+/* ── Print utilities ─────────────────────────────────────────────────────────
+   .no-print   — hidden in print, visible on screen
+   .print-only — hidden on screen, visible in print                           */
+.print-only { display: none; }
+
+@media print {
+  @page { margin: 15mm; size: A4 portrait; }
+
+  /* Hide navigation chrome and interactive controls */
+  aside, header, .no-print { display: none !important; }
+
+  /* Reveal print-only content */
+  .print-only { display: block !important; }
+
+  /* Remove overflow constraints so full content renders */
+  html, body        { overflow: visible !important; height: auto !important; }
+  .overflow-hidden  { overflow: visible !important; }
+  .h-screen         { height: auto !important; }
+  main              { overflow: visible !important; height: auto !important; }
+
+  /* Prevent rows from splitting across pages */
+  tr    { page-break-inside: avoid; }
+  thead { display: table-header-group; }
+
+  /* Preserve intentionally dark table headers */
+  .bg-slate-900 {
+    background-color: #0f172a !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .bg-slate-800 {
+    background-color: #1e293b !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

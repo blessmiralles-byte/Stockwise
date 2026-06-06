@@ -1,0 +1,10 @@
+import { createClient } from '@supabase/supabase-js'
+
+// Service role client — bypasses RLS, only use in server-side API routes.
+// Never import this in client components.
+export function createServiceClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
