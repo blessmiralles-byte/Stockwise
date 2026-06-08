@@ -139,8 +139,8 @@ export async function POST(
   const auth = await requireAnyRole('owner', 'admin', 'procurement', 'operations')
   if (auth.error) return auth.error
 
-  // Rate limit by user
-  const { ok } = importLimiter(auth.userId)
+  // Rate limit by user (distributed when Upstash is configured)
+  const { ok } = await importLimiter(auth.userId)
   if (!ok) return NextResponse.json({ error: 'Too many import requests — wait 1 minute.' }, { status: 429 })
 
   const { entity } = await params

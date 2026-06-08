@@ -13,6 +13,31 @@ const API_EXEMPT_PATHS = [
   '/api/jobledger/',
 ]
 
+// Update last_seen_at at most once per minute per user to avoid hammering the DB
+// on every page navigation. Uses a lightweight in-memory set of "userId:minute" keys.
+const seenThisMinute = new Set<string>()
+setInterval(() => seenThisMinute.clear(), 60_000)
+
+async function touchLastSeen(userId: string) {
+  const key = `${userId}:${Math.floor(Date.now() / 60_000)}`
+  if (seenThisMinute.has(key)) return
+  seenThisMinute.add(key)
+
+  const url   = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const token = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  // Fire-and-forget — don't await, don't block the response
+  fetch(`${url}/rest/v1/user_profiles?id=eq.${userId}`, {
+    method:  'PATCH',
+    headers: {
+      apikey:          token,
+      Authorization:   `Bearer ${token}`,
+      'Content-Type':  'application/json',
+      Prefer:          'return=minimal',
+    },
+    body: JSON.stringify({ last_seen_at: new Date().toISOString() }),
+  }).catch(() => { /* non-critical */ })
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
@@ -55,6 +80,7 @@ export async function proxy(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    touchLastSeen(user.id)
     return response
   }
 
@@ -76,6 +102,7 @@ export async function proxy(request: NextRequest) {
     }
   }
 
+  touchLastSeen(user.id)
   return response
 }
 
