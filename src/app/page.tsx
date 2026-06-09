@@ -4,7 +4,7 @@ import Link from 'next/link'
 import {
   Package, BarChart3, QrCode, Truck, ClipboardList, Wrench,
   CheckCircle2, ArrowRight, Shield, Zap, Users, Star,
-  ChevronRight, Globe, Lock
+  ChevronRight, Globe, Lock, Smartphone
 } from 'lucide-react'
 import { PLAN_CONFIG } from '@/lib/stripe-config'
 
@@ -18,17 +18,17 @@ function Hero() {
       <div className="relative max-w-6xl mx-auto px-6 pt-24 pb-28 text-center">
         <div className="inline-flex items-center gap-2 bg-indigo-800/60 border border-indigo-700/50 text-indigo-200 text-xs font-medium px-3 py-1.5 rounded-full mb-8">
           <Zap className="w-3.5 h-3.5" />
-          14-day free trial — no credit card required
+          Free 14-day trial · No credit card needed
         </div>
 
         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-tight mb-6">
-          Inventory management<br />
-          <span className="text-indigo-300">built for real businesses</span>
+          Stop losing money<br />
+          <span className="text-indigo-300">to stock you can't see</span>
         </h1>
         <p className="text-lg text-indigo-200 max-w-2xl mx-auto mb-10">
-          StockWise gives your team real-time stock visibility, purchase order workflows,
-          barcode scanning, fixed-asset tracking, and financial reports — in one
-          beautifully simple app.
+          Built for trade and services businesses — contractors, maintenance teams, and
+          field operations. Real-time stock, purchase orders, equipment tracking, and
+          field mobile access — all in one app your whole team can use from anywhere.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -46,7 +46,7 @@ function Hero() {
         </div>
 
         <p className="text-xs text-indigo-400 mt-5">
-          Trusted by businesses managing thousands of SKUs
+          Built for trade, services, and field operations
         </p>
       </div>
     </section>
@@ -58,32 +58,32 @@ const FEATURES = [
   {
     icon:  Package,
     title: 'Real-time Inventory',
-    desc:  'Track stock levels across multiple locations with weighted average or FIFO costing. Get low-stock alerts before you run out.',
+    desc:  'Always know what you have and where it is. Set reorder points so you get alerted before you run out — not after a job falls through.',
   },
   {
     icon:  Truck,
     title: 'Purchase Orders',
-    desc:  'Create POs, send to suppliers, and receive goods with a three-way match. SOD controls prevent the same person approving what they ordered.',
+    desc:  'Create POs, send them to suppliers, and receive goods in a few taps. Built-in controls mean the person who orders can\'t also approve the receipt — keeping your process clean.',
   },
   {
-    icon:  QrCode,
-    title: 'Barcode Scanning',
-    desc:  'Scan any barcode to instantly look up products, assets, locations, or POs. Works on any phone — no dedicated scanner needed.',
+    icon:  Smartphone,
+    title: 'Mobile & Field Access',
+    desc:  'Field staff update stock and check out equipment directly from their phone — on site, not back at the office. Scan any barcode to pull up live inventory, assets, or a purchase order instantly.',
   },
   {
     icon:  Wrench,
-    title: 'Fixed Assets',
-    desc:  'Track every asset from purchase to disposal. Automated straight-line or declining-balance depreciation with a full roll-forward report.',
+    title: 'Fixed Assets & Equipment',
+    desc:  'Track every tool, vehicle, and piece of equipment — where it is, who has it, and what it\'s worth. Automated depreciation, maintenance schedules, and a full audit trail from purchase to disposal.',
   },
   {
     icon:  ClipboardList,
     title: 'Stock Counts',
-    desc:  'Plan, execute, and approve cycle counts without stopping operations. Discrepancies are highlighted for review before adjustments post.',
+    desc:  'Run stocktakes without shutting down. Count by location, review any discrepancies, then post — only after a second set of eyes approves it.',
   },
   {
     icon:  BarChart3,
     title: 'Financial Reports',
-    desc:  'Inventory valuation, movement ledger, expense analysis, and asset schedules — ready for your accountant or ERP export.',
+    desc:  'Inventory value, stock movement, cost of goods, and asset depreciation schedules — export-ready whenever your accountant asks for them.',
   },
 ]
 
@@ -93,11 +93,11 @@ function Features() {
       <div className="max-w-6xl mx-auto px-6">
         <div className="text-center mb-16">
           <h2 className="text-3xl font-bold text-slate-900 mb-3">
-            Everything your operations team needs
+            Everything from purchase order to the job site
           </h2>
           <p className="text-slate-500 max-w-xl mx-auto">
-            One platform from purchase order to financial close. No spreadsheets,
-            no missing stock, no manual reconciliation.
+            One platform that connects your warehouse, your field team, and your
+            accountant. No spreadsheets, no missing stock, no surprises.
           </p>
         </div>
 
@@ -124,10 +124,10 @@ function TrustBar() {
       <div className="max-w-4xl mx-auto px-6">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 text-center">
           {[
-            { icon: Shield,  label: 'SOD Controls',       sub: 'Built-in separation of duties' },
-            { icon: Globe,   label: 'Multi-location',      sub: 'Warehouses, stores, sites' },
-            { icon: Lock,    label: 'Secure by design',    sub: 'Row-level security on every query' },
-            { icon: Users,   label: 'Team roles',          sub: 'Owner, Procurement, Finance & more' },
+            { icon: Smartphone, label: 'Field-ready',         sub: 'Update stock from any job site' },
+            { icon: Globe,      label: 'Multi-location',     sub: 'Warehouses, sites & vehicles' },
+            { icon: Lock,       label: 'Private by default', sub: 'Your data invisible to other accounts' },
+            { icon: Users,      label: '6 team roles',       sub: 'Right access for every job title' },
           ].map(item => (
             <div key={item.label} className="space-y-1">
               <item.icon className="w-6 h-6 text-indigo-500 mx-auto" />
@@ -160,9 +160,9 @@ function Pricing() {
     <section className="py-24 bg-white" id="pricing">
       <div className="max-w-5xl mx-auto px-6">
         <div className="text-center mb-14">
-          <h2 className="text-3xl font-bold text-slate-900 mb-3">Simple, transparent pricing</h2>
+          <h2 className="text-3xl font-bold text-slate-900 mb-3">Honest pricing. No surprises.</h2>
           <p className="text-slate-500">
-            Start with a 14-day free trial. Upgrade anytime — cancel anytime.
+            Try everything free for 14 days. No credit card. Cancel in one click.
           </p>
         </div>
 
@@ -236,7 +236,7 @@ function Pricing() {
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-8">
-          All plans include a 14-day free trial. No credit card required to start.
+          Every plan includes every feature. You're only limited by team size — not what you can do.
         </p>
       </div>
     </section>
@@ -248,15 +248,15 @@ function CtaBanner() {
   return (
     <section className="py-20 bg-indigo-600">
       <div className="max-w-3xl mx-auto px-6 text-center text-white">
-        <h2 className="text-3xl font-bold mb-4">Ready to take control of your inventory?</h2>
+        <h2 className="text-3xl font-bold mb-4">Your trade business deserves better than a spreadsheet.</h2>
         <p className="text-indigo-200 mb-8">
-          Join businesses that have replaced spreadsheets with StockWise.
-          Set up in minutes — your team will be scanning barcodes by tomorrow.
+          Set up in minutes. Your team — in the office, the warehouse, or out on a job —
+          will be scanning, ordering, and tracking equipment by tomorrow.
         </p>
         <Link
           href="/register"
           className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-white text-indigo-700 font-semibold text-sm hover:bg-indigo-50 transition-colors shadow-lg">
-          Get started free
+          Start your free trial
           <ChevronRight className="w-4 h-4" />
         </Link>
       </div>

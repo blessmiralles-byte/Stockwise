@@ -90,9 +90,9 @@ export default function RegisterPage() {
   return (
     <Card className="shadow-xl border-0">
       <CardHeader className="pb-4">
-        <CardTitle className="text-xl">Create your account</CardTitle>
+        <CardTitle className="text-xl">Start your free trial</CardTitle>
         <CardDescription>
-          The first account registered becomes the owner.
+          14 days free · No credit card · Cancel anytime
         </CardDescription>
       </CardHeader>
       <CardContent>

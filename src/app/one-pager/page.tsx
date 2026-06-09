@@ -4,7 +4,7 @@ import {
   Package, BarChart3, QrCode, Truck, ClipboardList, Wrench,
   CheckCircle2, Shield, Zap, Users, Globe, Lock, Star,
   FileText, Bell, ArrowUpDown, Layers, ScanLine, Building2,
-  Printer
+  Printer, Smartphone
 } from 'lucide-react'
 import { PLAN_CONFIG } from '@/lib/stripe-config'
 
@@ -40,29 +40,29 @@ const FEATURE_SECTIONS = [
     ],
   },
   {
-    heading: 'Barcode & QR Scanning',
-    icon: ScanLine,
+    heading: 'Mobile & Field Access',
+    icon: Smartphone,
     color: 'violet',
     items: [
-      'Universal resolver: scan any code to find any record',
-      'Works on any smartphone camera — no dedicated scanner',
-      'Resolves products, assets, locations, POs, and stock counts',
-      'Instant product detail view with live quantity',
-      'Asset check-in / check-out via barcode',
-      'Print barcodes directly from the product page',
+      'Field staff update stock directly from their smartphone — on site',
+      'No office visit needed — scan and transact from the job site',
+      'Scan products, assets, locations, or POs to get live data instantly',
+      'Equipment check-in / check-out via barcode scan',
+      'Works on any phone — no dedicated scanner hardware required',
+      'Print barcodes directly from the product or asset page',
     ],
   },
   {
-    heading: 'Fixed Assets',
+    heading: 'Fixed Assets & Equipment',
     icon: Wrench,
     color: 'amber',
     items: [
-      'Full asset register with photos, serial numbers, and tags',
-      'Straight-line and declining-balance depreciation engines',
-      'Automated monthly depreciation run with audit trail',
-      'Asset movement log and location tracking',
-      'Maintenance schedules with email alerts',
-      'Roll-forward report: opening balance → additions → disposals → closing',
+      'Full asset register: photos, serial numbers, location & assigned user',
+      'Track tools, vehicles, and equipment deployed to job sites',
+      'Straight-line and declining-balance depreciation — runs automatically',
+      'Maintenance schedules with email reminders before due dates',
+      'Asset movement log: know exactly who has what and where',
+      'Roll-forward report: opening → additions → disposals → closing value',
     ],
   },
   {
@@ -131,10 +131,10 @@ const COLOR_MAP: Record<string, { bg: string; icon: string; badge: string }> = {
 }
 
 const TRUST_ITEMS = [
-  { icon: Globe,          label: 'Multi-location',     sub: 'Warehouses, stores & sites'      },
-  { icon: Lock,           label: 'Secure by design',   sub: 'Org-isolated, RLS on every query' },
-  { icon: Shield,         label: 'SOD enforced',       sub: 'API-level duty separation'        },
-  { icon: Users,          label: 'Role-based access',  sub: '6 purpose-built roles'            },
+  { icon: Smartphone,     label: 'Field-ready',        sub: 'Update stock from any job site'   },
+  { icon: Globe,          label: 'Multi-location',     sub: 'Warehouses, sites & vehicles'     },
+  { icon: Lock,           label: 'Private by default', sub: 'Your data invisible to others'    },
+  { icon: Users,          label: '6 team roles',       sub: 'Right access for every job title' },
   { icon: ArrowUpDown,    label: 'FIFO & Avg cost',    sub: 'Configurable per product'         },
   { icon: Zap,            label: '14-day free trial',  sub: 'No credit card required'          },
 ]
@@ -171,13 +171,13 @@ export default function OnePagerPage() {
             </div>
 
             <h1 className="text-3xl font-extrabold leading-tight mb-3">
-              Inventory management<br />
-              <span className="text-indigo-300">built for real businesses</span>
+              Stop losing money<br />
+              <span className="text-indigo-300">to stock you can't see</span>
             </h1>
             <p className="text-indigo-200 text-sm max-w-lg leading-relaxed">
-              One platform for stock control, purchase orders, barcode scanning,
-              fixed assets, stock counts, and financial reporting. Replace your
-              spreadsheets — your team will be up and running in minutes.
+              Built for trade and services businesses — contractors, maintenance teams,
+              and field operations. Real-time stock, purchase orders, equipment tracking,
+              and field mobile access — all in one app your whole team can use from anywhere.
             </p>
           </div>
 
@@ -212,7 +212,7 @@ export default function OnePagerPage() {
         <section>
           <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
             <Layers className="w-5 h-5 text-indigo-500" />
-            Full feature breakdown
+            Everything from purchase order to the job site
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -305,7 +305,7 @@ export default function OnePagerPage() {
           </div>
 
           <p className="text-xs text-slate-400 text-center mt-4">
-            All plans include full access to every feature. No feature gating — just user seat limits.
+            Every plan includes every feature. You're only limited by team size — not what you can do.
             Upgrade or cancel anytime.
           </p>
         </section>
@@ -359,7 +359,7 @@ export default function OnePagerPage() {
               <Package className="w-3 h-3 text-white" strokeWidth={2.5} />
             </div>
             <span className="font-semibold text-slate-700">StockWise</span>
-            <span>— Inventory software for growing businesses</span>
+            <span>— Inventory software that grows with you</span>
           </div>
           <div className="flex gap-4">
             <span>stockwise.app</span>

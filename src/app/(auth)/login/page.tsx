@@ -93,8 +93,8 @@ function LoginForm() {
       </Button>
 
       <div className="flex items-center justify-between text-sm text-slate-500">
-        <span>No account yet?{' '}
-          <Link href="/register" className="text-indigo-600 font-medium hover:underline">Register</Link>
+        <span>New to StockWise?{' '}
+          <Link href="/register" className="text-indigo-600 font-medium hover:underline">Start free</Link>
         </span>
         <Link href="/forgot-password" className="text-indigo-600 font-medium hover:underline">
           Forgot password?
@@ -109,7 +109,7 @@ export default function LoginPage() {
     <Card className="shadow-xl border-0">
       <CardHeader className="pb-4">
         <CardTitle className="text-xl">Welcome back</CardTitle>
-        <CardDescription>Sign in to your StockWise account</CardDescription>
+        <CardDescription>Good to see you again</CardDescription>
       </CardHeader>
       <CardContent>
         <Suspense fallback={<div className="h-48 animate-pulse bg-slate-50 rounded-lg" />}>
