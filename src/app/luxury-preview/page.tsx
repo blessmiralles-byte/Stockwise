@@ -16,7 +16,8 @@ import {
   Package, ArrowRight, CheckCircle2, ChevronRight,
   Zap, Users, Globe, Lock, Smartphone, Wrench,
   Truck, BarChart3, ClipboardList, Star, Shield,
-  HardHat, Gauge, Hammer,
+  HardHat, Gauge, Hammer, HeartPulse, UtensilsCrossed,
+  Building2, MapPin,
 } from 'lucide-react'
 import { PLAN_CONFIG } from '@/lib/stripe-config'
 
@@ -68,19 +69,34 @@ const FEATURES = [
 
 const INDUSTRIES = [
   {
+    icon: Hammer,
+    title: 'Trade & Contractors',
+    desc: 'Electricians, plumbers, HVAC, civil works — track materials consumed per job, manage tools in the field, and keep every purchase order clean.',
+  },
+  {
     icon: HardHat,
-    title: 'Construction & Contractors',
-    desc: 'Track materials on site, equipment assigned to crews, and consumables per job — across multiple active projects at once.',
+    title: 'Construction & Fitout',
+    desc: 'Site managers, builders, and project teams — track materials across active sites, manage equipment check-out, and stay audit-ready.',
   },
   {
-    icon: Wrench,
-    title: 'Maintenance & Field Services',
-    desc: 'Manage spare parts, service vans, and tools in the field. Know exactly what each technician carries before they head out.',
+    icon: HeartPulse,
+    title: 'Healthcare & Aged Care',
+    desc: 'Hospitals, clinics, pharmacies, and retirement homes — manage medical supplies, equipment, and consumables with full traceability.',
   },
   {
-    icon: Gauge,
-    title: 'Trade & Technical Services',
-    desc: 'Electricians, plumbers, HVAC — track materials consumed, log equipment depreciation, and give your accountant what they need.',
+    icon: UtensilsCrossed,
+    title: 'Hospitality & F&B',
+    desc: 'Hotels, restaurants, and Airbnbs — track linen to laundry, kitchen stock, amenities, and everything in between across all your properties.',
+  },
+  {
+    icon: Building2,
+    title: 'Facilities Management',
+    desc: 'Building services, cleaning, and property maintenance — manage parts inventory, fixed assets, and maintenance schedules across every site.',
+  },
+  {
+    icon: MapPin,
+    title: 'Field Service Teams',
+    desc: 'Technical crews and on-site operations — equip your team with mobile stock access, equipment check-in/out, and live inventory from the field.',
   },
 ]
 
@@ -182,9 +198,9 @@ function Hero() {
 
         {/* Sub */}
         <p className="text-lg text-[#8A8A9E] max-w-2xl mx-auto mb-12 leading-relaxed">
-          Built for trade and services businesses — contractors, maintenance teams,
-          and field operations. Real-time stock, purchase orders, equipment tracking,
-          and field mobile access. All in one.
+          Built for operations and services businesses — trade contractors,
+          healthcare teams, hospitality operators, and field crews. Real-time
+          stock, equipment tracking, and mobile field access, all in one place.
         </p>
 
         {/* CTAs */}
@@ -279,28 +295,29 @@ function Industries() {
   return (
     <section className="py-28 bg-[#0D0D16]" id="industries">
       <div className="max-w-6xl mx-auto px-6">
-        <SectionLabel label="Built for" />
+        <SectionLabel label="Operations & Services" />
         <div className="text-center mb-16">
           <h2 className={`${serif.className} text-4xl font-bold text-white mb-4`}>
-            The software serious<br />
-            <em className="text-[#C9A96E] not-italic italic">trade businesses choose</em>
+            Built for the businesses<br />
+            <em className="text-[#C9A96E] not-italic italic">that keep the world running</em>
           </h2>
-          <p className="text-[#8A8A9E] max-w-lg mx-auto leading-relaxed">
-            Whether your team works from a warehouse, a service van, or a job site —
-            StockWise keeps everything in sync.
+          <p className="text-[#8A8A9E] max-w-xl mx-auto leading-relaxed">
+            Trade contractors, healthcare teams, hospitality operators, facilities managers —
+            any operations-driven business that needs to know what it has,
+            where it is, and when to restock.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {INDUSTRIES.map(ind => (
             <div
               key={ind.title}
-              className="p-8 rounded-2xl bg-[#131320] border border-[#C9A96E]/10 hover:border-[#C9A96E]/25 transition-all text-center"
+              className="p-6 rounded-2xl bg-[#131320] border border-[#C9A96E]/10 hover:border-[#C9A96E]/30 hover:bg-[#16162A] transition-all"
             >
-              <div className="w-12 h-12 rounded-full border border-[#C9A96E]/20 flex items-center justify-center mx-auto mb-5">
-                <ind.icon className="w-5 h-5 text-[#C9A96E]" strokeWidth={1.5} />
+              <div className="w-10 h-10 rounded-xl border border-[#C9A96E]/20 flex items-center justify-center mb-4">
+                <ind.icon className="w-4 h-4 text-[#C9A96E]" strokeWidth={1.5} />
               </div>
-              <h3 className={`${serif.className} text-xl font-semibold text-white mb-3`}>{ind.title}</h3>
+              <h3 className={`${serif.className} text-lg font-semibold text-white mb-2`}>{ind.title}</h3>
               <p className="text-sm text-[#8A8A9E] leading-relaxed">{ind.desc}</p>
             </div>
           ))}
@@ -564,13 +581,13 @@ function CtaBanner() {
         </div>
 
         <h2 className={`${serif.className} text-4xl sm:text-5xl font-bold text-white mb-5 leading-tight`}>
-          Your trade business deserves<br />
+          Your operations deserve<br />
           <em className="text-[#C9A96E] not-italic italic">better than a spreadsheet.</em>
         </h2>
 
         <p className="text-[#8A8A9E] mb-10 leading-relaxed max-w-lg mx-auto">
-          Set up in minutes. Your team — in the office, the warehouse, or out on a job —
-          will be scanning, ordering, and tracking equipment by tomorrow.
+          Set up in minutes. Your team — in the office, the ward, the kitchen,
+          or out on a job — will be scanning, ordering, and tracking stock by tomorrow.
         </p>
 
         <Link
