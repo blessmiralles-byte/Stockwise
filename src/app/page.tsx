@@ -2,17 +2,46 @@
 
 import Link from 'next/link'
 import {
-  Package, BarChart3, QrCode, Truck, ClipboardList, Wrench,
+  Package, BarChart3, Truck, ClipboardList, Wrench,
   CheckCircle2, ArrowRight, Shield, Zap, Users, Star,
-  ChevronRight, Globe, Lock, Smartphone
+  ChevronRight, Globe, Lock, Smartphone, CalendarClock,
+  Hammer, HardHat, HeartPulse, UtensilsCrossed, Building2, MapPin,
 } from 'lucide-react'
 import { PLAN_CONFIG } from '@/lib/stripe-config'
+
+// ── Nav ───────────────────────────────────────────────────────────────────────
+function Nav() {
+  return (
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-indigo-950/90 backdrop-blur-sm border-b border-indigo-900/60">
+      <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center">
+            <Package className="w-4 h-4 text-white" strokeWidth={2.5} />
+          </div>
+          <span className="text-white font-bold text-lg tracking-tight">StockWise</span>
+        </div>
+
+        <div className="hidden sm:flex items-center gap-6 text-sm text-indigo-300">
+          <a href="#features"   className="hover:text-white transition-colors">Features</a>
+          <a href="#industries" className="hover:text-white transition-colors">Industries</a>
+          <a href="#pricing"    className="hover:text-white transition-colors">Pricing</a>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Link href="/login"    className="text-sm text-indigo-300 hover:text-white transition-colors">Sign in</Link>
+          <Link href="/register" className="text-sm px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white font-semibold transition-colors">
+            Start free
+          </Link>
+        </div>
+      </div>
+    </nav>
+  )
+}
 
 // ── Hero ──────────────────────────────────────────────────────────────────────
 function Hero() {
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-indigo-950 via-indigo-900 to-slate-900 text-white">
-      {/* Grid decoration */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:64px_64px]" />
 
       <div className="relative max-w-6xl mx-auto px-6 pt-24 pb-28 text-center">
@@ -25,10 +54,11 @@ function Hero() {
           Stop losing money<br />
           <span className="text-indigo-300">to stock you can't see</span>
         </h1>
+
         <p className="text-lg text-indigo-200 max-w-2xl mx-auto mb-10">
-          Built for trade and services businesses — contractors, maintenance teams, and
-          field operations. Real-time stock, purchase orders, equipment tracking, and
-          field mobile access — all in one app your whole team can use from anywhere.
+          Built for operations and services businesses — trade contractors, healthcare teams,
+          hospitality operators, and field crews. Real-time stock, expiry tracking, equipment
+          management, and mobile field access, all in one place.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -46,24 +76,48 @@ function Hero() {
         </div>
 
         <p className="text-xs text-indigo-400 mt-5">
-          Built for trade, services, and field operations
+          For the businesses that keep the world running
         </p>
       </div>
     </section>
   )
 }
 
-// ── Features grid ─────────────────────────────────────────────────────────────
+// ── Trust bar ─────────────────────────────────────────────────────────────────
+function TrustBar() {
+  return (
+    <section className="py-12 bg-slate-50 border-y border-slate-100">
+      <div className="max-w-4xl mx-auto px-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 text-center">
+          {[
+            { icon: Smartphone,    label: 'Field-ready',         sub: 'Update stock from any job site' },
+            { icon: CalendarClock, label: 'Expiry tracking',     sub: 'Alerts before stock expires' },
+            { icon: Lock,          label: 'Private by default',  sub: 'Your data invisible to others' },
+            { icon: Users,         label: '6 team roles',        sub: 'Right access for every job title' },
+          ].map(item => (
+            <div key={item.label} className="space-y-1">
+              <item.icon className="w-6 h-6 text-indigo-500 mx-auto" />
+              <p className="text-sm font-semibold text-slate-800">{item.label}</p>
+              <p className="text-xs text-slate-500">{item.sub}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ── Features ──────────────────────────────────────────────────────────────────
 const FEATURES = [
   {
     icon:  Package,
     title: 'Real-time Inventory',
-    desc:  'Always know what you have and where it is. Set reorder points so you get alerted before you run out — not after a job falls through.',
+    desc:  'Always know what you have and where it is across every location. Set reorder points so you get alerted before you run out — not after a job falls through.',
   },
   {
-    icon:  Truck,
-    title: 'Purchase Orders',
-    desc:  'Create POs, send them to suppliers, and receive goods in a few taps. Built-in controls mean the person who orders can\'t also approve the receipt — keeping your process clean.',
+    icon:  CalendarClock,
+    title: 'Expiry & Batch Tracking',
+    desc:  'Set expiry dates on any product or batch — medicines, food supplies, chemicals, and consumables. Get automatic alerts before stock expires so nothing goes to waste and compliance stays intact.',
   },
   {
     icon:  Smartphone,
@@ -76,9 +130,9 @@ const FEATURES = [
     desc:  'Track every tool, vehicle, and piece of equipment — where it is, who has it, and what it\'s worth. Automated depreciation, maintenance schedules, and a full audit trail from purchase to disposal.',
   },
   {
-    icon:  ClipboardList,
-    title: 'Stock Counts',
-    desc:  'Run stocktakes without shutting down. Count by location, review any discrepancies, then post — only after a second set of eyes approves it.',
+    icon:  Truck,
+    title: 'Purchase Orders',
+    desc:  'Create POs, send them to suppliers, and receive goods in a few taps. Built-in controls mean the person who orders can\'t also approve the receipt — keeping your process clean.',
   },
   {
     icon:  BarChart3,
@@ -117,22 +171,72 @@ function Features() {
   )
 }
 
-// ── Social proof / trust signals ──────────────────────────────────────────────
-function TrustBar() {
+// ── Industries ────────────────────────────────────────────────────────────────
+const INDUSTRIES = [
+  {
+    icon:  Hammer,
+    title: 'Trade & Contractors',
+    desc:  'Electricians, plumbers, HVAC, civil works — track materials consumed per job, manage tools in the field, and keep every purchase order clean.',
+  },
+  {
+    icon:  HardHat,
+    title: 'Construction & Fitout',
+    desc:  'Site managers, builders, and project teams — track materials across active sites, manage equipment check-out, and stay audit-ready.',
+  },
+  {
+    icon:  HeartPulse,
+    title: 'Healthcare & Aged Care',
+    desc:  'Hospitals, clinics, pharmacies, and retirement homes — manage medical supplies and medications with expiry alerts, batch tracking, and full traceability.',
+  },
+  {
+    icon:  UtensilsCrossed,
+    title: 'Hospitality & F&B',
+    desc:  'Hotels, restaurants, and Airbnbs — track linen to laundry, kitchen stock with expiry dates, amenities, and supplies across all your properties.',
+  },
+  {
+    icon:  Building2,
+    title: 'Facilities Management',
+    desc:  'Building services, cleaning, and property maintenance — manage parts inventory, fixed assets, and maintenance schedules across every site.',
+  },
+  {
+    icon:  MapPin,
+    title: 'Field Service Teams',
+    desc:  'Technical crews and on-site operations — equip your team with mobile stock access, equipment check-in/out, and live inventory from the field.',
+  },
+]
+
+function Industries() {
   return (
-    <section className="py-12 bg-slate-50 border-y border-slate-100">
-      <div className="max-w-4xl mx-auto px-6">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 text-center">
-          {[
-            { icon: Smartphone, label: 'Field-ready',         sub: 'Update stock from any job site' },
-            { icon: Globe,      label: 'Multi-location',     sub: 'Warehouses, sites & vehicles' },
-            { icon: Lock,       label: 'Private by default', sub: 'Your data invisible to other accounts' },
-            { icon: Users,      label: '6 team roles',       sub: 'Right access for every job title' },
-          ].map(item => (
-            <div key={item.label} className="space-y-1">
-              <item.icon className="w-6 h-6 text-indigo-500 mx-auto" />
-              <p className="text-sm font-semibold text-slate-800">{item.label}</p>
-              <p className="text-xs text-slate-500">{item.sub}</p>
+    <section className="py-24 bg-slate-50" id="industries">
+      <div className="max-w-6xl mx-auto px-6">
+        {/* Label */}
+        <div className="flex items-center gap-4 mb-5">
+          <div className="h-px flex-1 bg-slate-200" />
+          <span className="text-indigo-500 text-xs font-semibold tracking-widest uppercase">
+            Operations & Services
+          </span>
+          <div className="h-px flex-1 bg-slate-200" />
+        </div>
+
+        <div className="text-center mb-14">
+          <h2 className="text-3xl font-bold text-slate-900 mb-3">
+            Built for the businesses that keep the world running
+          </h2>
+          <p className="text-slate-500 max-w-xl mx-auto">
+            Trade contractors, healthcare teams, hospitality operators, facilities managers —
+            any operations-driven business that needs to know what it has,
+            where it is, and when to restock.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {INDUSTRIES.map(ind => (
+            <div key={ind.title} className="p-6 rounded-2xl bg-white border border-slate-100 hover:border-indigo-100 hover:shadow-sm transition-all group">
+              <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center mb-4 group-hover:bg-indigo-100 transition-colors">
+                <ind.icon className="w-5 h-5 text-indigo-600" />
+              </div>
+              <h3 className="font-semibold text-slate-900 mb-2">{ind.title}</h3>
+              <p className="text-sm text-slate-500 leading-relaxed">{ind.desc}</p>
             </div>
           ))}
         </div>
@@ -144,16 +248,8 @@ function TrustBar() {
 // ── Pricing ───────────────────────────────────────────────────────────────────
 function Pricing() {
   const plans = [
-    {
-      key:       'starter' as const,
-      highlight: false,
-      cta:       'Start free trial',
-    },
-    {
-      key:       'pro' as const,
-      highlight: true,
-      cta:       'Start free trial',
-    },
+    { key: 'starter' as const, highlight: false, cta: 'Start free trial' },
+    { key: 'pro'     as const, highlight: true,  cta: 'Start free trial' },
   ]
 
   return (
@@ -248,10 +344,10 @@ function CtaBanner() {
   return (
     <section className="py-20 bg-indigo-600">
       <div className="max-w-3xl mx-auto px-6 text-center text-white">
-        <h2 className="text-3xl font-bold mb-4">Your trade business deserves better than a spreadsheet.</h2>
+        <h2 className="text-3xl font-bold mb-4">Your operations deserve better than a spreadsheet.</h2>
         <p className="text-indigo-200 mb-8">
-          Set up in minutes. Your team — in the office, the warehouse, or out on a job —
-          will be scanning, ordering, and tracking equipment by tomorrow.
+          Set up in minutes. Your team — in the office, the ward, the kitchen, or out on a job —
+          will be scanning, ordering, and tracking stock by tomorrow.
         </p>
         <Link
           href="/register"
@@ -261,34 +357,6 @@ function CtaBanner() {
         </Link>
       </div>
     </section>
-  )
-}
-
-// ── Nav ───────────────────────────────────────────────────────────────────────
-function Nav() {
-  return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-indigo-950/90 backdrop-blur-sm border-b border-indigo-900/60">
-      <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center">
-            <Package className="w-4 h-4 text-white" strokeWidth={2.5} />
-          </div>
-          <span className="text-white font-bold text-lg tracking-tight">StockWise</span>
-        </div>
-
-        <div className="hidden sm:flex items-center gap-6 text-sm text-indigo-300">
-          <a href="#features" className="hover:text-white transition-colors">Features</a>
-          <a href="#pricing"  className="hover:text-white transition-colors">Pricing</a>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Link href="/login"    className="text-sm text-indigo-300 hover:text-white transition-colors">Sign in</Link>
-          <Link href="/register" className="text-sm px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white font-semibold transition-colors">
-            Start free
-          </Link>
-        </div>
-      </div>
-    </nav>
   )
 }
 
@@ -325,10 +393,11 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen">
       <Nav />
-      <div className="pt-16"> {/* offset for fixed nav */}
+      <div className="pt-16">
         <Hero />
         <TrustBar />
         <Features />
+        <Industries />
         <Pricing />
         <CtaBanner />
         <Footer />

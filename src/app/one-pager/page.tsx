@@ -21,8 +21,8 @@ const FEATURE_SECTIONS = [
       'Real-time stock levels across unlimited locations',
       'Weighted average and FIFO cost methods per product',
       'Low-stock threshold alerts and reorder points',
-      'Multi-location balance view with transfer support',
-      'Category and SKU management with barcode fields',
+      'Expiry date tracking with automatic alerts before stock expires',
+      'Batch tracking for medicines, food, chemicals, and consumables',
       'CSV / Excel import for bulk product setup',
     ],
   },
@@ -175,9 +175,9 @@ export default function OnePagerPage() {
               <span className="text-indigo-300">to stock you can't see</span>
             </h1>
             <p className="text-indigo-200 text-sm max-w-lg leading-relaxed">
-              Built for trade and services businesses — contractors, maintenance teams,
-              and field operations. Real-time stock, purchase orders, equipment tracking,
-              and field mobile access — all in one app your whole team can use from anywhere.
+              Built for operations and services businesses — trade contractors, healthcare
+              teams, hospitality operators, and field crews. Real-time stock, expiry tracking,
+              equipment management, and mobile field access, all in one place.
             </p>
           </div>
 
