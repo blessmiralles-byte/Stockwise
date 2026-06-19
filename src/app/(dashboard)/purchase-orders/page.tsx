@@ -30,6 +30,7 @@ function NewPODrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
   const [prodSearch, setProdSearch]   = useState('')
   const [products,   setProducts]     = useState<Product[]>([])
   const [supplier_id, setSupplier]    = useState('')
+  const [order_date, setOrderDate]    = useState('')
   const [expected_date, setExpected]  = useState('')
   const [notes, setNotes]             = useState('')
   const [lines, setLines]             = useState<{ product: Product; qty: number; cost: number }[]>([])
@@ -73,6 +74,7 @@ function NewPODrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           supplier_id: supplier_id || null,
+          order_date: order_date || null,
           expected_date: expected_date || null,
           notes,
           lines: lines.map(l => ({
@@ -102,20 +104,24 @@ function NewPODrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
         </CardHeader>
         <CardContent className="pt-4">
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Supplier</label>
+              <select
+                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                value={supplier_id}
+                onChange={e => setSupplier(e.target.value)}
+              >
+                <option value="">— No supplier —</option>
+                {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Supplier</label>
-                <select
-                  className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  value={supplier_id}
-                  onChange={e => setSupplier(e.target.value)}
-                >
-                  <option value="">— No supplier —</option>
-                  {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Order Date</label>
+                <Input type="date" value={order_date} onChange={e => setOrderDate(e.target.value)} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Expected Date</label>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Expected Delivery</label>
                 <Input type="date" value={expected_date} onChange={e => setExpected(e.target.value)} />
               </div>
             </div>
@@ -276,7 +282,8 @@ export default function PurchaseOrdersPage() {
                       <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide">Supplier</th>
                       <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide hidden md:table-cell">Lines</th>
                       <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide hidden lg:table-cell">Total</th>
-                      <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide hidden md:table-cell">Expected</th>
+                      <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide hidden md:table-cell">Order Date</th>
+                      <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide hidden lg:table-cell">Expected Delivery</th>
                       <th className="text-center px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide">Status</th>
                       <th className="w-10"></th>
                     </tr>
@@ -294,7 +301,8 @@ export default function PurchaseOrdersPage() {
                           </td>
                           <td className="px-4 py-3 text-right text-slate-600 hidden md:table-cell">{(o.lines ?? []).length}</td>
                           <td className="px-4 py-3 text-right font-semibold text-slate-900 hidden lg:table-cell">{formatCurrency(total)}</td>
-                          <td className="px-4 py-3 text-slate-500 text-xs hidden md:table-cell">{o.expected_date ? formatDate(o.expected_date) : '—'}</td>
+                          <td className="px-4 py-3 text-slate-500 text-xs hidden md:table-cell">{o.order_date ? formatDate(o.order_date) : '—'}</td>
+                          <td className="px-4 py-3 text-slate-500 text-xs hidden lg:table-cell">{o.expected_date ? formatDate(o.expected_date) : '—'}</td>
                           <td className="px-4 py-3 text-center">
                             <Badge variant={cfg?.variant ?? 'secondary'} className="gap-1">
                               {cfg?.icon}{cfg?.label}

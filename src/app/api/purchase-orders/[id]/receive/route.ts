@@ -44,10 +44,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const successLines: string[] = []
 
   for (const recv of lines) {
-    const { line_id, quantity_received, to_location_id, unit_cost, batch_no, expiration_date } = recv
+    const { line_id, quantity_received, to_location_id, source_type, from_location_id, unit_cost, batch_no, expiration_date } = recv
 
     if (!to_location_id) {
       errors.push(`line ${line_id}: to_location_id is required`)
+      continue
+    }
+    if (source_type === 'location' && !from_location_id) {
+      errors.push(`line ${line_id}: from_location_id is required for location transfers`)
       continue
     }
 
@@ -65,10 +69,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const effectiveCost = unit_cost ?? poLine.unit_cost
 
+    const txType = source_type === 'location' ? 'transfer' : 'purchase'
+
     const { error: txErr } = await supabase.rpc('record_inventory_movement', {
-      p_transaction_type: 'purchase',
+      p_transaction_type: txType,
       p_product_id: poLine.product_id,
-      p_from_location_id: null,
+      p_from_location_id: from_location_id || null,
       p_to_location_id: to_location_id,
       p_quantity: quantity_received,
       p_unit_cost: effectiveCost,
@@ -78,6 +84,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       p_notes: `GRN against ${po.po_number}`,
       p_created_by: auth.userId,
       p_job_order_id: null,
+      p_org_id: auth.orgId,
     })
 
     if (txErr) {

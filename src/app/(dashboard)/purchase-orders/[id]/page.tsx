@@ -41,6 +41,8 @@ function GRNDialog({
     already: number
     qty: number
     cost: number
+    source_type: 'supplier' | 'location'
+    from_location_id: string
     to_location_id: string
     batch_no: string
     expiration_date: string
@@ -58,6 +60,8 @@ function GRNDialog({
         already: l.quantity_received,
         qty: l.quantity_ordered - l.quantity_received,
         cost: l.unit_cost,
+        source_type: 'supplier',
+        from_location_id: '',
         to_location_id: '',
         batch_no: '',
         expiration_date: '',
@@ -72,7 +76,9 @@ function GRNDialog({
 
   async function handleReceive() {
     const missing = lines.find(l => l.qty > 0 && !l.to_location_id)
-    if (missing) { setError(`Select a location for "${missing.product_name}"`); return }
+    if (missing) { setError(`Select a destination location for "${missing.product_name}"`); return }
+    const missingFrom = lines.find(l => l.qty > 0 && l.source_type === 'location' && !l.from_location_id)
+    if (missingFrom) { setError(`Select a source location for "${missingFrom.product_name}"`); return }
 
     setSaving(true)
     setError('')
@@ -80,12 +86,14 @@ function GRNDialog({
       const payload = lines
         .filter(l => l.qty > 0)
         .map(l => ({
-          line_id:         l.line_id,
-          quantity_received: l.qty,
-          unit_cost:       l.cost,
-          to_location_id:  l.to_location_id,
-          batch_no:        l.batch_no || null,
-          expiration_date: l.expiration_date || null,
+          line_id:           l.line_id,
+          quantity_received:  l.qty,
+          unit_cost:         l.cost,
+          source_type:       l.source_type,
+          from_location_id:  l.source_type === 'location' ? l.from_location_id : null,
+          to_location_id:    l.to_location_id,
+          batch_no:          l.batch_no || null,
+          expiration_date:   l.expiration_date || null,
         }))
 
       const res = await fetch(`/api/purchase-orders/${po.id}/receive`, {
@@ -131,6 +139,42 @@ function GRNDialog({
                       {l.already}/{l.ordered} already received
                     </p>
                   </div>
+                  {/* Source */}
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">Received From *</label>
+                    <div className="flex gap-1 mb-2">
+                      {(['supplier', 'location'] as const).map(t => (
+                        <button
+                          key={t} type="button"
+                          onClick={() => update(l.line_id, 'source_type', t)}
+                          className={`flex-1 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                            l.source_type === t
+                              ? 'bg-indigo-600 text-white border-indigo-600'
+                              : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400'
+                          }`}
+                        >
+                          {t === 'supplier' ? 'Supplier' : 'Another Location'}
+                        </button>
+                      ))}
+                    </div>
+                    {l.source_type === 'supplier' ? (
+                      <div className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-sm text-slate-600">
+                        {po.supplier?.name ?? <span className="text-slate-400 italic">No supplier on PO</span>}
+                      </div>
+                    ) : (
+                      <select
+                        className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        value={l.from_location_id}
+                        onChange={e => update(l.line_id, 'from_location_id', e.target.value)}
+                      >
+                        <option value="">— Select source location —</option>
+                        {locations
+                          .filter(loc => loc.id !== l.to_location_id)
+                          .map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+                      </select>
+                    )}
+                  </div>
+
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <div>
                       <label className="block text-xs text-slate-500 mb-1">Qty to Receive</label>
@@ -177,7 +221,9 @@ function GRNDialog({
                       onChange={e => update(l.line_id, 'to_location_id', e.target.value)}
                     >
                       <option value="">— Select location —</option>
-                      {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+                      {locations
+                        .filter(loc => loc.id !== l.from_location_id)
+                        .map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
                     </select>
                   </div>
                 </div>

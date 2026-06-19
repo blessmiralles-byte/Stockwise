@@ -172,6 +172,7 @@ export interface PurchaseOrder {
   po_number: string
   supplier_id?: string
   status: PurchaseOrderStatus
+  order_date?: string
   expected_date?: string
   notes?: string
   created_by?: string

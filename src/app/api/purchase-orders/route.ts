@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   if (auth.error) return auth.error
 
   const body = await req.json()
-  const { supplier_id, expected_date, notes, lines } = body
+  const { supplier_id, order_date, expected_date, notes, lines } = body
 
   if (!Array.isArray(lines) || lines.length === 0) {
     return NextResponse.json({ error: 'At least one line item is required' }, { status: 400 })
@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
       org_id: auth.orgId,
       po_number,
       supplier_id: supplier_id || null,
+      order_date: order_date || null,
       expected_date: expected_date || null,
       notes: notes?.trim() || null,
       created_by: auth.userId,
