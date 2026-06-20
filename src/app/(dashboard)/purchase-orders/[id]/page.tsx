@@ -25,14 +25,16 @@ function GRNDialog({
   po,
   locations,
   members,
+  suppliers,
   onClose,
   onReceived,
 }: {
   po: PurchaseOrder
   locations: Location[]
   members: { id: string; full_name: string; role: string }[]
+  suppliers: { id: string; name: string }[]
   onClose: () => void
-  onReceived: () => void
+  onReceived: (statusMsg?: string) => void
 }) {
   type ReceiveLine = {
     line_id: string
@@ -51,6 +53,8 @@ function GRNDialog({
     condition: 'good' | 'damaged' | 'missing'
     condition_notes: string
   }
+
+  const [supplierId, setSupplierId] = useState<string>((po as any).supplier_id ?? '')
 
   const [lines, setLines] = useState<ReceiveLine[]>(
     (po.lines ?? [])
@@ -82,7 +86,9 @@ function GRNDialog({
   }
 
   async function handleReceive() {
-    if (!receivedBy.trim()) { setError('Please enter the name of who is receiving the goods'); return }
+    if (!receivedBy.trim()) { setError('Please select or enter who is receiving the goods'); return }
+    const supplierLines = lines.filter(l => l.source_type === 'supplier')
+    if (supplierLines.length > 0 && !supplierId) { setError('Please select the supplier the goods are received from'); return }
     const missing = lines.find(l => l.qty > 0 && !l.to_location_id && l.condition !== 'missing')
     if (missing) { setError(`Select a destination location for "${missing.product_name}"`); return }
     const missingFrom = lines.find(l => l.qty > 0 && l.source_type === 'location' && !l.from_location_id)
@@ -109,7 +115,11 @@ function GRNDialog({
       const res = await fetch(`/api/purchase-orders/${po.id}/receive`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lines: payload, received_by: receivedBy.trim() || null }),
+        body: JSON.stringify({
+          lines: payload,
+          received_by:  receivedBy.trim() || null,
+          supplier_id:  supplierId || null,
+        }),
       })
 
       if (!res.ok) {
@@ -117,7 +127,16 @@ function GRNDialog({
         setError(j.error ?? 'Receive failed')
         return
       }
-      onReceived()
+
+      const j = await res.json()
+      const newStatus = j.data?.new_status
+      const statusMsg = newStatus === 'received'
+        ? 'All items received — PO marked as Received.'
+        : newStatus === 'partial'
+        ? 'Partially received — PO marked as Partial.'
+        : ''
+      if (statusMsg) setError('') // clear errors
+      onReceived(statusMsg)
     } finally {
       setSaving(false)
     }
@@ -193,9 +212,16 @@ function GRNDialog({
                       ))}
                     </div>
                     {l.source_type === 'supplier' ? (
-                      <div className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-sm text-slate-600">
-                        {po.supplier?.name ?? <span className="text-slate-400 italic">No supplier on PO</span>}
-                      </div>
+                      <select
+                        className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                        value={supplierId}
+                        onChange={e => setSupplierId(e.target.value)}
+                      >
+                        <option value="">— Select supplier —</option>
+                        {suppliers.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
                     ) : (
                       <select
                         className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -465,17 +491,20 @@ function OrderLinesCard({ po, products, poId, onUpdated }: { po: PurchaseOrder; 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function PODetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const [showGRN, setShowGRN] = useState(false)
+  const [showGRN, setShowGRN]       = useState(false)
+  const [grnSuccess, setGrnSuccess] = useState('')
 
   const { data: poData, loading, error, refetch } = useApi<{ data: PurchaseOrder }>(`/api/purchase-orders/${id}`)
-  const { data: locData }    = useApi<{ data: Location[] }>('/api/locations')
-  const { data: prodData }   = useApi<{ data: any[] }>('/api/products')
-  const { data: memberData } = useApi<{ data: any[] }>('/api/members')
+  const { data: locData }      = useApi<{ data: Location[] }>('/api/locations')
+  const { data: prodData }     = useApi<{ data: any[] }>('/api/products')
+  const { data: memberData }   = useApi<{ data: any[] }>('/api/members')
+  const { data: supplierData } = useApi<{ data: any[] }>('/api/suppliers')
 
   const po        = poData?.data
   const locations = locData?.data ?? []
   const products  = prodData?.data ?? []
   const members   = memberData?.data ?? []
+  const suppliers = supplierData?.data ?? []
 
   async function markStatus(status: string) {
     await fetch(`/api/purchase-orders/${id}`, {
@@ -708,13 +737,25 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
         <OrderLinesCard po={po} products={products} poId={id} onUpdated={refetch} />
       </div>
 
+      {grnSuccess && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white text-sm font-medium px-5 py-3 rounded-xl shadow-lg flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          {grnSuccess}
+        </div>
+      )}
+
       {showGRN && (
         <GRNDialog
           po={po}
           locations={locations}
           members={members}
+          suppliers={suppliers}
           onClose={() => setShowGRN(false)}
-          onReceived={() => { setShowGRN(false); refetch() }}
+          onReceived={(msg) => {
+            setShowGRN(false)
+            refetch()
+            if (msg) { setGrnSuccess(msg); setTimeout(() => setGrnSuccess(''), 4000) }
+          }}
         />
       )}
     </div>
