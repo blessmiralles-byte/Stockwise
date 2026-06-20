@@ -239,7 +239,17 @@ BEGIN
 END;
 $$;
 
--- ── 5. Backfill org_id on rows written by old RPC ────────────
+-- ── 5. Ensure org_id exists on balance + batch tables ────────
+ALTER TABLE public.inventory_balances
+  ADD COLUMN IF NOT EXISTS org_id uuid REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+ALTER TABLE public.inventory_batches
+  ADD COLUMN IF NOT EXISTS org_id uuid REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+CREATE INDEX IF NOT EXISTS idx_inventory_balances_org
+  ON public.inventory_balances (org_id);
+
+-- ── 6. Backfill org_id on rows written by old RPC ────────────
 UPDATE public.inventory_transactions t
    SET org_id = p.org_id
   FROM public.products p
@@ -252,4 +262,11 @@ UPDATE public.inventory_balances b
   FROM public.products p
  WHERE b.product_id = p.id
    AND b.org_id IS NULL
+   AND p.org_id IS NOT NULL;
+
+UPDATE public.inventory_batches ib
+   SET org_id = p.org_id
+  FROM public.products p
+ WHERE ib.product_id = p.id
+   AND ib.org_id IS NULL
    AND p.org_id IS NOT NULL;
