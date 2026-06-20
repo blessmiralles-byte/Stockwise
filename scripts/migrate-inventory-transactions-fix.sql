@@ -16,15 +16,22 @@ ALTER TABLE public.inventory_transactions
 CREATE INDEX IF NOT EXISTS idx_inventory_transactions_org
   ON public.inventory_transactions (org_id);
 
--- ── 2. Drop all existing overloads so there is exactly one ───
+-- ── 2. Drop ALL existing overloads so there is exactly one ────
+-- 12-param original
 DROP FUNCTION IF EXISTS public.record_inventory_movement(
   text, uuid, integer, numeric, uuid, uuid, text, text, text, uuid, text, date);
-
+-- 13-param with p_job_order_id uuid
 DROP FUNCTION IF EXISTS public.record_inventory_movement(
   text, uuid, integer, numeric, uuid, uuid, text, text, text, uuid, text, date, uuid);
-
+-- 15-param with p_job_order_id text (no org_id)
 DROP FUNCTION IF EXISTS public.record_inventory_movement(
   text, uuid, integer, numeric, uuid, uuid, text, text, text, uuid, text, date, text, uuid, text);
+-- 16-param with p_job_order_id TEXT (from migrate-rpc-consolidated)
+DROP FUNCTION IF EXISTS public.record_inventory_movement(
+  text, uuid, integer, numeric, uuid, uuid, text, text, text, uuid, text, date, text, uuid, text, uuid);
+-- 16-param with p_job_order_id UUID (previous run of this script)
+DROP FUNCTION IF EXISTS public.record_inventory_movement(
+  text, uuid, integer, numeric, uuid, uuid, text, text, text, uuid, text, date, uuid, uuid, text, uuid);
 
 -- Drop old 5-param balance helper so the new 6-param one replaces it cleanly
 DROP FUNCTION IF EXISTS public.upsert_inventory_balance(uuid, uuid, integer, numeric, text);
