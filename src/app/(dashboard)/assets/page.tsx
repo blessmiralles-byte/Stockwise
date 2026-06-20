@@ -245,7 +245,7 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons }: {
   onSaved: () => void
   canManagePersons: boolean
 }) {
-  const { data: catData }    = useApi<{ data: any[] }>('/api/categories?type=asset')
+  const { data: catData }    = useApi<{ data: any[] }>('/api/categories?type=fixed_asset')
   const { data: locData }    = useApi<{ data: any[] }>('/api/locations?all=true')
   // Always fetch persons — GET is open to all authenticated users now
   const { data: personData } = useApi<{ data: any[] }>('/api/accountable-persons')
