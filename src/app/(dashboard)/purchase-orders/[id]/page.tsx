@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { useApi } from '@/lib/use-api'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { PurchaseOrder, Location } from '@/types'
-import { ArrowLeft, Truck, CheckCircle2, Send, X, FileText, AlertTriangle, Scale, Loader2 } from 'lucide-react'
+import { ArrowLeft, Truck, CheckCircle2, Send, X, FileText, AlertTriangle, Scale, Loader2, Plus, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 
 const STATUS_CFG: Record<string, { label: string; variant: any }> = {
@@ -245,6 +245,166 @@ function GRNDialog({
   )
 }
 
+// ── Order Lines Card ──────────────────────────────────────────────────────────
+function OrderLinesCard({ po, products, poId, onUpdated }: { po: PurchaseOrder; products: any[]; poId: string; onUpdated: () => void }) {
+  const canEdit = po.status !== 'received' && po.status !== 'cancelled'
+  const isDraft = po.status === 'draft'
+
+  const [newProductId, setNewProductId] = useState('')
+  const [newQty,       setNewQty]       = useState('')
+  const [newCost,      setNewCost]      = useState('')
+  const [adding,       setAdding]       = useState(false)
+  const [addErr,       setAddErr]       = useState('')
+  const [removingId,   setRemovingId]   = useState<string | null>(null)
+
+  const total = (po.lines ?? []).reduce((s, l) => s + l.quantity_ordered * l.unit_cost, 0)
+
+  const selectedProduct = products.find(p => p.id === newProductId)
+
+  async function addLine() {
+    if (!newProductId) { setAddErr('Select a product'); return }
+    const qty = parseInt(newQty)
+    if (!qty || qty < 1) { setAddErr('Quantity must be ≥ 1'); return }
+    setAdding(true); setAddErr('')
+    const res = await fetch(`/api/purchase-orders/${poId}/lines`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product_id: newProductId, quantity_ordered: qty, unit_cost: parseFloat(newCost) || 0 }),
+    })
+    const json = await res.json()
+    setAdding(false)
+    if (!res.ok) { setAddErr(json.error ?? 'Failed to add item'); return }
+    setNewProductId(''); setNewQty(''); setNewCost('')
+    onUpdated()
+  }
+
+  async function removeLine(lineId: string) {
+    if (!confirm('Remove this item from the PO?')) return
+    setRemovingId(lineId)
+    await fetch(`/api/purchase-orders/${poId}/lines?line_id=${lineId}`, { method: 'DELETE' })
+    setRemovingId(null)
+    onUpdated()
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">Order Lines</CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 border-b border-slate-100">
+              <tr>
+                <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Item</th>
+                <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Qty Ordered</th>
+                <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Received</th>
+                <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Outstanding</th>
+                <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Negotiated Price</th>
+                <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Line Total</th>
+                {isDraft && <th className="px-3 py-3" />}
+              </tr>
+            </thead>
+            <tbody>
+              {(po.lines ?? []).map(l => {
+                const outstanding = l.quantity_ordered - l.quantity_received
+                return (
+                  <tr key={l.id} className="border-b border-slate-50 hover:bg-slate-50/50">
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-slate-900">{l.product?.name}</p>
+                      <p className="text-xs text-slate-400">{l.product?.sku}</p>
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">{l.quantity_ordered}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-green-600 font-medium">{l.quantity_received}</td>
+                    <td className={`px-4 py-3 text-right tabular-nums font-semibold ${outstanding > 0 ? 'text-orange-600' : 'text-slate-400'}`}>
+                      {outstanding}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(l.unit_cost)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold">{formatCurrency(l.quantity_ordered * l.unit_cost)}</td>
+                    {isDraft && (
+                      <td className="px-3 py-3">
+                        {l.quantity_received === 0 && (
+                          <button
+                            onClick={() => removeLine(l.id)}
+                            disabled={removingId === l.id}
+                            className="text-slate-300 hover:text-red-500 transition-colors disabled:opacity-40"
+                            title="Remove line"
+                          >
+                            {removingId === l.id
+                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              : <Trash2 className="w-3.5 h-3.5" />}
+                          </button>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                )
+              })}
+
+              {/* Add Item row */}
+              {canEdit && (
+                <tr className="border-t border-dashed border-slate-200 bg-slate-50/60">
+                  <td className="px-3 py-2">
+                    <select
+                      value={newProductId}
+                      onChange={e => {
+                        const p = products.find(x => x.id === e.target.value)
+                        setNewProductId(e.target.value)
+                        if (p) setNewCost(String(p.unit_cost ?? ''))
+                        setAddErr('')
+                      }}
+                      className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                    >
+                      <option value="">— Select item to add —</option>
+                      {products.map(p => (
+                        <option key={p.id} value={p.id}>{p.name} {p.sku ? `(${p.sku})` : ''}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-2 py-2">
+                    <Input
+                      type="number" min={1} placeholder="Qty"
+                      value={newQty}
+                      onChange={e => { setNewQty(e.target.value); setAddErr('') }}
+                      className="h-8 text-sm text-right w-24 ml-auto"
+                    />
+                  </td>
+                  <td className="px-2 py-2 text-right text-xs text-slate-400">—</td>
+                  <td className="px-2 py-2 text-right text-xs text-slate-400">—</td>
+                  <td className="px-2 py-2">
+                    <Input
+                      type="number" min={0} step="0.01" placeholder="0.00"
+                      value={newCost}
+                      onChange={e => { setNewCost(e.target.value); setAddErr('') }}
+                      className="h-8 text-sm text-right w-28 ml-auto"
+                    />
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums text-sm text-slate-500">
+                    {newQty && newCost ? formatCurrency(parseFloat(newQty) * parseFloat(newCost)) : '—'}
+                  </td>
+                  <td className="px-3 py-2">
+                    <Button size="sm" onClick={addLine} disabled={adding} className="gap-1 h-8 px-2.5">
+                      {adding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                      Add
+                    </Button>
+                  </td>
+                </tr>
+              )}
+
+              <tr className="border-t-2 border-slate-200 bg-slate-50">
+                <td colSpan={isDraft ? 5 : 5} className="px-4 py-3 text-right font-bold text-slate-700">Total</td>
+                <td className="px-4 py-3 text-right font-bold text-slate-900">{formatCurrency(total)}</td>
+                {isDraft && <td />}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        {addErr && <p className="text-red-500 text-xs px-4 pb-3">{addErr}</p>}
+      </CardContent>
+    </Card>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function PODetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -252,9 +412,11 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
 
   const { data: poData, loading, error, refetch } = useApi<{ data: PurchaseOrder }>(`/api/purchase-orders/${id}`)
   const { data: locData } = useApi<{ data: Location[] }>('/api/locations')
+  const { data: prodData } = useApi<{ data: any[] }>('/api/products')
 
   const po = poData?.data
   const locations = locData?.data ?? []
+  const products  = prodData?.data ?? []
 
   async function markStatus(status: string) {
     await fetch(`/api/purchase-orders/${id}`, {
@@ -479,51 +641,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
         <ThreeWayMatch po={po} onUpdated={refetch} />
 
         {/* Lines */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Order Lines</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 border-b border-slate-100">
-                  <tr>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Item</th>
-                    <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Ordered</th>
-                    <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Received</th>
-                    <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Outstanding</th>
-                    <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Unit Cost</th>
-                    <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Line Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(po.lines ?? []).map(l => {
-                    const outstanding = l.quantity_ordered - l.quantity_received
-                    return (
-                      <tr key={l.id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                        <td className="px-4 py-3">
-                          <p className="font-medium text-slate-900">{l.product?.name}</p>
-                          <p className="text-xs text-slate-400">{l.product?.sku}</p>
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums">{l.quantity_ordered}</td>
-                        <td className="px-4 py-3 text-right tabular-nums text-green-600 font-medium">{l.quantity_received}</td>
-                        <td className={`px-4 py-3 text-right tabular-nums font-semibold ${outstanding > 0 ? 'text-orange-600' : 'text-slate-400'}`}>
-                          {outstanding}
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(l.unit_cost)}</td>
-                        <td className="px-4 py-3 text-right tabular-nums font-semibold">{formatCurrency(l.quantity_ordered * l.unit_cost)}</td>
-                      </tr>
-                    )
-                  })}
-                  <tr className="border-t-2 border-slate-200 bg-slate-50">
-                    <td colSpan={5} className="px-4 py-3 text-right font-bold text-slate-700">Total</td>
-                    <td className="px-4 py-3 text-right font-bold text-slate-900">{formatCurrency(total)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+        <OrderLinesCard po={po} products={products} poId={id} onUpdated={refetch} />
       </div>
 
       {showGRN && (
