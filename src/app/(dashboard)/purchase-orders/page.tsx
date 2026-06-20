@@ -24,39 +24,164 @@ const STATUS_CONFIG: Record<string, { label: string; variant: any; icon: React.R
   cancelled: { label: 'Cancelled', variant: 'destructive',  icon: <X className="w-3 h-3" /> },
 }
 
+// ── Inline new-item mini-form ─────────────────────────────────────────────────
+type NewItemType = 'inventory' | 'fixed_asset'
+
+function InlineNewItemForm({
+  initialName,
+  onCreated,
+  onCancel,
+}: {
+  initialName: string
+  onCreated: (product: Product) => void
+  onCancel: () => void
+}) {
+  const [itemType,  setItemType]  = useState<NewItemType>('inventory')
+  const [name,      setName]      = useState(initialName)
+  const [sku,       setSku]       = useState('')
+  const [unit,      setUnit]      = useState('pc')
+  const [cost,      setCost]      = useState('')
+  const [saving,    setSaving]    = useState(false)
+  const [err,       setErr]       = useState('')
+
+  async function create() {
+    if (!name.trim()) { setErr('Name is required'); return }
+    setSaving(true); setErr('')
+    try {
+      // Always create a product record (PO lines reference products)
+      const prodRes = await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          sku: sku.trim() || undefined,
+          unit_of_measure: unit || 'pc',
+          cost_method: 'average',
+          reorder_point: 0,
+          attributes: {},
+          track_expiry: false,
+        }),
+      })
+      const prodJson = await prodRes.json()
+      if (!prodRes.ok) { setErr(prodJson.error ?? 'Failed to create item'); return }
+
+      const product = prodJson.data as Product
+
+      // For fixed assets, also create the asset record
+      if (itemType === 'fixed_asset') {
+        await fetch('/api/assets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: name.trim(),
+            purchase_cost: parseFloat(cost) || 0,
+            status: 'ordered',
+          }),
+        })
+        // We proceed even if asset creation fails — the product is the one added to the PO
+      }
+
+      onCreated(product)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="mt-2 border border-indigo-200 bg-indigo-50 rounded-xl p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-indigo-700">Create new item</p>
+        <button type="button" onClick={onCancel} className="text-slate-400 hover:text-slate-600">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Type toggle */}
+      <div className="flex gap-1">
+        {(['inventory', 'fixed_asset'] as const).map(t => (
+          <button
+            key={t} type="button"
+            onClick={() => setItemType(t)}
+            className={`flex-1 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+              itemType === t
+                ? 'bg-indigo-600 text-white border-indigo-600'
+                : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400'
+            }`}
+          >
+            {t === 'inventory' ? '📦 Inventory Item' : '🏷 Fixed Asset'}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div className="col-span-2">
+          <label className="text-xs font-medium text-slate-600 block mb-1">Name *</label>
+          <Input value={name} onChange={e => setName(e.target.value)} placeholder="Item name" className="h-8 text-sm" />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-slate-600 block mb-1">SKU / Code</label>
+          <Input value={sku} onChange={e => setSku(e.target.value)} placeholder="Optional" className="h-8 text-sm" />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-slate-600 block mb-1">Unit</label>
+          <Input value={unit} onChange={e => setUnit(e.target.value)} placeholder="pc, kg, box…" className="h-8 text-sm" />
+        </div>
+        {itemType === 'fixed_asset' && (
+          <div className="col-span-2">
+            <label className="text-xs font-medium text-slate-600 block mb-1">Purchase Cost</label>
+            <Input type="number" min={0} step="0.01" value={cost} onChange={e => setCost(e.target.value)} placeholder="0.00" className="h-8 text-sm" />
+          </div>
+        )}
+      </div>
+
+      {err && <p className="text-xs text-red-600">{err}</p>}
+
+      <div className="flex gap-2 justify-end">
+        <Button type="button" variant="outline" size="sm" onClick={onCancel}>Cancel</Button>
+        <Button type="button" size="sm" onClick={create} disabled={saving} className="gap-1.5">
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+          {saving ? 'Creating…' : 'Create & Add to PO'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 // ── New PO Drawer ─────────────────────────────────────────────────────────────
 function NewPODrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const { data: suppData } = useApi<{ data: Supplier[] }>('/api/suppliers')
-  const [prodSearch, setProdSearch]   = useState('')
-  const [products,   setProducts]     = useState<Product[]>([])
-  const [supplier_id, setSupplier]    = useState('')
-  const [order_date, setOrderDate]    = useState('')
-  const [expected_date, setExpected]  = useState('')
-  const [notes, setNotes]             = useState('')
-  const [lines, setLines]             = useState<{ product: Product; qty: number; cost: number }[]>([])
-  const [saving, setSaving]           = useState(false)
-  const [error, setError]             = useState('')
+  const [prodSearch,    setProdSearch]   = useState('')
+  const [products,      setProducts]     = useState<Product[]>([])
+  const [searched,      setSearched]     = useState(false)   // true once a search completes
+  const [showNewItem,   setShowNewItem]  = useState(false)
+  const [supplier_id,   setSupplier]     = useState('')
+  const [order_date,    setOrderDate]    = useState('')
+  const [expected_date, setExpected]     = useState('')
+  const [notes,         setNotes]        = useState('')
+  const [lines, setLines]  = useState<{ product: Product; qty: number; cost: number }[]>([])
+  const [saving, setSaving] = useState(false)
+  const [error,  setError]  = useState('')
 
   const suppliers = suppData?.data ?? []
 
-  // Product search
   useEffect(() => {
-    if (prodSearch.length < 1) { setProducts([]); return }
+    if (prodSearch.length < 1) { setProducts([]); setSearched(false); return }
     const t = setTimeout(async () => {
       const res = await fetch(`/api/products?q=${encodeURIComponent(prodSearch)}`)
       if (res.ok) {
         const j = await res.json()
         setProducts(j.data ?? [])
+        setSearched(true)
       }
     }, 250)
     return () => clearTimeout(t)
   }, [prodSearch])
 
   function addLine(p: Product) {
-    if (lines.find(l => l.product.id === p.id)) return
-    setLines(ls => [...ls, { product: p, qty: 1, cost: 0 }])
-    setProdSearch('')
-    setProducts([])
+    if (!lines.find(l => l.product.id === p.id)) {
+      setLines(ls => [...ls, { product: p, qty: 1, cost: 0 }])
+    }
+    setProdSearch(''); setProducts([]); setSearched(false); setShowNewItem(false)
   }
 
   function removeLine(id: string) {
@@ -66,27 +191,24 @@ function NewPODrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (lines.length === 0) { setError('Add at least one product'); return }
-    setSaving(true)
-    setError('')
+    setSaving(true); setError('')
     try {
       const res = await fetch('/api/purchase-orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           supplier_id: supplier_id || null,
-          order_date: order_date || null,
+          order_date:  order_date  || null,
           expected_date: expected_date || null,
           notes,
           lines: lines.map(l => ({
-            product_id: l.product.id,
+            product_id:       l.product.id,
             quantity_ordered: l.qty,
-            unit_cost: l.cost,
+            unit_cost:        l.cost,
           })),
         }),
       })
-      if (!res.ok) {
-        const j = await res.json(); setError(j.error ?? 'Failed'); return
-      }
+      if (!res.ok) { const j = await res.json(); setError(j.error ?? 'Failed'); return }
       onSaved()
     } finally {
       setSaving(false)
@@ -94,6 +216,7 @@ function NewPODrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
   }
 
   const total = lines.reduce((s, l) => s + l.qty * l.cost, 0)
+  const noResults = searched && products.length === 0 && prodSearch.length > 0
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -129,14 +252,16 @@ function NewPODrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
             {/* Line items */}
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-2">Items</label>
-              <div className="relative mb-2">
+              <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <Input
-                  placeholder="Search product to add…"
+                  placeholder="Search or type an item name…"
                   className="pl-9"
                   value={prodSearch}
-                  onChange={e => setProdSearch(e.target.value)}
+                  onChange={e => { setProdSearch(e.target.value); setShowNewItem(false) }}
+                  onFocus={() => {}}
                 />
+                {/* Search results dropdown */}
                 {products.length > 0 && (
                   <div className="absolute z-10 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                     {products.slice(0, 8).map(p => (
@@ -153,8 +278,33 @@ function NewPODrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
                 )}
               </div>
 
+              {/* Not found prompt */}
+              {noResults && !showNewItem && (
+                <div className="mt-2 flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                  <p className="text-xs text-amber-800">
+                    No item found for <span className="font-semibold">"{prodSearch}"</span> — want to add it?
+                  </p>
+                  <Button
+                    type="button" size="sm"
+                    className="ml-3 gap-1.5 shrink-0"
+                    onClick={() => setShowNewItem(true)}
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add New Item
+                  </Button>
+                </div>
+              )}
+
+              {/* Inline create form */}
+              {showNewItem && (
+                <InlineNewItemForm
+                  initialName={prodSearch}
+                  onCreated={addLine}
+                  onCancel={() => setShowNewItem(false)}
+                />
+              )}
+
               {lines.length > 0 && (
-                <div className="border border-slate-100 rounded-lg overflow-hidden">
+                <div className="mt-3 border border-slate-100 rounded-lg overflow-hidden">
                   <table className="w-full text-sm">
                     <thead className="bg-slate-50">
                       <tr>
