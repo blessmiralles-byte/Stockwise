@@ -41,14 +41,14 @@ function NewPODrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
 
   // Product search
   useEffect(() => {
-    if (prodSearch.length < 2) { setProducts([]); return }
+    if (prodSearch.length < 1) { setProducts([]); return }
     const t = setTimeout(async () => {
-      const res = await fetch(`/api/inventory?search=${encodeURIComponent(prodSearch)}`)
+      const res = await fetch(`/api/products?q=${encodeURIComponent(prodSearch)}`)
       if (res.ok) {
         const j = await res.json()
-        setProducts((j.data ?? []).map((b: any) => b.product).filter(Boolean))
+        setProducts(j.data ?? [])
       }
-    }, 300)
+    }, 250)
     return () => clearTimeout(t)
   }, [prodSearch])
 

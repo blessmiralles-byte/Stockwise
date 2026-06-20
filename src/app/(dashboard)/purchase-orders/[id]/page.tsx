@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { useApi } from '@/lib/use-api'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { PurchaseOrder, Location } from '@/types'
-import { ArrowLeft, Truck, CheckCircle2, Send, X, FileText, AlertTriangle, Scale, Loader2, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, Truck, CheckCircle2, Send, X, FileText, AlertTriangle, Scale, Loader2, Plus, Trash2, Download } from 'lucide-react'
 import Link from 'next/link'
 
 const STATUS_CFG: Record<string, { label: string; variant: any }> = {
@@ -617,6 +617,11 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
                 {po.notes && <p className="text-sm text-slate-500 mt-2">{po.notes}</p>}
               </div>
               <div className="flex gap-2 flex-wrap">
+                <a href={`/api/purchase-orders/${id}/pdf`} download>
+                  <Button variant="outline" size="sm" className="gap-1">
+                    <Download className="w-3.5 h-3.5" /> Download PDF
+                  </Button>
+                </a>
                 {canSend && (
                   <Button variant="outline" size="sm" onClick={() => markStatus('sent')} className="gap-1">
                     <Send className="w-3.5 h-3.5" /> Mark Sent
