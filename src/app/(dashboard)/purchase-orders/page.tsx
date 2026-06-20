@@ -12,7 +12,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { PurchaseOrder, PurchaseOrderLine, Supplier, Product } from '@/types'
 import {
   Plus, Search, X, ChevronRight, Package, Truck, CheckCircle2,
-  Clock, AlertCircle, FileText, Minus,
+  Clock, AlertCircle, FileText, Minus, Loader2,
 } from 'lucide-react'
 import Link from 'next/link'
 
