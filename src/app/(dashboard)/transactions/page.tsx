@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/lib/use-api'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { Search, Plus, Download, ArrowRight } from 'lucide-react'
+import { Search, Plus, Download, ArrowRight, FileCheck, Trash2, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 
 const typeConfig: Record<string, { label: string; variant: any }> = {
@@ -20,12 +20,86 @@ const typeConfig: Record<string, { label: string; variant: any }> = {
   adjustment:  { label: 'Adjustment',  variant: 'outline'     },
 }
 
-export default function TransactionsPage() {
-  const [search, setSearch] = useState('')
-  const [typeFilter, setTypeFilter] = useState('all')
+function DraftsSection({ onPosted }: { onPosted: () => void }) {
+  const { data, loading, refetch } = useApi<{ data: any[] }>('/api/transactions?status=draft&limit=100')
+  const drafts = data?.data ?? []
+  const [posting, setPosting] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
 
-  const { data, loading, error } = useApi<{ data: any[] }>('/api/transactions')
-  const transactions = data?.data ?? []
+  const postDraft = useCallback(async (id: string) => {
+    setPosting(id)
+    try {
+      const res = await fetch(`/api/transactions/${id}`, { method: 'POST' })
+      if (res.ok) { refetch(); onPosted() }
+    } finally { setPosting(null) }
+  }, [refetch, onPosted])
+
+  const deleteDraft = useCallback(async (id: string) => {
+    setDeleting(id)
+    try {
+      const res = await fetch(`/api/transactions/${id}`, { method: 'DELETE' })
+      if (res.ok) refetch()
+    } finally { setDeleting(null) }
+  }, [refetch])
+
+  if (loading) return <div className="text-sm text-slate-400 py-2">Loading drafts…</div>
+  if (drafts.length === 0) return null
+
+  return (
+    <Card className="border-amber-200 bg-amber-50/30">
+      <CardContent className="p-0">
+        <div className="px-4 py-3 border-b border-amber-100 flex items-center gap-2">
+          <span className="text-sm font-semibold text-amber-800">Pending Drafts</span>
+          <Badge variant="warning">{drafts.length}</Badge>
+          <span className="text-xs text-amber-600 ml-1">— review and post to update stock</span>
+        </div>
+        <div className="divide-y divide-amber-50">
+          {drafts.map((m: any) => {
+            const cfg = typeConfig[m.transaction_type]
+            return (
+              <div key={m.id} className="px-4 py-3 flex items-center gap-3">
+                <Badge variant={cfg?.variant ?? 'secondary'}>{cfg?.label ?? m.transaction_type}</Badge>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900 truncate">{m.product?.name}</p>
+                  <p className="text-xs text-slate-400 font-mono">{m.reference_no ?? '—'} · {formatDate(m.created_at)}</p>
+                </div>
+                <span className="text-sm font-semibold text-slate-700 shrink-0">×{m.quantity}</span>
+                <div className="flex gap-1.5 shrink-0">
+                  <Button
+                    size="sm"
+                    className="gap-1.5 h-7 text-xs bg-green-600 hover:bg-green-700"
+                    onClick={() => postDraft(m.id)}
+                    disabled={posting === m.id || deleting === m.id}
+                  >
+                    {posting === m.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileCheck className="w-3 h-3" />}
+                    Post
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 h-7 text-xs border-red-200 text-red-600 hover:bg-red-50"
+                    onClick={() => deleteDraft(m.id)}
+                    disabled={posting === m.id || deleting === m.id}
+                  >
+                    {deleting === m.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                  </Button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+export default function TransactionsPage() {
+  const [search, setSearch]       = useState('')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [tick, setTick]           = useState(0)
+
+  const { data, loading, error, refetch } = useApi<{ data: any[] }>(`/api/transactions?_t=${tick}`)
+  const transactions = (data?.data ?? []).filter((m: any) => m.status !== 'draft')
 
   const filtered = transactions.filter((m: any) => {
     const matchesSearch =
@@ -61,6 +135,10 @@ export default function TransactionsPage() {
           </div>
         </div>
 
+        {/* Drafts section */}
+        <DraftsSection onPosted={() => { setTick(t => t + 1); refetch() }} />
+
+        {/* Posted transactions */}
         <Card>
           <CardContent className="p-0">
             {loading ? (
@@ -101,11 +179,7 @@ export default function TransactionsPage() {
                             </div>
                           </td>
                           <td className="px-4 py-3 hidden xl:table-cell">
-                            {m.job_order ? (
-                              <span className="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 border border-indigo-100 rounded px-2 py-0.5 font-medium">
-                                {m.job_order.job_number}
-                              </span>
-                            ) : m.customer_id ? (
+                            {m.customer_id ? (
                               <span className="text-xs text-slate-600">{m.customer_id}</span>
                             ) : (
                               <span className="text-xs text-slate-300">—</span>

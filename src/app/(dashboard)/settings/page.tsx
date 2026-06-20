@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -480,6 +480,26 @@ function BillingSection() {
   const [upgrading, setUpgrading] = useState<string | null>(null)
   const [portalLoading, setPortalLoading] = useState(false)
   const [billingError, setBillingError] = useState('')
+  const [highlightPlan, setHighlightPlan] = useState<string | null>(null)
+  const highlightRef = useRef<HTMLDivElement | null>(null)
+
+  // Pre-highlight the plan the visitor chose on the marketing site. The landing
+  // pricing CTAs pass ?plan=, register stashes it, and we surface it here so the
+  // intent isn't lost across the trial signup.
+  useEffect(() => {
+    const intended = localStorage.getItem('stockwise.intended_plan')
+    if (intended === 'starter' || intended === 'pro') {
+      setHighlightPlan(intended)
+      localStorage.removeItem('stockwise.intended_plan')
+    }
+  }, [])
+
+  // Scroll the highlighted card into view once the billing cards have rendered.
+  useEffect(() => {
+    if (highlightPlan && highlightRef.current) {
+      highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [highlightPlan, loading])
 
   const checkout = async (plan: string) => {
     setUpgrading(plan); setBillingError('')
@@ -558,9 +578,13 @@ function BillingSection() {
                   const isCurrent = currentPlan === plan
                   const isPro     = plan === 'pro'
                   return (
-                    <div key={plan} className={`rounded-xl border p-4 space-y-3 relative ${
-                      isPro ? 'border-indigo-200 bg-indigo-50' : 'border-slate-200 bg-white'
-                    }`}>
+                    <div
+                      key={plan}
+                      ref={plan === highlightPlan ? highlightRef : undefined}
+                      className={`rounded-xl border p-4 space-y-3 relative transition-shadow ${
+                        plan === highlightPlan ? 'ring-2 ring-indigo-400 ring-offset-2' : ''
+                      } ${isPro ? 'border-indigo-200 bg-indigo-50' : 'border-slate-200 bg-white'}`}
+                    >
                       {isPro && (
                         <span className="absolute -top-2 left-4 bg-indigo-600 text-white text-xs font-semibold px-2 py-0.5 rounded-full flex items-center gap-1">
                           <Star className="w-2.5 h-2.5" /> Most Popular

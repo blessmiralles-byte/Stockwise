@@ -295,7 +295,7 @@ function Pricing() {
                   ))}
                 </ul>
                 <Link
-                  href="/register"
+                  href={`/register?plan=${key}`}
                   className={`block text-center py-2.5 rounded-xl text-sm font-semibold transition-colors ${
                     highlight
                       ? 'bg-white text-indigo-700 hover:bg-indigo-50'
@@ -332,7 +332,8 @@ function Pricing() {
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-8">
-          Every plan includes every feature. You're only limited by team size — not what you can do.
+          Every plan includes the full inventory, asset, and field toolkit. Higher tiers simply add
+          seats, priority support, and audit-trail export.
         </p>
       </div>
     </section>

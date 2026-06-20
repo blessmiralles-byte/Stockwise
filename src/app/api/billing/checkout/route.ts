@@ -76,7 +76,16 @@ export async function POST(req: NextRequest) {
       .eq('id', auth.orgId)
   }
 
+  // Stripe rejects relative success/cancel URLs. Fail loudly here with a clear
+  // message instead of letting Stripe return an opaque error if the site URL
+  // env var is missing or misconfigured.
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? ''
+  if (!/^https?:\/\//.test(siteUrl)) {
+    return NextResponse.json(
+      { error: 'Billing is not configured: set NEXT_PUBLIC_SITE_URL (or NEXT_PUBLIC_APP_URL) to an absolute URL.' },
+      { status: 500 }
+    )
+  }
 
   const session = await stripe.checkout.sessions.create({
     customer:             customerId,

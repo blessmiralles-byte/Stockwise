@@ -12,10 +12,12 @@ export async function GET(req: NextRequest) {
 
   const supabase = createServiceClient()
 
+  const status = searchParams.get('status')
+
   let query = supabase
     .from('inventory_transactions')
     .select(`
-      id, transaction_type, quantity, unit_cost, reference_no,
+      id, transaction_type, quantity, unit_cost, reference_no, status,
       customer_id, job_order_id, notes, created_at, created_by,
       product:products(id, sku, name),
       from_location:locations!inventory_transactions_from_location_id_fkey(id, name),
@@ -25,7 +27,8 @@ export async function GET(req: NextRequest) {
     .order('created_at', { ascending: false })
     .limit(limit)
 
-  if (type) query = query.eq('transaction_type', type)
+  if (type)   query = query.eq('transaction_type', type)
+  if (status) query = query.eq('status', status)
 
   const { data, error } = await query
   if (error) {

@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
     to_location_id, from_location_id,
     unit_cost, reference_no, customer_id, notes,
     expiration_date, batch_no, job_order_id,
+    draft, related_po_id,
   } = body
 
   // ── Input validation (M-2) ─────────────────────────────────────────────────
@@ -94,6 +95,37 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServiceClient()
+
+  // ── Draft: save record only, no balance update ────────────────────────────
+  if (draft === true) {
+    const { data: tx, error: txError } = await supabase
+      .from('inventory_transactions')
+      .insert({
+        org_id: auth.orgId,
+        status: 'draft',
+        transaction_type,
+        product_id,
+        from_location_id: from_location_id ?? null,
+        to_location_id:   to_location_id   ?? null,
+        quantity: qty,
+        unit_cost: unit_cost ?? 0,
+        reference_no: reference_no ?? null,
+        customer_id:   customer_id  ?? null,
+        notes:         notes        ?? null,
+        created_by:    auth.userId,
+        job_order_id:  job_order_id ?? null,
+        related_po_id: related_po_id ?? null,
+      })
+      .select()
+      .single()
+
+    if (txError) {
+      console.error('[POST /api/inventory] draft insert', txError)
+      return NextResponse.json({ error: txError.message ?? 'Failed to save draft' }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true, draft: true, transaction: tx }, { status: 201 })
+  }
 
   // ── Prefer atomic RPC when available (H-1) ────────────────────────────────
   const { data: rpcData, error: rpcError } = await supabase.rpc('record_inventory_movement', {

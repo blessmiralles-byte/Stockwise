@@ -113,7 +113,7 @@ export async function PATCH(
             p_transaction_type: 'consumption',
             p_product_id:       item.product_id,
             p_quantity:         qty,
-            p_unit_cost:        0,
+            p_unit_cost:        0,   // 0 → RPC costs the issue at the balance's book avg_cost
             p_from_location_id: r.location_id ?? null,
             p_to_location_id:   null,
             p_reference_no:     r.req_number,
@@ -125,6 +125,7 @@ export async function PATCH(
             p_job_order_id:     r.job_reference ?? null,
             p_cost_center_id:   r.cost_center_id ?? null,
             p_job_code:         r.job_code ?? null,
+            p_org_id:           auth.orgId,
           })
 
           if (rpcErr) {

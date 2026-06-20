@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
-const PUBLIC_PATHS = ['/', '/login', '/register', '/auth/callback', '/forgot-password', '/reset-password', '/onboarding', '/privacy', '/terms', '/one-pager']
+const PUBLIC_PATHS = [
+  '/', '/login', '/register', '/auth/callback', '/forgot-password', '/reset-password',
+  '/onboarding', '/privacy', '/terms', '/one-pager',
+  // Public SEO / social-share assets — must be reachable by unauthenticated
+  // crawlers (Slackbot, LinkedIn, Twitterbot, Googlebot), not redirected to login.
+  '/opengraph-image', '/twitter-image', '/robots.txt', '/sitemap.xml',
+]
 
 // API routes that use their own non-session auth (API key or cron secret).
 const API_EXEMPT_PATHS = [

@@ -240,7 +240,7 @@ function GRNDialog({
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     <div>
                       <label className="block text-xs text-slate-500 mb-1">Qty to Receive</label>
                       <Input
@@ -248,16 +248,6 @@ function GRNDialog({
                         value={l.qty}
                         disabled={l.condition === 'missing'}
                         onChange={e => update(l.line_id, 'qty', parseInt(e.target.value) || 0)}
-                        className="h-8 text-sm disabled:opacity-50"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-slate-500 mb-1">Unit Cost</label>
-                      <Input
-                        type="number" min={0} step="0.01"
-                        value={l.cost}
-                        disabled={l.condition === 'missing'}
-                        onChange={e => update(l.line_id, 'cost', parseFloat(e.target.value) || 0)}
                         className="h-8 text-sm disabled:opacity-50"
                       />
                     </div>

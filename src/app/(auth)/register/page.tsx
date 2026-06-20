@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -18,6 +18,16 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [needsConfirmation, setNeedsConfirmation] = useState(false)
+
+  // Capture plan intent from the landing pricing CTAs (/register?plan=pro).
+  // We can't act on it during a no-card trial signup, so we stash it for the
+  // billing page to pre-highlight once the user decides to upgrade.
+  useEffect(() => {
+    const plan = new URLSearchParams(window.location.search).get('plan')
+    if (plan === 'starter' || plan === 'pro') {
+      localStorage.setItem('stockwise.intended_plan', plan)
+    }
+  }, [])
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()

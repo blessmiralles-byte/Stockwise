@@ -47,22 +47,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const variance = Number(line.variance)
     if (variance === 0) continue
 
-    const isPositive = variance > 0
-    const absVariance = Math.abs(variance)
-
+    // The RPC's adjustment branch takes a SIGNED quantity at a single location —
+    // a shortage (negative variance) must decrease stock, not add it back.
     const { error: txErr } = await supabase.rpc('record_inventory_movement', {
       p_transaction_type: 'adjustment',
       p_product_id: line.product_id,
-      p_from_location_id: isPositive ? null : line.location_id,
-      p_to_location_id:   isPositive ? line.location_id : null,
-      p_quantity: absVariance,
-      p_unit_cost: 0,
+      p_from_location_id: null,
+      p_to_location_id: line.location_id,
+      p_quantity: variance,
+      p_unit_cost: 0,   // 0 → RPC values the variance at the balance's book avg_cost
       p_reference_no: sc.count_number,
       p_batch_no: null,
       p_expiration_date: null,
       p_notes: `Stock count adjustment: ${sc.count_number}`,
       p_created_by: auth.userId,
       p_job_order_id: null,
+      p_org_id: auth.orgId,
     })
 
     if (txErr) {
