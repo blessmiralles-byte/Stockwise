@@ -205,24 +205,28 @@ function CategorySelector({
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function NewProductPage() {
   const router = useRouter()
-  const [submitted,   setSubmitted]   = useState(false)
-  const [attrs,       setAttrs]       = useState<AttrRow[]>([])
-  const [trackExpiry, setTrackExpiry] = useState(false)
-  const [errorMsg,    setErrorMsg]    = useState('')
-  const [categoryId,  setCategoryId]  = useState('')
+  const [submitted,      setSubmitted]      = useState(false)
+  const [attrs,          setAttrs]          = useState<AttrRow[]>([])
+  const [trackExpiry,    setTrackExpiry]    = useState(false)
+  const [errorMsg,       setErrorMsg]       = useState('')
+  const [categoryId,     setCategoryId]     = useState('')
+  const [initQty,        setInitQty]        = useState('')
+  const [initCost,       setInitCost]       = useState('')
+  const [initLocationId, setInitLocationId] = useState('')
 
-  const { data: catData, refetch: refetchCats } = useApi<{ data: any[] }>('/api/categories?type=inventory')
+  const { data: catData } = useApi<{ data: any[] }>('/api/categories?type=inventory')
+  const { data: locData } = useApi<{ data: any[] }>('/api/locations')
   const [extraCats, setExtraCats] = useState<{ id: string; name: string }[]>([])
   const categories = [...(catData?.data ?? []), ...extraCats].filter(
-    (c, i, arr) => arr.findIndex(x => x.id === c.id) === i  // dedupe
+    (c, i, arr) => arr.findIndex(x => x.id === c.id) === i
   )
+  const locations = locData?.data ?? []
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const form = e.currentTarget
     const fd = new FormData(form)
 
-    // Build attributes object (skip rows with empty key)
     const attributesObj: Record<string, string> = {}
     attrs.forEach(({ key, value }) => {
       if (key.trim()) attributesObj[key.trim()] = value.trim()
@@ -247,6 +251,29 @@ export default function NewProductPage() {
     })
     const json = await res.json()
     if (!res.ok) { setErrorMsg(json.error ?? 'Failed to create item'); return }
+
+    // Record initial stock if provided
+    const qty = parseInt(initQty)
+    if (qty > 0 && initLocationId) {
+      const stockRes = await fetch('/api/inventory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transaction_type: 'adjustment',
+          product_id:       json.data.id,
+          quantity:         qty,
+          unit_cost:        parseFloat(initCost) || 0,
+          to_location_id:   initLocationId,
+          reference_no:     'Opening stock',
+        }),
+      })
+      if (!stockRes.ok) {
+        const sj = await stockRes.json()
+        setErrorMsg(`Item created but stock entry failed: ${sj.error ?? 'unknown error'}`)
+        return
+      }
+    }
+
     setSubmitted(true)
     setTimeout(() => router.push('/inventory'), 1200)
   }
@@ -347,6 +374,45 @@ export default function NewProductPage() {
                       </p>
                     </div>
                   </label>
+                </section>
+
+                {/* ── Initial Stock ── */}
+                <section className="space-y-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Initial Stock</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">Optional — set a starting quantity so the item appears in your inventory list right away.</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-sm font-medium text-slate-700 block mb-1">Quantity</label>
+                      <Input
+                        type="number" min="0" placeholder="0"
+                        value={initQty}
+                        onChange={e => setInitQty(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-slate-700 block mb-1">Unit Cost</label>
+                      <Input
+                        type="number" min="0" step="0.01" placeholder="0.00"
+                        value={initCost}
+                        onChange={e => setInitCost(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-slate-700 block mb-1">Location</label>
+                      <select
+                        value={initLocationId}
+                        onChange={e => setInitLocationId(e.target.value)}
+                        className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="">— Select location —</option>
+                        {locations.map((l: any) => (
+                          <option key={l.id} value={l.id}>{l.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </section>
 
                 {errorMsg && (
