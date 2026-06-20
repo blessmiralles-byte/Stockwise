@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
 
   if (poErr) {
     console.error('[POST /api/purchase-orders] insert PO', poErr)
-    return NextResponse.json({ error: 'Failed to create purchase order' }, { status: 500 })
+    return NextResponse.json({ error: poErr.message ?? 'Failed to create purchase order' }, { status: 500 })
   }
 
   // Insert lines
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
   if (lineErr) {
     console.error('[POST /api/purchase-orders] insert lines', lineErr)
     await supabase.from('purchase_orders').delete().eq('id', po.id)
-    return NextResponse.json({ error: 'Failed to create PO lines' }, { status: 500 })
+    return NextResponse.json({ error: lineErr.message ?? 'Failed to create PO lines' }, { status: 500 })
   }
 
   return NextResponse.json({ data: po }, { status: 201 })
