@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   const name = body.name?.trim()
   if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 })
 
-  const VALID_TYPES = ['inventory', 'asset', 'both']
+  const VALID_TYPES = ['inventory', 'fixed_asset', 'both']
   const type = body.type ?? 'inventory'
   if (!VALID_TYPES.includes(type)) {
     return NextResponse.json({ error: `type must be one of: ${VALID_TYPES.join(', ')}` }, { status: 400 })

@@ -187,9 +187,9 @@ function LocationsTab() {
 // 2. CATEGORIES TAB
 // ─────────────────────────────────────────────────────────────────────────────
 const CAT_TYPES = [
-  { value: 'inventory', label: 'Product / Inventory' },
-  { value: 'asset',     label: 'Fixed Asset' },
-  { value: 'both',      label: 'Both' },
+  { value: 'inventory',   label: 'Product / Inventory' },
+  { value: 'fixed_asset', label: 'Fixed Asset' },
+  { value: 'both',        label: 'Both' },
 ]
 
 function CategoriesTab() {
@@ -202,7 +202,7 @@ function CategoriesTab() {
   const [type,     setType]     = useState('inventory')
   const [saving,   setSaving]   = useState(false)
   const [error,    setError]    = useState('')
-  const [filter,   setFilter]   = useState<'all' | 'inventory' | 'asset'>('all')
+  const [filter,   setFilter]   = useState<'all' | 'inventory' | 'fixed_asset'>('all')
 
   const openAdd = () => { setEditId(null); setName(''); setType('inventory'); setError(''); setShowForm(true) }
   const openEdit = (c: any) => { setEditId(c.id); setName(c.name); setType(c.type); setError(''); setShowForm(true) }
@@ -234,7 +234,7 @@ function CategoriesTab() {
       <div className="flex items-center gap-3">
         <Button size="sm" className="gap-1.5" onClick={openAdd}><Plus className="w-3.5 h-3.5" /> Add Category</Button>
         <div className="flex rounded-lg border border-slate-200 overflow-hidden">
-          {(['all', 'inventory', 'asset'] as const).map(f => (
+          {(['all', 'inventory', 'fixed_asset'] as const).map(f => (
             <button key={f} onClick={() => setFilter(f)} className={cn('px-3 py-1.5 text-xs font-medium transition-colors capitalize', filter === f ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50')}>
               {f === 'all' ? 'All' : f === 'inventory' ? 'Products' : 'Assets'}
             </button>
