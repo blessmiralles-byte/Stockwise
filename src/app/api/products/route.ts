@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { requireAuth, requireRole } from '@/lib/api-auth'
+import { requireAuth, requireAnyRole } from '@/lib/api-auth'
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth()
@@ -32,8 +32,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  // C-2: Creating products is a manager-level action
-  const auth = await requireRole('manager')
+  const auth = await requireAnyRole('owner', 'operations', 'procurement', 'manager')
   if (auth.error) return auth.error
 
   let body: any
@@ -41,10 +40,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { sku, barcode, name, category_id, unit_of_measure, cost_method, reorder_point, attributes, track_expiry } = body
+  const { barcode, name, category_id, unit_of_measure, cost_method, reorder_point, attributes, track_expiry } = body
+  let { sku } = body
 
-  if (!sku?.trim() || !name?.trim()) {
-    return NextResponse.json({ error: 'sku and name are required' }, { status: 422 })
+  if (!name?.trim()) {
+    return NextResponse.json({ error: 'name is required' }, { status: 422 })
+  }
+
+  // Auto-generate SKU if not supplied
+  if (!sku?.trim()) {
+    const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    const rand = Math.random().toString(36).slice(2, 6).toUpperCase()
+    sku = `ITM-${datePart}-${rand}`
+  } else {
+    sku = sku.trim()
   }
 
   // M-2 style: basic field validation
@@ -63,7 +72,7 @@ export async function POST(req: NextRequest) {
     .from('products')
     .insert({
       org_id:          auth.orgId,
-      sku:             sku.trim(),
+      sku,
       barcode:         barcode ?? null,
       name:            name.trim(),
       category_id:     category_id ?? null,

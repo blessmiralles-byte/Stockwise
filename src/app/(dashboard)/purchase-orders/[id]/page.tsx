@@ -46,6 +46,8 @@ function GRNDialog({
     to_location_id: string
     batch_no: string
     expiration_date: string
+    condition: 'good' | 'damaged' | 'missing'
+    condition_notes: string
   }
 
   const [lines, setLines] = useState<ReceiveLine[]>(
@@ -65,8 +67,11 @@ function GRNDialog({
         to_location_id: '',
         batch_no: '',
         expiration_date: '',
+        condition: 'good',
+        condition_notes: '',
       }))
   )
+  const [receivedBy, setReceivedBy] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
 
@@ -75,7 +80,8 @@ function GRNDialog({
   }
 
   async function handleReceive() {
-    const missing = lines.find(l => l.qty > 0 && !l.to_location_id)
+    if (!receivedBy.trim()) { setError('Please enter the name of who is receiving the goods'); return }
+    const missing = lines.find(l => l.qty > 0 && !l.to_location_id && l.condition !== 'missing')
     if (missing) { setError(`Select a destination location for "${missing.product_name}"`); return }
     const missingFrom = lines.find(l => l.qty > 0 && l.source_type === 'location' && !l.from_location_id)
     if (missingFrom) { setError(`Select a source location for "${missingFrom.product_name}"`); return }
@@ -84,22 +90,24 @@ function GRNDialog({
     setError('')
     try {
       const payload = lines
-        .filter(l => l.qty > 0)
+        .filter(l => l.qty > 0 || l.condition === 'missing')
         .map(l => ({
           line_id:           l.line_id,
-          quantity_received:  l.qty,
+          quantity_received: l.condition === 'missing' ? 0 : l.qty,
           unit_cost:         l.cost,
           source_type:       l.source_type,
           from_location_id:  l.source_type === 'location' ? l.from_location_id : null,
           to_location_id:    l.to_location_id,
           batch_no:          l.batch_no || null,
           expiration_date:   l.expiration_date || null,
+          condition:         l.condition,
+          condition_notes:   l.condition_notes || null,
         }))
 
       const res = await fetch(`/api/purchase-orders/${po.id}/receive`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lines: payload }),
+        body: JSON.stringify({ lines: payload, received_by: receivedBy.trim() || null }),
       })
 
       if (!res.ok) {
@@ -128,6 +136,18 @@ function GRNDialog({
             <p className="text-center text-slate-400 py-8">All items have already been received.</p>
           ) : (
             <>
+              {/* Received By */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Received By *</label>
+                <input
+                  type="text"
+                  placeholder="Name of person receiving the goods"
+                  value={receivedBy}
+                  onChange={e => setReceivedBy(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
               {lines.map(l => (
                 <div key={l.line_id} className="border border-slate-100 rounded-lg p-4 space-y-3">
                   <div className="flex items-start justify-between">
@@ -175,14 +195,45 @@ function GRNDialog({
                     )}
                   </div>
 
+                  {/* Condition */}
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">Item Condition</label>
+                    <div className="flex gap-1">
+                      {(['good', 'damaged', 'missing'] as const).map(c => (
+                        <button
+                          key={c} type="button"
+                          onClick={() => update(l.line_id, 'condition', c)}
+                          className={`flex-1 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                            l.condition === c
+                              ? c === 'good'    ? 'bg-green-600  text-white border-green-600'
+                              : c === 'damaged' ? 'bg-amber-500  text-white border-amber-500'
+                              :                   'bg-red-600    text-white border-red-600'
+                              : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
+                          }`}
+                        >
+                          {c === 'good' ? '✓ Good' : c === 'damaged' ? '⚠ Damaged' : '✕ Not Received'}
+                        </button>
+                      ))}
+                    </div>
+                    {(l.condition === 'damaged' || l.condition === 'missing') && (
+                      <Input
+                        value={l.condition_notes}
+                        onChange={e => update(l.line_id, 'condition_notes', e.target.value)}
+                        placeholder={l.condition === 'damaged' ? 'Describe the damage…' : 'Reason not received…'}
+                        className="mt-2 h-8 text-sm"
+                      />
+                    )}
+                  </div>
+
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <div>
                       <label className="block text-xs text-slate-500 mb-1">Qty to Receive</label>
                       <Input
                         type="number" min={0} max={l.ordered - l.already}
                         value={l.qty}
+                        disabled={l.condition === 'missing'}
                         onChange={e => update(l.line_id, 'qty', parseInt(e.target.value) || 0)}
-                        className="h-8 text-sm"
+                        className="h-8 text-sm disabled:opacity-50"
                       />
                     </div>
                     <div>
@@ -190,8 +241,9 @@ function GRNDialog({
                       <Input
                         type="number" min={0} step="0.01"
                         value={l.cost}
+                        disabled={l.condition === 'missing'}
                         onChange={e => update(l.line_id, 'cost', parseFloat(e.target.value) || 0)}
-                        className="h-8 text-sm"
+                        className="h-8 text-sm disabled:opacity-50"
                       />
                     </div>
                     <div>

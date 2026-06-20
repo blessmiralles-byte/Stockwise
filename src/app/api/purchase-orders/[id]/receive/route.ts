@@ -43,8 +43,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const errors: string[] = []
   const successLines: string[] = []
 
+  const received_by = body.received_by?.trim() || null
+
   for (const recv of lines) {
-    const { line_id, quantity_received, to_location_id, source_type, from_location_id, unit_cost, batch_no, expiration_date } = recv
+    const { line_id, quantity_received, to_location_id, source_type, from_location_id, unit_cost, batch_no, expiration_date, condition, condition_notes } = recv
 
     if (!to_location_id) {
       errors.push(`line ${line_id}: to_location_id is required`)
@@ -62,6 +64,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const remaining = poLine.quantity_ordered - poLine.quantity_received
+
+    // "missing" lines: record the note but skip inventory movement
+    if (condition === 'missing') {
+      await supabase
+        .from('purchase_order_lines')
+        .update({ received_by, condition: 'missing', condition_notes: condition_notes?.trim() || null })
+        .eq('id', line_id)
+      successLines.push(line_id)
+      continue
+    }
+
     if (quantity_received <= 0 || quantity_received > remaining) {
       errors.push(`line ${line_id}: quantity must be 1–${remaining}`)
       continue
@@ -95,7 +108,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const { error: lineErr } = await supabase
       .from('purchase_order_lines')
-      .update({ quantity_received: poLine.quantity_received + quantity_received })
+      .update({
+        quantity_received: poLine.quantity_received + quantity_received,
+        received_by:       received_by,
+        condition:         condition || 'good',
+        condition_notes:   condition_notes?.trim() || null,
+      })
       .eq('id', line_id)
 
     if (lineErr) {
