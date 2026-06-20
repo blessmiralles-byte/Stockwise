@@ -12,7 +12,6 @@ export async function GET() {
     .from('user_profiles')
     .select('id, full_name, role')
     .eq('org_id', auth.orgId)
-    .eq('is_active', true)
     .order('full_name', { ascending: true })
 
   if (error) {
