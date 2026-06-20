@@ -110,6 +110,7 @@ export async function POST(req: NextRequest) {
     p_batch_no:         batch_no         ?? null,
     p_expiration_date:  expiration_date  ?? null,
     p_job_order_id:     job_order_id     ?? null,
+    p_org_id:           auth.orgId,
   })
 
   // If RPC exists and succeeded, return immediately
@@ -121,7 +122,7 @@ export async function POST(req: NextRequest) {
   const isRpcMissing = rpcError.message?.includes('function') || rpcError.code === 'PGRST202'
   if (!isRpcMissing) {
     console.error('[POST /api/inventory] RPC error', rpcError)
-    return NextResponse.json({ error: 'Failed to record movement' }, { status: 500 })
+    return NextResponse.json({ error: rpcError.message ?? 'Failed to record movement' }, { status: 500 })
   }
 
   // ── Fallback: manual multi-step (run rpc_record_movement.sql to upgrade) ──
@@ -157,7 +158,7 @@ export async function POST(req: NextRequest) {
 
   if (txError) {
     console.error('[POST /api/inventory] insert tx', txError)
-    return NextResponse.json({ error: 'Failed to record movement' }, { status: 500 })
+    return NextResponse.json({ error: txError.message ?? 'Failed to record movement' }, { status: 500 })
   }
 
   const cost = unit_cost ?? 0
