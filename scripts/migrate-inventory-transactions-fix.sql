@@ -9,7 +9,7 @@
 ALTER TABLE public.inventory_transactions
   ADD COLUMN IF NOT EXISTS org_id         uuid REFERENCES public.organizations(id) ON DELETE CASCADE,
   ADD COLUMN IF NOT EXISTS created_by     uuid REFERENCES auth.users(id),
-  ADD COLUMN IF NOT EXISTS job_order_id   text,
+  ADD COLUMN IF NOT EXISTS job_order_id   uuid,
   ADD COLUMN IF NOT EXISTS cost_center_id uuid,
   ADD COLUMN IF NOT EXISTS job_code       text;
 
@@ -87,7 +87,7 @@ CREATE OR REPLACE FUNCTION public.record_inventory_movement(
   p_created_by       uuid       DEFAULT NULL,
   p_batch_no         text       DEFAULT NULL,
   p_expiration_date  date       DEFAULT NULL,
-  p_job_order_id     text       DEFAULT NULL,
+  p_job_order_id     uuid       DEFAULT NULL,
   p_cost_center_id   uuid       DEFAULT NULL,
   p_job_code         text       DEFAULT NULL,
   p_org_id           uuid       DEFAULT NULL
