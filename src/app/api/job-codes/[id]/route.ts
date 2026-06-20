@@ -13,10 +13,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const updates: Record<string, any> = {}
-  if ('name'        in body) updates.name        = body.name?.trim()
-  if ('code'        in body) updates.code        = body.code?.trim()?.toUpperCase()
-  if ('description' in body) updates.description = body.description?.trim() || null
-  if ('is_active'   in body) updates.is_active   = !!body.is_active
+  if ('name'           in body) updates.name           = body.name?.trim()
+  if ('code'           in body) updates.code           = body.code?.trim()?.toUpperCase()
+  if ('description'    in body) updates.description    = body.description?.trim()    || null
+  if ('billing_entity' in body) updates.billing_entity = body.billing_entity?.trim() || null
+  if ('address'        in body) updates.address        = body.address?.trim()        || null
+  if ('contact_name'   in body) updates.contact_name   = body.contact_name?.trim()   || null
+  if ('contact_phone'  in body) updates.contact_phone  = body.contact_phone?.trim()  || null
+  if ('contact_email'  in body) updates.contact_email  = body.contact_email?.trim()  || null
+  if ('is_active'      in body) updates.is_active      = !!body.is_active
 
   if ('name' in updates && !updates.name) return NextResponse.json({ error: 'name cannot be empty' }, { status: 400 })
   if ('code' in updates && !updates.code) return NextResponse.json({ error: 'code cannot be empty' }, { status: 400 })
@@ -28,7 +33,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .update(updates)
     .eq('id', id)
     .eq('org_id', auth.orgId)
-    .select('id, code, name, description, is_active')
+    .select('id, code, name, description, billing_entity, address, contact_name, contact_phone, contact_email, is_active')
     .single()
 
   if (error) {

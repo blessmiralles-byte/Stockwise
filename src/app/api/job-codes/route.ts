@@ -14,7 +14,7 @@ export async function GET() {
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('job_codes')
-    .select('id, code, name, description, is_active')
+    .select('id, code, name, description, billing_entity, address, contact_name, contact_phone, contact_email, is_active')
     .eq('org_id', auth.orgId)
     .order('code')
 
@@ -47,13 +47,18 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase
     .from('job_codes')
     .insert({
-      org_id:      auth.orgId,
+      org_id:         auth.orgId,
       code,
       name,
-      description: body.description?.trim() || null,
-      is_active:   true,
+      description:    body.description?.trim()    || null,
+      billing_entity: body.billing_entity?.trim() || null,
+      address:        body.address?.trim()        || null,
+      contact_name:   body.contact_name?.trim()   || null,
+      contact_phone:  body.contact_phone?.trim()  || null,
+      contact_email:  body.contact_email?.trim()  || null,
+      is_active:      true,
     })
-    .select('id, code, name, description, is_active')
+    .select('id, code, name, description, billing_entity, address, contact_name, contact_phone, contact_email, is_active')
     .single()
 
   if (error) {

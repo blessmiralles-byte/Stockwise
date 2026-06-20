@@ -395,24 +395,41 @@ function JobCodesTab() {
   const { data, loading, error: loadErr, refetch } = useApi<{ data: any[] }>('/api/job-codes')
   const jobs = (data?.data ?? []).filter((j: any) => j.is_active !== false)
 
-  const [showForm, setShowForm]   = useState(false)
-  const [editId,   setEditId]     = useState<string | null>(null)
-  const [code,     setCode]       = useState('')
-  const [name,     setName]       = useState('')
-  const [desc,     setDesc]       = useState('')
-  const [saving,   setSaving]     = useState(false)
-  const [error,    setError]      = useState('')
+  const blank = { code: '', name: '', desc: '', billing_entity: '', address: '', contact_name: '', contact_phone: '', contact_email: '' }
+  const [showForm, setShowForm] = useState(false)
+  const [editId,   setEditId]   = useState<string | null>(null)
+  const [form,     setForm]     = useState(blank)
+  const [saving,   setSaving]   = useState(false)
+  const [error,    setError]    = useState('')
 
-  const openAdd = () => { setEditId(null); setCode(''); setName(''); setDesc(''); setError(''); setShowForm(true) }
-  const openEdit = (j: any) => { setEditId(j.id); setCode(j.code); setName(j.name); setDesc(j.description ?? ''); setError(''); setShowForm(true) }
+  const f = (k: keyof typeof blank) => (e: React.ChangeEvent<HTMLInputElement>) => setForm(v => ({ ...v, [k]: e.target.value }))
+
+  const openAdd  = () => { setEditId(null); setForm(blank); setError(''); setShowForm(true) }
+  const openEdit = (j: any) => {
+    setEditId(j.id)
+    setForm({ code: j.code, name: j.name, desc: j.description ?? '', billing_entity: j.billing_entity ?? '', address: j.address ?? '', contact_name: j.contact_name ?? '', contact_phone: j.contact_phone ?? '', contact_email: j.contact_email ?? '' })
+    setError(''); setShowForm(true)
+  }
   const cancel = () => { setShowForm(false); setEditId(null); setError('') }
 
   const save = async () => {
-    if (!code.trim()) { setError('Code is required'); return }
-    if (!name.trim()) { setError('Name is required'); return }
+    if (!form.code.trim()) { setError('Code is required'); return }
+    if (!form.name.trim()) { setError('Name is required'); return }
     setSaving(true); setError('')
     const url = editId ? `/api/job-codes/${editId}` : '/api/job-codes'
-    const res = await fetch(url, { method: editId ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: code.trim(), name: name.trim(), description: desc.trim() || undefined }) })
+    const res = await fetch(url, {
+      method: editId ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code: form.code.trim(), name: form.name.trim(),
+        description:    form.desc.trim()           || undefined,
+        billing_entity: form.billing_entity.trim() || undefined,
+        address:        form.address.trim()        || undefined,
+        contact_name:   form.contact_name.trim()   || undefined,
+        contact_phone:  form.contact_phone.trim()  || undefined,
+        contact_email:  form.contact_email.trim()  || undefined,
+      }),
+    })
     const json = await res.json()
     setSaving(false)
     if (!res.ok) { setError(json.error ?? 'Failed to save'); return }
@@ -424,19 +441,18 @@ function JobCodesTab() {
     refetch()
   }
 
-  // Check if table exists (503 = table missing)
   const tablesMissing = loadErr?.includes('503') || loadErr?.includes('not found')
 
   return (
     <div className="space-y-4">
-      <SectionHeader title="Job Codes" description="Tag purchase orders and requisitions to specific projects or jobs for cost tracking." />
+      <SectionHeader title="Job Codes" description="Tag purchase orders and transactions to specific projects or jobs for cost tracking." />
 
       {tablesMissing && (
         <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
           <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <div>
             <p className="font-semibold">One-time setup required</p>
-            <p className="text-xs mt-1">Run <code className="bg-amber-100 px-1 rounded">scripts/migrate-job-codes.sql</code> in your Supabase SQL editor to enable job codes.</p>
+            <p className="text-xs mt-1">Run <code className="bg-amber-100 px-1 rounded">scripts/migrate-job-codes.sql</code> then <code className="bg-amber-100 px-1 rounded">scripts/migrate-job-codes-billing.sql</code> in Supabase.</p>
           </div>
         </div>
       )}
@@ -444,24 +460,59 @@ function JobCodesTab() {
       <Button size="sm" className="gap-1.5" onClick={openAdd} disabled={tablesMissing}><Plus className="w-3.5 h-3.5" /> Add Job Code</Button>
 
       {showForm && (
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-4">
           <p className="text-xs font-semibold text-slate-700">{editId ? 'Edit Job Code' : 'New Job Code'}</p>
+
+          {/* Job identity */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-slate-600 block mb-1">Code *</label>
-              <Input value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="e.g. JOB-001" className="font-mono" autoFocus />
+              <Input value={form.code} onChange={f('code')} onBlur={e => setForm(v => ({ ...v, code: e.target.value.toUpperCase() }))} placeholder="JOB-001" className="font-mono" autoFocus />
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 block mb-1">Name *</label>
-              <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Building Renovation" />
+              <Input value={form.name} onChange={f('name')} placeholder="e.g. Building Renovation" />
             </div>
             <div className="col-span-2">
               <label className="text-xs font-medium text-slate-600 block mb-1">Description <span className="font-normal text-slate-400">(optional)</span></label>
-              <Input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Brief description of this job or project" />
+              <Input value={form.desc} onChange={f('desc')} placeholder="Brief description of this job or project" />
             </div>
           </div>
+
+          {/* Billing */}
+          <div className="border-t border-slate-200 pt-3 space-y-3">
+            <p className="text-xs font-semibold text-slate-600">Billing Details</p>
+            <div>
+              <label className="text-xs font-medium text-slate-600 block mb-1">Entity to Bill</label>
+              <Input value={form.billing_entity} onChange={f('billing_entity')} placeholder="e.g. ABC Corporation Pte Ltd" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600 block mb-1">Billing Address</label>
+              <Input value={form.address} onChange={f('address')} placeholder="Street, City, Country" />
+            </div>
+          </div>
+
+          {/* Contact */}
+          <div className="border-t border-slate-200 pt-3 space-y-3">
+            <p className="text-xs font-semibold text-slate-600">Contact Person</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Name</label>
+                <Input value={form.contact_name} onChange={f('contact_name')} placeholder="Full name" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Phone</label>
+                <Input value={form.contact_phone} onChange={f('contact_phone')} placeholder="+65 9123 4567" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Email</label>
+                <Input type="email" value={form.contact_email} onChange={f('contact_email')} placeholder="contact@client.com" />
+              </div>
+            </div>
+          </div>
+
           {error && <ErrorBanner msg={error} />}
-          <div className="flex gap-2 justify-end">
+          <div className="flex gap-2 justify-end pt-1">
             <Button variant="outline" size="sm" onClick={cancel}>Cancel</Button>
             <Button size="sm" onClick={save} disabled={saving} className="gap-1.5">
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
@@ -483,7 +534,11 @@ function JobCodesTab() {
                 <span className="text-xs font-mono font-bold text-indigo-700 w-24 flex-shrink-0">{j.code}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-slate-900">{j.name}</p>
-                  {j.description && <p className="text-xs text-slate-400 truncate">{j.description}</p>}
+                  <div className="flex items-center gap-3 mt-0.5">
+                    {j.billing_entity && <p className="text-xs text-slate-500 truncate">{j.billing_entity}</p>}
+                    {j.contact_name   && <p className="text-xs text-slate-400 truncate">· {j.contact_name}</p>}
+                    {j.description && !j.billing_entity && <p className="text-xs text-slate-400 truncate">{j.description}</p>}
+                  </div>
                 </div>
                 <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button onClick={() => openEdit(j)} className="p-1.5 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"><Pencil className="w-3.5 h-3.5" /></button>
