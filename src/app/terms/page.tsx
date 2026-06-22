@@ -2,12 +2,12 @@ import Link from 'next/link'
 import { Package } from 'lucide-react'
 
 export const metadata = {
-  title: 'Terms of Service — StockWise',
-  description: 'The terms and conditions for using StockWise.',
+  title: 'Terms of Service — Stocked',
+  description: 'The terms and conditions for using Stocked.',
 }
 
 const EFFECTIVE_DATE = 'June 2, 2026'
-const CONTACT_EMAIL  = 'legal@stockwise.app'
+const CONTACT_EMAIL  = 'legal@stocked.tech'
 
 export default function TermsPage() {
   return (
@@ -19,7 +19,7 @@ export default function TermsPage() {
             <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
               <Package className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
             </div>
-            <span className="font-bold text-slate-900">StockWise</span>
+            <span className="font-bold text-slate-900">Stocked</span>
           </Link>
           <Link href="/" className="text-sm text-slate-500 hover:text-slate-700">← Back to home</Link>
         </div>
@@ -34,7 +34,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-slate-800 mb-3">1. Acceptance of terms</h2>
             <p className="text-slate-600">
-              By creating an account or using StockWise (&quot;Service&quot;), you agree to these Terms of
+              By creating an account or using Stocked (&quot;Service&quot;), you agree to these Terms of
               Service (&quot;Terms&quot;). If you are accepting on behalf of a company or other legal entity,
               you represent that you have the authority to bind that entity. If you do not agree to
               these Terms, do not use the Service.
@@ -44,7 +44,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-slate-800 mb-3">2. The service</h2>
             <p className="text-slate-600">
-              StockWise is a cloud-based inventory management platform. We provide the software as
+              Stocked is a cloud-based inventory management platform. We provide the software as
               a service (SaaS) on a subscription basis. We reserve the right to modify or
               discontinue the Service at any time with reasonable notice.
             </p>
@@ -59,7 +59,7 @@ export default function TermsPage() {
                 under your account.
               </p>
               <p>
-                Each organization on StockWise has one designated &quot;Owner&quot; who is responsible for
+                Each organization on Stocked has one designated &quot;Owner&quot; who is responsible for
                 managing team members, roles, and the subscription. The Owner is responsible for
                 ensuring that all team members comply with these Terms.
               </p>
@@ -113,7 +113,7 @@ export default function TermsPage() {
             <h2 className="text-lg font-semibold text-slate-800 mb-3">6. Your data</h2>
             <div className="space-y-3 text-slate-600">
               <p>
-                You retain ownership of all data you input into StockWise (&quot;Customer Data&quot;). We
+                You retain ownership of all data you input into Stocked (&quot;Customer Data&quot;). We
                 process Customer Data solely to provide and improve the Service as described in our{' '}
                 <Link href="/privacy" className="text-indigo-600 hover:underline">Privacy Policy</Link>.
               </p>
@@ -133,7 +133,7 @@ export default function TermsPage() {
             <h2 className="text-lg font-semibold text-slate-800 mb-3">7. Intellectual property</h2>
             <p className="text-slate-600">
               The Service, including its software, design, and content (excluding Customer Data),
-              is the exclusive property of StockWise and is protected by copyright, trademark, and
+              is the exclusive property of Stocked and is protected by copyright, trademark, and
               other intellectual property laws. You may not copy, modify, or distribute any part
               of the Service without our prior written consent.
             </p>
@@ -173,7 +173,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-slate-800 mb-3">11. Indemnification</h2>
             <p className="text-slate-600">
-              You agree to indemnify and hold harmless StockWise and its officers, directors,
+              You agree to indemnify and hold harmless Stocked and its officers, directors,
               employees, and agents from any claims, damages, or expenses (including reasonable
               attorneys&apos; fees) arising from your use of the Service, violation of these Terms, or
               infringement of any third-party rights by you or your team members.
@@ -194,7 +194,7 @@ export default function TermsPage() {
             <h2 className="text-lg font-semibold text-slate-800 mb-3">13. Governing law</h2>
             <p className="text-slate-600">
               These Terms are governed by and construed in accordance with the laws of the
-              jurisdiction in which StockWise is incorporated, without regard to conflict of law
+              jurisdiction in which Stocked is incorporated, without regard to conflict of law
               principles. Any disputes shall be resolved in the courts of that jurisdiction.
             </p>
           </section>

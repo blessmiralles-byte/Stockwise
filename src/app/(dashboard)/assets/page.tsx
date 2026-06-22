@@ -14,6 +14,7 @@ import {
   Search, Plus, ScanBarcode, Building2, MoreVertical, User, MapPin,
   X, AlertCircle, Loader2, Shield, TrendingDown, Wrench, ChevronRight,
   Calendar, Info, CheckCircle2, Users, Pencil, Trash2, Printer, Tag,
+  Archive, DollarSign, RefreshCw,
 } from 'lucide-react'
 import Link from 'next/link'
 import { PrintLabelsDialog, type LabelAsset } from '@/components/print-labels'
@@ -24,6 +25,8 @@ const statusConfig: Record<string, { label: string; variant: any }> = {
   maintenance: { label: 'In Maintenance', variant: 'warning'     },
   inactive:    { label: 'Inactive',       variant: 'secondary'   },
   disposed:    { label: 'Disposed',       variant: 'destructive' },
+  retired:     { label: 'Retired',        variant: 'secondary'   },
+  sold:        { label: 'Sold',           variant: 'secondary'   },
 }
 
 const DEPRECIATION_LABELS: Record<string, string> = {
@@ -227,6 +230,270 @@ function ManagePersonsPanel({ onClose }: { onClose: () => void }) {
           <Button variant="outline" onClick={onClose}>Done</Button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Retire / Sell Dialog ─────────────────────────────────────────────────────
+function RetireSellDialog({
+  asset,
+  mode,
+  onClose,
+  onSaved,
+}: {
+  asset:   any
+  mode:    'retire' | 'sell'
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [date,   setDate]   = useState(new Date().toISOString().split('T')[0])
+  const [reason, setReason] = useState('')
+  const [buyer,  setBuyer]  = useState('')
+  const [price,  setPrice]  = useState('')
+  const [notes,  setNotes]  = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error,  setError]  = useState('')
+
+  const isRetire = mode === 'retire'
+
+  const handleSubmit = async () => {
+    if (isRetire && !reason.trim()) { setError('Please provide a retirement reason'); return }
+    if (!isRetire && !price)        { setError('Sale price is required'); return }
+    if (!isRetire && Number(price) <= 0) { setError('Sale price must be greater than zero'); return }
+
+    setSaving(true); setError('')
+    const body: Record<string, any> = { status: isRetire ? 'retired' : 'sold' }
+    if (isRetire) {
+      body.retirement_reason = reason.trim()
+    } else {
+      body.sale_price = Number(price)
+      body.sale_buyer = buyer.trim() || undefined
+      body.sale_notes = notes.trim() || undefined
+    }
+
+    const res  = await fetch(`/api/assets/${asset.id}`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body),
+    })
+    const json = await res.json()
+    setSaving(false)
+    if (!res.ok) { setError(json.error ?? 'Failed to save'); return }
+    onSaved()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+
+        {/* Header */}
+        <div className={cn(
+          'flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100 rounded-t-xl',
+          isRetire ? 'bg-slate-50' : 'bg-amber-50'
+        )}>
+          <div className="flex items-center gap-3">
+            <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center',
+              isRetire ? 'bg-slate-200' : 'bg-amber-100'
+            )}>
+              {isRetire
+                ? <Archive    className="w-4 h-4 text-slate-600" />
+                : <DollarSign className="w-4 h-4 text-amber-600" />
+              }
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900">
+                {isRetire ? 'Retire Asset' : 'Sell Asset'}
+              </h2>
+              <p className="text-xs text-slate-500 truncate max-w-[260px]">{asset.name} · {asset.asset_tag}</p>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose}><X className="w-4 h-4" /></Button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+
+          {isRetire ? (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Retirement Date
+                </label>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={e => setDate(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Reason for Retirement <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={reason}
+                  onChange={e => setReason(e.target.value)}
+                  placeholder="e.g. End of useful life, beyond economical repair, replaced by newer model…"
+                  rows={3}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                  autoFocus
+                />
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {['End of useful life', 'Beyond economical repair', 'Replaced by newer model', 'Damaged / written off'].map(r => (
+                    <button key={r} type="button" onClick={() => setReason(r)}
+                      className="text-xs px-2 py-1 rounded-full border border-slate-200 text-slate-500 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Sale Date</label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={e => setDate(e.target.value)}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    Sale Price <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    type="number" min="0" step="0.01"
+                    placeholder="0.00"
+                    value={price}
+                    onChange={e => setPrice(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              {asset.purchase_cost > 0 && price && Number(price) > 0 && (
+                <div className={cn('text-xs px-3 py-2 rounded-lg border',
+                  Number(price) >= asset.purchase_cost
+                    ? 'bg-green-50 border-green-100 text-green-700'
+                    : 'bg-amber-50 border-amber-100 text-amber-700'
+                )}>
+                  {Number(price) >= asset.purchase_cost
+                    ? `Gain on sale: ${formatCurrency(Number(price) - asset.purchase_cost)}`
+                    : `Loss on sale: ${formatCurrency(asset.purchase_cost - Number(price))}`
+                  }
+                  {' '}(purchase cost was {formatCurrency(asset.purchase_cost)})
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Buyer Name</label>
+                <Input
+                  value={buyer}
+                  onChange={e => setBuyer(e.target.value)}
+                  placeholder="Individual or company name"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Notes</label>
+                <textarea
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  placeholder="Invoice reference, payment method, any additional details…"
+                  rows={2}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                />
+              </div>
+            </>
+          )}
+
+          {error && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 flex items-center gap-1.5">
+              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {error}
+            </p>
+          )}
+
+          <div className="flex gap-2 justify-end pt-1">
+            <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+            <Button
+              size="sm"
+              onClick={handleSubmit}
+              disabled={saving}
+              className={cn('gap-1.5', isRetire ? '' : 'bg-amber-600 hover:bg-amber-700')}
+            >
+              {saving
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : isRetire ? <Archive className="w-3.5 h-3.5" /> : <DollarSign className="w-3.5 h-3.5" />
+              }
+              {saving ? 'Saving…' : isRetire ? 'Retire Asset' : 'Record Sale'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Asset card dropdown ───────────────────────────────────────────────────────
+function AssetCardMenu({
+  asset,
+  canDispose,
+  onRetire,
+  onSell,
+  onReactivate,
+}: {
+  asset:        any
+  canDispose:   boolean
+  onRetire:     () => void
+  onSell:       () => void
+  onReactivate: () => void
+}) {
+  const [open, setOpen] = useState(false)
+
+  const isEndOfLife = ['retired', 'sold', 'disposed'].includes(asset.status)
+
+  if (!canDispose) return null
+
+  return (
+    <div className="relative">
+      <Button
+        variant="ghost" size="icon"
+        className="w-7 h-7"
+        onClick={e => { e.stopPropagation(); setOpen(o => !o) }}
+      >
+        <MoreVertical className="w-4 h-4" />
+      </Button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-lg z-20 py-1 overflow-hidden">
+            {isEndOfLife ? (
+              <button
+                onClick={() => { setOpen(false); onReactivate() }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-green-500" /> Reactivate
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => { setOpen(false); onRetire() }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <Archive className="w-3.5 h-3.5 text-slate-500" /> Retire Asset
+                </button>
+                <button
+                  onClick={() => { setOpen(false); onSell() }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <DollarSign className="w-3.5 h-3.5 text-amber-500" /> Sell Asset
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -828,6 +1095,7 @@ export default function AssetsPage() {
   const [showAdd,        setShowAdd]        = useState(false)
   const [showPersons,    setShowPersons]    = useState(false)
   const [printAssets,    setPrintAssets]    = useState<LabelAsset[] | null>(null)
+  const [disposeTarget,  setDisposeTarget]  = useState<{ asset: any; mode: 'retire' | 'sell' } | null>(null)
 
   const { data: profileData } = useApi<any>('/api/user/profile')
   const role = profileData?.role ?? 'viewer'
@@ -880,7 +1148,7 @@ export default function AssetsPage() {
               />
             </div>
             <div className="flex flex-wrap gap-1">
-              {['all', 'active', 'maintenance', 'inactive'].map(s => (
+              {['all', 'active', 'maintenance', 'inactive', 'retired', 'sold'].map(s => (
                 <Button
                   key={s}
                   size="sm"
@@ -961,9 +1229,20 @@ export default function AssetsPage() {
                         >
                           <Tag className="w-3.5 h-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="w-7 h-7">
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
+                        <AssetCardMenu
+                          asset={asset}
+                          canDispose={canManagePersons}
+                          onRetire={() => setDisposeTarget({ asset, mode: 'retire' })}
+                          onSell={() => setDisposeTarget({ asset, mode: 'sell' })}
+                          onReactivate={async () => {
+                            await fetch(`/api/assets/${asset.id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ status: 'active' }),
+                            })
+                            refetch()
+                          }}
+                        />
                       </div>
                     </div>
 
@@ -1028,6 +1307,15 @@ export default function AssetsPage() {
         <PrintLabelsDialog
           assets={printAssets}
           onClose={() => setPrintAssets(null)}
+        />
+      )}
+
+      {disposeTarget && (
+        <RetireSellDialog
+          asset={disposeTarget.asset}
+          mode={disposeTarget.mode}
+          onClose={() => setDisposeTarget(null)}
+          onSaved={() => { setDisposeTarget(null); refetch() }}
         />
       )}
     </div>

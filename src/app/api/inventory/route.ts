@@ -107,13 +107,14 @@ export async function POST(req: NextRequest) {
         product_id,
         from_location_id: from_location_id ?? null,
         to_location_id:   to_location_id   ?? null,
-        quantity: qty,
-        unit_cost: unit_cost ?? 0,
+        quantity:     qty,
+        unit_cost:    unit_cost ?? 0,
+        total_cost:   Math.abs(qty) * (unit_cost ?? 0),
         reference_no: reference_no ?? null,
-        customer_id:   customer_id  ?? null,
-        notes:         notes        ?? null,
-        created_by:    auth.userId,
-        job_order_id:  job_order_id ?? null,
+        customer_id:  customer_id  ?? null,
+        notes:        notes        ?? null,
+        created_by:   auth.userId,
+        job_order_id: job_order_id ?? null,
         related_po_id: related_po_id ?? null,
       })
       .select()
@@ -177,13 +178,14 @@ export async function POST(req: NextRequest) {
       product_id,
       from_location_id: from_location_id ?? null,
       to_location_id:   to_location_id   ?? null,
-      quantity: qty,
-      unit_cost: unit_cost ?? 0,
+      quantity:     qty,
+      unit_cost:    unit_cost ?? 0,
+      total_cost:   Math.abs(qty) * (unit_cost ?? 0),
       reference_no: reference_no ?? null,
-      customer_id:   customer_id  ?? null,
-      notes:         notes        ?? null,
-      created_by:    auth.userId,           // H-3
-      job_order_id:  job_order_id ?? null,
+      customer_id:  customer_id  ?? null,
+      notes:        notes        ?? null,
+      created_by:   auth.userId,
+      job_order_id: job_order_id ?? null,
     })
     .select()
     .single()
@@ -195,18 +197,19 @@ export async function POST(req: NextRequest) {
 
   const cost = unit_cost ?? 0
 
+  const oid = auth.orgId
   if (transaction_type === 'purchase') {
     if (to_location_id) {
-      await upsertBalance(supabase, product_id, to_location_id, +qty, cost, product.cost_method)
+      await upsertBalance(supabase, product_id, to_location_id, +qty, cost, product.cost_method, oid)
     }
   } else if (transaction_type === 'transfer') {
-    if (from_location_id) await upsertBalance(supabase, product_id, from_location_id, -qty, cost, product.cost_method)
-    if (to_location_id)   await upsertBalance(supabase, product_id, to_location_id,   +qty, cost, product.cost_method)
+    if (from_location_id) await upsertBalance(supabase, product_id, from_location_id, -qty, cost, product.cost_method, oid)
+    if (to_location_id)   await upsertBalance(supabase, product_id, to_location_id,   +qty, cost, product.cost_method, oid)
   } else if (transaction_type === 'consumption' || transaction_type === 'sale') {
-    if (from_location_id) await upsertBalance(supabase, product_id, from_location_id, -qty, cost, product.cost_method)
+    if (from_location_id) await upsertBalance(supabase, product_id, from_location_id, -qty, cost, product.cost_method, oid)
   } else if (transaction_type === 'adjustment') {
     const adjLocation = to_location_id ?? from_location_id
-    if (adjLocation) await upsertBalance(supabase, product_id, adjLocation, qty, cost, product.cost_method)
+    if (adjLocation) await upsertBalance(supabase, product_id, adjLocation, qty, cost, product.cost_method, oid)
   }
 
   if (transaction_type === 'purchase' && product.cost_method === 'fifo' && to_location_id) {
@@ -231,7 +234,8 @@ async function upsertBalance(
   location_id: string,
   qty_delta: number,
   unit_cost: number,
-  cost_method: string
+  cost_method: string,
+  org_id: string,
 ) {
   const { data: existing } = await supabase
     .from('inventory_balances')
@@ -242,8 +246,8 @@ async function upsertBalance(
 
   if (!existing) {
     await supabase.from('inventory_balances').insert({
-      product_id, location_id,
-      quantity: qty_delta,   // H-5: no clamp — allow negative to surface data issues
+      product_id, location_id, org_id,
+      quantity: qty_delta,
       avg_cost: unit_cost,
     })
     return

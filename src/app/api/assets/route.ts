@@ -107,11 +107,10 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     console.error('[POST /api/assets]', error)
-    // Unique constraint on asset_tag
     if (error.code === '23505') {
       return NextResponse.json({ error: `Asset tag "${tag}" is already in use` }, { status: 409 })
     }
-    return NextResponse.json({ error: 'Failed to create asset' }, { status: 500 })
+    return NextResponse.json({ error: error.message ?? 'Failed to create asset' }, { status: 500 })
   }
 
   return NextResponse.json({ data }, { status: 201 })

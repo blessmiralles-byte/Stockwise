@@ -167,7 +167,7 @@ export default function OnePagerPage() {
               <div className="w-11 h-11 bg-indigo-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-900/40">
                 <Package className="w-5.5 h-5.5 text-white" strokeWidth={2.5} />
               </div>
-              <span className="text-2xl font-extrabold tracking-tight">StockWise</span>
+              <span className="text-2xl font-extrabold tracking-tight">Stocked</span>
             </div>
 
             <h1 className="text-3xl font-extrabold leading-tight mb-3">
@@ -188,7 +188,7 @@ export default function OnePagerPage() {
               <p className="text-2xl font-extrabold">Free 14-day</p>
               <p className="text-indigo-200 text-sm">trial — no card needed</p>
               <div className="pt-2 border-t border-white/10 mt-2">
-                <p className="text-xs text-indigo-300">stockwise.app/register</p>
+                <p className="text-xs text-indigo-300">stocked.tech/register</p>
               </div>
             </div>
           </div>
@@ -358,12 +358,12 @@ export default function OnePagerPage() {
             <div className="w-6 h-6 bg-indigo-600 rounded-md flex items-center justify-center">
               <Package className="w-3 h-3 text-white" strokeWidth={2.5} />
             </div>
-            <span className="font-semibold text-slate-700">StockWise</span>
+            <span className="font-semibold text-slate-700">Stocked</span>
             <span>— Inventory software that grows with you</span>
           </div>
           <div className="flex gap-4">
-            <span>stockwise.app</span>
-            <span>hello@stockwise.app</span>
+            <span>stocked.tech</span>
+            <span>hello@stocked.tech</span>
             <span>© {new Date().getFullYear()}</span>
           </div>
         </footer>

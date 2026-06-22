@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { BarcodeScanner } from '@/components/scanner/barcode-scanner'
 import { LocationSelect } from '@/components/ui/location-select'
 import {
   ScanBarcode, Search, X, Loader2, CheckCircle2,
   AlertCircle, Minus, Plus, Keyboard, ChevronLeft,
+  Save, FileCheck,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -17,12 +18,14 @@ const LOG_TYPES = [
   { value: 'adjustment',  label: 'Adjust Stock',  emoji: '✏️', needsFrom: false, needsJob: false },
 ]
 
+type Condition = 'good' | 'damaged' | 'missing'
+
 // ── Product search inline ─────────────────────────────────────────────────────
 function ItemSearch({ onSelect }: { onSelect: (p: any) => void }) {
-  const [q, setQ]           = useState('')
+  const [q, setQ]             = useState('')
   const [results, setResults] = useState<any[]>([])
-  const [busy, setBusy]     = useState(false)
-  const [open, setOpen]     = useState(false)
+  const [busy, setBusy]       = useState(false)
+  const [open, setOpen]       = useState(false)
 
   const search = async (val: string) => {
     setQ(val)
@@ -74,7 +77,7 @@ function ItemSearch({ onSelect }: { onSelect: (p: any) => void }) {
 }
 
 // ── Qty stepper ───────────────────────────────────────────────────────────────
-function QtyStepper({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+function QtyStepper({ value, onChange, max }: { value: number; onChange: (n: number) => void; max?: number }) {
   return (
     <div className="flex items-center gap-4 bg-gray-50 rounded-2xl p-2 border border-gray-200">
       <button
@@ -88,13 +91,14 @@ function QtyStepper({ value, onChange }: { value: number; onChange: (n: number) 
       <input
         type="number"
         min="1"
+        max={max}
         value={value}
-        onChange={e => onChange(Math.max(1, Number(e.target.value) || 1))}
+        onChange={e => onChange(Math.max(1, Math.min(Number(e.target.value) || 1, max ?? 99999)))}
         className="flex-1 text-center text-3xl font-bold text-gray-900 bg-transparent focus:outline-none"
       />
       <button
         type="button"
-        onClick={() => onChange(value + 1)}
+        onClick={() => onChange(max ? Math.min(value + 1, max) : value + 1)}
         className="w-14 h-14 rounded-xl bg-white border border-gray-200 flex items-center justify-center active:bg-gray-50 shadow-sm text-gray-600"
       >
         <Plus className="w-5 h-5 stroke-[2.5]" />
@@ -104,26 +108,49 @@ function QtyStepper({ value, onChange }: { value: number; onChange: (n: number) 
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
-type Step = 'type' | 'item' | 'details' | 'done'
+type Step      = 'type' | 'item' | 'details' | 'done'
 type InputMode = 'scan' | 'search'
+type SaveMode  = 'draft' | 'post'
 
 export default function FieldLogPage() {
-  const [step, setStep]               = useState<Step>('type')
-  const [typeIdx, setTypeIdx]         = useState(0)
-  const [inputMode, setInputMode]     = useState<InputMode>('scan')
-  const [product, setProduct]         = useState<any>(null)
-  const [qty, setQty]                 = useState(1)
+  const [step, setStep]           = useState<Step>('type')
+  const [typeIdx, setTypeIdx]     = useState(0)
+  const [inputMode, setInputMode] = useState<InputMode>('scan')
+  const [product, setProduct]     = useState<any>(null)
+  const [qty, setQty]             = useState(1)
   const [fromLocation, setFromLocation] = useState('')
-  const [toLocation, setToLocation]   = useState('')
-  const [jobRef, setJobRef]           = useState('')
-  const [refNo, setRefNo]             = useState('')
-  const [notes, setNotes]             = useState('')
-  const [submitting, setSubmitting]   = useState(false)
-  const [errorMsg, setErrorMsg]       = useState('')
-  const [scanError, setScanError]     = useState('')
-  const [scanLookup, setScanLookup]   = useState(false)
+  const [toLocation, setToLocation]     = useState('')
+  const [jobRef, setJobRef]       = useState('')
+  const [refNo, setRefNo]         = useState('')
+  const [notes, setNotes]         = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [saveMode, setSaveMode]   = useState<SaveMode>('draft')
+  const [errorMsg, setErrorMsg]   = useState('')
+  const [scanError, setScanError] = useState('')
+  const [scanLookup, setScanLookup] = useState(false)
 
-  const logType = LOG_TYPES[typeIdx]
+  // Purchase-specific
+  const [pendingPOs, setPendingPOs]     = useState<any[]>([])
+  const [selectedPO, setSelectedPO]     = useState<any>(null)
+  const [selectedLine, setSelectedLine] = useState<any>(null)
+  const [supplierId, setSupplierId]     = useState('')
+  const [suppliers, setSuppliers]       = useState<any[]>([])
+  const [receivedBy, setReceivedBy]     = useState('')
+  const [members, setMembers]           = useState<any[]>([])
+  const [condition, setCondition]       = useState<Condition>('good')
+  const [conditionNotes, setConditionNotes] = useState('')
+  const [doneStatus, setDoneStatus]     = useState('')
+
+  const logType    = LOG_TYPES[typeIdx]
+  const isPurchase = logType.value === 'purchase'
+
+  // Load purchase-specific data when type = purchase
+  useEffect(() => {
+    if (!isPurchase) return
+    fetch('/api/purchase-orders/pending').then(r => r.json()).then(j => setPendingPOs(j.data ?? [])).catch(() => {})
+    fetch('/api/suppliers').then(r => r.json()).then(j => setSuppliers(j.data ?? [])).catch(() => {})
+    fetch('/api/members').then(r => r.json()).then(j => setMembers(j.data ?? [])).catch(() => {})
+  }, [isPurchase])
 
   const handleScan = useCallback(async (barcode: string) => {
     setScanLookup(true)
@@ -144,19 +171,77 @@ export default function FieldLogPage() {
     }
   }, [])
 
-  const handleSubmit = async () => {
+  function selectPOLine(po: any, line: any) {
+    setSelectedPO(po)
+    setSelectedLine(line)
+    setProduct(line.product)
+    setSupplierId((po as any).supplier_id ?? '')
+    setRefNo(po.po_number)
+    setQty(1)
+    setStep('details')
+  }
+
+  const handleSubmit = async (mode: SaveMode) => {
+    if (isPurchase && !receivedBy.trim()) { setErrorMsg('Please select who is receiving the goods'); return }
+    if (isPurchase && !supplierId)        { setErrorMsg('Please select the supplier'); return }
+
+    setSaveMode(mode)
     setSubmitting(true)
     setErrorMsg('')
+
+    // If linked to a PO, use the GRN receive endpoint for proper status update
+    // toLocation only required when items are actually received (not 'missing')
+    if (isPurchase && selectedPO && selectedLine && (condition === 'missing' || toLocation)) {
+      try {
+        const res = await fetch(`/api/purchase-orders/${selectedPO.id}/receive`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            received_by:  receivedBy,
+            supplier_id:  supplierId || null,
+            lines: [{
+              line_id:           selectedLine.id,
+              quantity_received: condition === 'missing' ? 0 : qty,
+              unit_cost:         selectedLine.unit_cost,
+              source_type:       'supplier',
+              from_location_id:  null,
+              to_location_id:    toLocation,
+              batch_no:          null,
+              expiration_date:   null,
+              condition,
+              condition_notes:   conditionNotes || null,
+            }],
+          }),
+        })
+        const json = await res.json()
+        if (!res.ok) { setErrorMsg(json.error ?? 'Receive failed'); setSubmitting(false); return }
+        const newStatus = json.data?.new_status
+        setDoneStatus(
+          newStatus === 'received' ? 'All items received — PO marked as Received' :
+          newStatus === 'partial'  ? 'Partially received — PO marked as Partial' : ''
+        )
+        setStep('done')
+      } catch {
+        setErrorMsg('Network error — please try again.')
+        setSubmitting(false)
+      }
+      return
+    }
+
+    // General inventory movement (draft or post)
     const body: Record<string, any> = {
       transaction_type: logType.value,
-      product_id: product.id,
-      quantity: qty,
-      unit_cost: product.avg_cost ?? 0,
-      reference_no: refNo.trim() || undefined,
-      notes: notes.trim() || undefined,
+      product_id:       product.id,
+      quantity:         qty,
+      unit_cost:        product.avg_cost ?? 0,
+      reference_no:     refNo.trim() || undefined,
+      notes:            notes.trim() || undefined,
+      draft:            mode === 'draft',
     }
-    if (logType.needsFrom)           body.from_location_id = fromLocation || undefined
-    if (!logType.needsFrom)          body.to_location_id   = toLocation   || undefined
+    if (supplierId)   body.supplier_id     = supplierId
+    if (selectedPO)   body.related_po_id   = selectedPO.id
+    if (logType.needsFrom)            body.from_location_id = fromLocation || undefined
+    if (!logType.needsFrom)           body.to_location_id   = toLocation   || undefined
     if (logType.value === 'transfer') { body.from_location_id = fromLocation; body.to_location_id = toLocation }
     if (logType.needsJob && jobRef.trim()) body.job_order_id = jobRef.trim()
 
@@ -179,9 +264,12 @@ export default function FieldLogPage() {
     setStep('type'); setProduct(null); setQty(1)
     setFromLocation(''); setToLocation(''); setJobRef('')
     setRefNo(''); setNotes(''); setErrorMsg(''); setScanError('')
+    setSelectedPO(null); setSelectedLine(null); setSupplierId('')
+    setReceivedBy(''); setCondition('good'); setConditionNotes('')
+    setDoneStatus('')
   }
 
-  // ── Success screen ──────────────────────────────────────────────────────────
+  // ── Success screen ────────────────────────────────────────────────────────
   if (step === 'done') {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-6 px-6 text-center">
@@ -189,11 +277,19 @@ export default function FieldLogPage() {
           <CheckCircle2 className="w-10 h-10 text-green-600" />
         </div>
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Logged!</h2>
+          <h2 className="text-2xl font-bold text-gray-900">
+            {saveMode === 'draft' ? 'Draft Saved!' : 'Logged!'}
+          </h2>
           <p className="text-gray-500 mt-1">
             {qty}× {product?.name}
             {jobRef && <span className="text-indigo-600"> → {jobRef}</span>}
           </p>
+          {doneStatus && (
+            <p className="mt-2 text-sm font-medium text-green-600">{doneStatus}</p>
+          )}
+          {saveMode === 'draft' && (
+            <p className="mt-1 text-xs text-gray-400">Review and post it from the Transactions list.</p>
+          )}
         </div>
         <button
           onClick={reset}
@@ -216,7 +312,7 @@ export default function FieldLogPage() {
         <h1 className="font-bold text-gray-900 text-lg">Log Movement</h1>
       </div>
 
-      <div className="flex-1 px-4 py-5 space-y-5">
+      <div className="flex-1 px-4 py-5 space-y-5 pb-10">
 
         {/* ── Step 1: Type selection ── */}
         <div>
@@ -240,8 +336,48 @@ export default function FieldLogPage() {
           </div>
         </div>
 
-        {/* ── Step 2: Item selection ── */}
-        {step !== 'type' && (
+        {/* ── Purchase: PO selector ── */}
+        {step !== 'type' && isPurchase && (
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+              Receive Against Purchase Order
+            </p>
+            {pendingPOs.length === 0 ? (
+              <p className="text-sm text-gray-400 py-1">No pending POs found — select item manually below.</p>
+            ) : (
+              <div className="space-y-2 max-h-52 overflow-y-auto">
+                {pendingPOs.map(po => (
+                  <div key={po.id} className="border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-sm">
+                    <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
+                      <span className="font-mono text-xs font-bold text-gray-700">{po.po_number}</span>
+                      <span className="text-xs text-gray-500">{po.supplier?.name ?? 'No supplier'}</span>
+                    </div>
+                    {po.lines
+                      .filter((l: any) => l.quantity_ordered > l.quantity_received)
+                      .map((l: any) => (
+                        <button
+                          key={l.id}
+                          type="button"
+                          onClick={() => selectPOLine(po, l)}
+                          className={`w-full text-left px-4 py-3 flex items-center justify-between active:bg-indigo-50 transition-colors ${
+                            selectedLine?.id === l.id ? 'bg-indigo-50 border-l-4 border-indigo-500' : ''
+                          }`}
+                        >
+                          <span className="font-medium text-gray-900 text-sm">{l.product?.name}</span>
+                          <span className="text-xs text-gray-400 ml-2 shrink-0">
+                            Outstanding: {l.quantity_ordered - l.quantity_received} {l.product?.unit_of_measure}
+                          </span>
+                        </button>
+                      ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Step 2: Item selection (non-purchase or no PO selected) ── */}
+        {step !== 'type' && (!isPurchase || !selectedLine) && (
           <div>
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
@@ -304,25 +440,126 @@ export default function FieldLogPage() {
           </div>
         )}
 
+        {/* PO line chip when selected */}
+        {isPurchase && selectedLine && (
+          <div className="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-2xl px-4 py-3.5">
+            <div className="flex-1">
+              <p className="font-semibold text-gray-900">{selectedLine.product?.name}</p>
+              <p className="text-xs text-gray-500 font-mono mt-0.5">{selectedLine.product?.sku} · from {selectedPO.po_number}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setSelectedLine(null); setSelectedPO(null); setProduct(null); setRefNo(''); setSupplierId('') }}
+              className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-gray-400 active:bg-gray-50 border border-gray-200"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* ── Step 3: Details ── */}
         {step === 'details' && product && (
           <>
             {/* Qty stepper */}
             <div>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Quantity</p>
-              <QtyStepper value={qty} onChange={setQty} />
-            </div>
-
-            {/* Location(s) */}
-            <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-                {logType.value === 'transfer' ? 'From Location' : logType.needsFrom ? 'Source Location' : 'Destination Location'}
-              </p>
-              <LocationSelect
-                value={logType.needsFrom || logType.value === 'transfer' ? fromLocation : toLocation}
-                onChange={id => logType.needsFrom || logType.value === 'transfer' ? setFromLocation(id) : setToLocation(id)}
+              <QtyStepper
+                value={qty}
+                onChange={setQty}
+                max={selectedLine ? selectedLine.quantity_ordered - selectedLine.quantity_received : undefined}
               />
             </div>
+
+            {/* Purchase-specific fields */}
+            {isPurchase && (
+              <>
+                {/* Received From (Supplier) */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+                    Received From <span className="text-red-400">*</span>
+                  </p>
+                  <select
+                    value={supplierId}
+                    onChange={e => setSupplierId(e.target.value)}
+                    className="w-full h-14 px-4 rounded-2xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                  >
+                    <option value="">— Select supplier —</option>
+                    {suppliers.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Received By */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+                    Received By <span className="text-red-400">*</span>
+                  </p>
+                  {members.length > 0 ? (
+                    <select
+                      value={receivedBy}
+                      onChange={e => setReceivedBy(e.target.value)}
+                      className="w-full h-14 px-4 rounded-2xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                    >
+                      <option value="">— Select staff member —</option>
+                      {members.map(m => (
+                        <option key={m.id} value={m.full_name ?? m.id}>{m.full_name ?? m.id} ({m.role})</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      value={receivedBy}
+                      onChange={e => setReceivedBy(e.target.value)}
+                      placeholder="Name of person receiving"
+                      className="w-full h-14 px-4 rounded-2xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                    />
+                  )}
+                </div>
+
+                {/* Condition */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Item Condition</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {([['good','✓ Good','bg-green-600'],['damaged','⚠ Damaged','bg-amber-500'],['missing','✕ Not Received','bg-red-600']] as const).map(([val, label, active]) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setCondition(val as Condition)}
+                        className={`py-3 rounded-2xl text-sm font-semibold border transition-all active:scale-95 ${
+                          condition === val
+                            ? `${active} text-white border-transparent`
+                            : 'bg-white text-gray-600 border-gray-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {(condition === 'damaged' || condition === 'missing') && (
+                    <textarea
+                      value={conditionNotes}
+                      onChange={e => setConditionNotes(e.target.value)}
+                      placeholder={condition === 'damaged' ? 'Describe the damage…' : 'Reason not received…'}
+                      rows={2}
+                      className="mt-3 w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                    />
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* Location(s) */}
+            {condition !== 'missing' && (
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+                  {logType.value === 'transfer' ? 'From Location' : logType.needsFrom ? 'Source Location' : 'Destination Location'}
+                </p>
+                <LocationSelect
+                  value={logType.needsFrom || logType.value === 'transfer' ? fromLocation : toLocation}
+                  onChange={id => logType.needsFrom || logType.value === 'transfer' ? setFromLocation(id) : setToLocation(id)}
+                />
+              </div>
+            )}
 
             {logType.value === 'transfer' && fromLocation && (
               <div>
@@ -346,7 +583,7 @@ export default function FieldLogPage() {
               </div>
             )}
 
-            {/* Reference + notes (collapsed unless needed) */}
+            {/* Reference + notes */}
             <details className="group">
               <summary className="text-xs font-semibold text-gray-400 uppercase tracking-wide cursor-pointer list-none flex items-center gap-2">
                 <span>More options</span>
@@ -375,18 +612,48 @@ export default function FieldLogPage() {
               </div>
             )}
 
-            {/* Submit */}
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={submitting}
-              className="w-full h-16 rounded-2xl bg-indigo-600 text-white font-bold text-lg active:bg-indigo-700 disabled:opacity-60 transition-colors flex items-center justify-center gap-3 shadow-md shadow-indigo-200"
-            >
-              {submitting
-                ? <><Loader2 className="w-5 h-5 animate-spin" /> Saving…</>
-                : <>Confirm &amp; Log {qty}× {product?.unit_of_measure}</>
-              }
-            </button>
+            {/* Submit buttons */}
+            {isPurchase ? (
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => handleSubmit('post')}
+                  disabled={submitting}
+                  className="w-full h-16 rounded-2xl bg-green-600 text-white font-bold text-lg active:bg-green-700 disabled:opacity-60 transition-colors flex items-center justify-center gap-3 shadow-md shadow-green-200"
+                >
+                  {submitting && saveMode === 'post'
+                    ? <><Loader2 className="w-5 h-5 animate-spin" /> Saving…</>
+                    : <><FileCheck className="w-5 h-5" /> Confirm Receipt</>
+                  }
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSubmit('draft')}
+                  disabled={submitting}
+                  className="w-full h-12 rounded-2xl bg-white border border-gray-200 text-gray-700 font-semibold text-base active:bg-gray-50 disabled:opacity-60 transition-colors flex items-center justify-center gap-2 shadow-sm"
+                >
+                  {submitting && saveMode === 'draft'
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
+                    : <><Save className="w-4 h-4" /> Save as Draft</>
+                  }
+                </button>
+                <p className="text-xs text-center text-gray-400">
+                  Confirm Receipt updates stock immediately. Save as Draft lets a manager review first.
+                </p>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleSubmit('post')}
+                disabled={submitting}
+                className="w-full h-16 rounded-2xl bg-indigo-600 text-white font-bold text-lg active:bg-indigo-700 disabled:opacity-60 transition-colors flex items-center justify-center gap-3 shadow-md shadow-indigo-200"
+              >
+                {submitting
+                  ? <><Loader2 className="w-5 h-5 animate-spin" /> Saving…</>
+                  : <>Confirm &amp; Log {qty}× {product?.unit_of_measure}</>
+                }
+              </button>
+            )}
           </>
         )}
       </div>

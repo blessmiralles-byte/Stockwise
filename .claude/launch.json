@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "stockwise",
-      "runtimeExecutable": "npm.cmd",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeExecutable": "powershell.exe",
+      "runtimeArgs": ["-NoProfile", "-Command", "Set-Location 'C:\\Users\\Bless Miralles\\stockwise'; npm run dev"],
       "port": 3000
     }
   ]

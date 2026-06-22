@@ -153,7 +153,7 @@ export function PrintLabelsDialog({
 <html>
 <head>
 <meta charset="utf-8">
-<title>Asset Labels — StockWise</title>
+<title>Asset Labels — Stocked</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {

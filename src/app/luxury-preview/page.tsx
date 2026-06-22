@@ -142,7 +142,7 @@ function Nav() {
           <div className="w-8 h-8 border border-[#C9A96E]/40 rounded-lg flex items-center justify-center">
             <Package className="w-4 h-4 text-[#C9A96E]" strokeWidth={1.5} />
           </div>
-          <span className="text-white font-semibold tracking-wide">StockWise</span>
+          <span className="text-white font-semibold tracking-wide">Stocked</span>
         </div>
 
         {/* Links */}
@@ -365,7 +365,7 @@ function FieldSpotlight() {
                 <div className="w-7 h-7 rounded-lg border border-[#C9A96E]/30 flex items-center justify-center">
                   <Package className="w-3.5 h-3.5 text-[#C9A96E]" strokeWidth={1.5} />
                 </div>
-                <span className="text-white text-sm font-medium">StockWise Field</span>
+                <span className="text-white text-sm font-medium">Stocked Field</span>
                 <span className="ml-auto w-2 h-2 rounded-full bg-emerald-400" />
               </div>
 
@@ -454,7 +454,7 @@ function AssetsSpotlight() {
               <em className="text-[#C9A96E] not-italic italic">is worth — and where it is</em>
             </h2>
             <p className="text-[#8A8A9E] mb-8 leading-relaxed">
-              From hand tools to service vehicles — StockWise tracks every piece of
+              From hand tools to service vehicles — Stocked tracks every piece of
               equipment through its full life. Depreciation runs automatically.
               Your accountant gets a clean schedule. You get clarity.
             </p>
@@ -552,7 +552,7 @@ function Pricing() {
               ))}
             </ul>
             <a
-              href="mailto:hello@stockwise.app"
+              href="mailto:hello@stocked.tech"
               className="block text-center py-2.5 rounded-xl text-sm font-semibold border border-white/10 text-[#8A8A9E] hover:text-white hover:border-white/20 transition-all"
             >
               Contact Sales
@@ -616,7 +616,7 @@ function Footer() {
           <div className="w-7 h-7 border border-[#C9A96E]/30 rounded-lg flex items-center justify-center">
             <Package className="w-3.5 h-3.5 text-[#C9A96E]" strokeWidth={1.5} />
           </div>
-          <span className="text-white font-semibold text-sm tracking-wide">StockWise</span>
+          <span className="text-white font-semibold text-sm tracking-wide">Stocked</span>
           <span className="text-[#52526A] text-xs hidden sm:inline">
             — Inventory software that grows with you
           </span>
@@ -625,10 +625,10 @@ function Footer() {
         <div className="flex gap-6 text-xs text-[#52526A]">
           <Link href="/privacy" className="hover:text-[#C9A96E] transition-colors">Privacy</Link>
           <Link href="/terms"   className="hover:text-[#C9A96E] transition-colors">Terms</Link>
-          <a href="mailto:hello@stockwise.app" className="hover:text-[#C9A96E] transition-colors">Contact</a>
+          <a href="mailto:hello@stocked.tech" className="hover:text-[#C9A96E] transition-colors">Contact</a>
         </div>
 
-        <p className="text-xs text-[#52526A]">© {new Date().getFullYear()} StockWise</p>
+        <p className="text-xs text-[#52526A]">© {new Date().getFullYear()} Stocked</p>
       </div>
     </footer>
   )

@@ -48,15 +48,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   for (const recv of lines) {
     const { line_id, quantity_received, to_location_id, source_type, from_location_id, unit_cost, batch_no, expiration_date, condition, condition_notes } = recv
 
-    if (!to_location_id) {
-      errors.push(`line ${line_id}: to_location_id is required`)
-      continue
-    }
-    if (source_type === 'location' && !from_location_id) {
-      errors.push(`line ${line_id}: from_location_id is required for location transfers`)
-      continue
-    }
-
     const poLine = (po.lines as any[]).find((l: any) => l.id === line_id)
     if (!poLine) {
       errors.push(`line ${line_id}: not found on this PO`)
@@ -65,13 +56,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const remaining = poLine.quantity_ordered - poLine.quantity_received
 
-    // "missing" lines: record the note but skip inventory movement
+    // "missing" lines: record the note but skip inventory movement (no location needed)
     if (condition === 'missing') {
       await supabase
         .from('purchase_order_lines')
         .update({ received_by, condition: 'missing', condition_notes: condition_notes?.trim() || null })
         .eq('id', line_id)
       successLines.push(line_id)
+      continue
+    }
+
+    if (!to_location_id) {
+      errors.push(`line ${line_id}: to_location_id is required`)
+      continue
+    }
+    if (source_type === 'location' && !from_location_id) {
+      errors.push(`line ${line_id}: from_location_id is required for location transfers`)
       continue
     }
 

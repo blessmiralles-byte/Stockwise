@@ -144,7 +144,7 @@ export default function NewTransactionPage() {
     setProduct(line.product)
     setUnitCost(String(line.unit_cost ?? ''))
     setRefNo(po.po_number)
-    setQty(String(line.quantity_ordered - line.quantity_received))
+    setQty('')
   }
 
   const handleScan = useCallback(async (barcode: string) => {

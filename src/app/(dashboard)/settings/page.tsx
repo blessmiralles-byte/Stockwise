@@ -487,10 +487,10 @@ function BillingSection() {
   // pricing CTAs pass ?plan=, register stashes it, and we surface it here so the
   // intent isn't lost across the trial signup.
   useEffect(() => {
-    const intended = localStorage.getItem('stockwise.intended_plan')
+    const intended = localStorage.getItem('stocked.intended_plan')
     if (intended === 'starter' || intended === 'pro') {
       setHighlightPlan(intended)
-      localStorage.removeItem('stockwise.intended_plan')
+      localStorage.removeItem('stocked.intended_plan')
     }
   }, [])
 
@@ -631,7 +631,7 @@ function BillingSection() {
             {currentPlan !== 'enterprise' && (
               <p className="text-xs text-center text-slate-400">
                 Need more than 20 users?{' '}
-                <a href="mailto:hello@stockwise.app" className="text-indigo-600 hover:underline font-medium">
+                <a href="mailto:hello@stocked.tech" className="text-indigo-600 hover:underline font-medium">
                   Contact us for Enterprise pricing
                 </a>
               </p>
@@ -737,6 +737,130 @@ function Section({ icon: Icon, title, description, children }: any) {
   )
 }
 
+// ── Accountable Persons section ───────────────────────────────────────────────
+function AccountablePersonsSection() {
+  const { data, loading, refetch } = useApi<{ data: any[] }>('/api/accountable-persons')
+  const persons = data?.data ?? []
+
+  const [showForm, setShowForm]   = useState(false)
+  const [editing,  setEditing]    = useState<any | null>(null)
+  const [name,     setName]       = useState('')
+  const [dept,     setDept]       = useState('')
+  const [email,    setEmail]      = useState('')
+  const [phone,    setPhone]      = useState('')
+  const [saving,   setSaving]     = useState(false)
+  const [deleting, setDeleting]   = useState<string | null>(null)
+  const [error,    setError]      = useState('')
+
+  function openAdd() {
+    setEditing(null); setName(''); setDept(''); setEmail(''); setPhone('')
+    setError(''); setShowForm(true)
+  }
+
+  function openEdit(p: any) {
+    setEditing(p); setName(p.name); setDept(p.department ?? ''); setEmail(p.email ?? ''); setPhone(p.phone ?? '')
+    setError(''); setShowForm(true)
+  }
+
+  async function handleSave() {
+    if (!name.trim()) { setError('Name is required'); return }
+    setSaving(true); setError('')
+    const url    = editing ? `/api/accountable-persons/${editing.id}` : '/api/accountable-persons'
+    const method = editing ? 'PATCH' : 'POST'
+    const res    = await fetch(url, {
+      method, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim(), department: dept.trim() || null, email: email.trim() || null, phone: phone.trim() || null }),
+    })
+    const j = await res.json()
+    setSaving(false)
+    if (!res.ok) { setError(j.error ?? 'Failed to save'); return }
+    setShowForm(false); refetch()
+  }
+
+  async function handleDelete(id: string) {
+    setDeleting(id)
+    const res = await fetch(`/api/accountable-persons/${id}`, { method: 'DELETE' })
+    const j   = await res.json()
+    setDeleting(null)
+    if (!res.ok) { alert(j.error ?? 'Failed to delete'); return }
+    refetch()
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-slate-500">
+        Accountable persons are employees responsible for assets. They don't need a Stocked account.
+      </p>
+
+      {/* Add form */}
+      {showForm ? (
+        <div className="border border-slate-200 rounded-lg p-4 space-y-3 bg-slate-50">
+          <p className="text-sm font-semibold text-slate-700">{editing ? 'Edit Person' : 'Add Person'}</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-slate-600 block mb-1">Full Name *</label>
+              <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. John Smith" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600 block mb-1">Department</label>
+              <Input value={dept} onChange={e => setDept(e.target.value)} placeholder="e.g. Operations" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600 block mb-1">Email</label>
+              <Input value={email} onChange={e => setEmail(e.target.value)} placeholder="john@company.com" type="email" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600 block mb-1">Phone</label>
+              <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+1 555 0100" />
+            </div>
+          </div>
+          {error && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" />{error}</p>}
+          <div className="flex gap-2">
+            <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1.5">
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+              {editing ? 'Save Changes' : 'Add Person'}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+          </div>
+        </div>
+      ) : (
+        <Button size="sm" onClick={openAdd} className="gap-2">
+          <Plus className="w-3.5 h-3.5" /> Add Person
+        </Button>
+      )}
+
+      {/* List */}
+      {loading ? (
+        <p className="text-sm text-slate-400">Loading…</p>
+      ) : persons.length === 0 ? (
+        <p className="text-sm text-slate-400 py-4 text-center">No accountable persons yet. Add employees who are responsible for assets.</p>
+      ) : (
+        <div className="border border-slate-200 rounded-lg overflow-hidden">
+          {persons.map((p, i) => (
+            <div key={p.id} className={`flex items-center gap-3 px-4 py-3 ${i < persons.length - 1 ? 'border-b border-slate-100' : ''}`}>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-900">{p.name}</p>
+                <p className="text-xs text-slate-400">
+                  {[p.department, p.email, p.phone].filter(Boolean).join(' · ') || 'No details'}
+                </p>
+              </div>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openEdit(p)}>Edit</Button>
+              <Button
+                size="sm" variant="outline"
+                className="h-7 text-xs border-red-200 text-red-600 hover:bg-red-50"
+                onClick={() => handleDelete(p.id)}
+                disabled={deleting === p.id}
+              >
+                {deleting === p.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Thin alias map for the "Your Account" badge
 const roleConfig: Record<string, { variant: any; label: string }> = Object.fromEntries(
   Object.entries(ROLE_CFG).map(([k, v]) => [k, { variant: v.variant, label: v.label }])
@@ -746,7 +870,7 @@ function SettingsInner() {
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
   const [activeTab, setActiveTab] = useState(
-    ['users', 'billing', 'costcenters', 'periods'].includes(tabParam ?? '') ? tabParam! : 'general'
+    ['users', 'billing', 'people', 'costcenters', 'periods'].includes(tabParam ?? '') ? tabParam! : 'general'
   )
 
   const { data: profile } = useApi<any>('/api/user/profile')
@@ -785,6 +909,7 @@ function SettingsInner() {
     { id: 'general',      label: 'General',          icon: Settings      },
     ...(isAdmin   ? [{ id: 'users',       label: 'Team',             icon: Shield        }] : []),
     ...(isAdmin   ? [{ id: 'billing',     label: 'Billing',          icon: CreditCard    }] : []),
+    ...(isAdmin   ? [{ id: 'people',      label: 'People',           icon: UserPlus      }] : []),
     ...(isFinance ? [{ id: 'costcenters', label: 'Cost Centers',     icon: Briefcase     }] : []),
     ...(isFinance ? [{ id: 'periods',     label: 'Acct. Periods',    icon: CalendarRange }] : []),
   ]
@@ -834,6 +959,13 @@ function SettingsInner() {
         {/* User Management tab — owner only */}
         {activeTab === 'users' && isAdmin && (
           <UserManagementSection currentUserId={profile?.id ?? ''} />
+        )}
+
+        {/* People tab — owner only */}
+        {activeTab === 'people' && isAdmin && (
+          <Section icon={UserPlus} title="Accountable Persons" description="Employees responsible for assets — no system account required">
+            <AccountablePersonsSection />
+          </Section>
         )}
 
         {/* Billing tab — owner only */}

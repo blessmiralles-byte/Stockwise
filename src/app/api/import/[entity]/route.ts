@@ -16,8 +16,8 @@ import * as XLSX from 'xlsx'
  *   { imported: number, skipped: number, errors: string[] }
  */
 
-type Entity = 'products' | 'assets' | 'locations' | 'suppliers'
-const VALID_ENTITIES: Entity[] = ['products', 'assets', 'locations', 'suppliers']
+type Entity = 'products' | 'assets' | 'locations' | 'suppliers' | 'categories' | 'job_codes' | 'cost_centers'
+const VALID_ENTITIES: Entity[] = ['products', 'assets', 'locations', 'suppliers', 'categories', 'job_codes', 'cost_centers']
 
 // ── Column mappers ────────────────────────────────────────────────────────────
 // Normalise common header variations (lowercase, no spaces) → field name
@@ -117,18 +117,63 @@ function transformSupplier(row: Record<string, any>) {
   }
 }
 
+function transformCategory(row: Record<string, any>) {
+  const r = Object.fromEntries(Object.entries(row).map(([k, v]) => [normaliseHeader(k), v]))
+  if (!r.name && !r.category_name) return null
+  const validTypes = ['inventory', 'fixed_asset', 'both']
+  const rawType = (r.type ?? r.applies_to ?? 'inventory').toLowerCase().replace(/\s+/g, '_')
+  return {
+    name: String(r.name ?? r.category_name ?? '').trim().slice(0, 200),
+    type: validTypes.includes(rawType) ? rawType : 'inventory',
+  }
+}
+
+function transformJobCode(row: Record<string, any>) {
+  const r = Object.fromEntries(Object.entries(row).map(([k, v]) => [normaliseHeader(k), v]))
+  if (!r.code && !r.job_code) return null
+  if (!r.name && !r.job_name) return null
+  return {
+    code:           String(r.code ?? r.job_code ?? '').trim().toUpperCase().slice(0, 50),
+    name:           String(r.name ?? r.job_name ?? '').trim().slice(0, 200),
+    description:    r.description ?? r.desc ?? null,
+    billing_entity: r.billing_entity ?? r.client ?? null,
+    address:        r.address ?? null,
+    contact_name:   r.contact_name ?? r.contact ?? null,
+    contact_phone:  r.contact_phone ?? r.phone ?? null,
+    contact_email:  r.contact_email ?? r.email ?? null,
+    is_active:      true,
+  }
+}
+
+function transformCostCenter(row: Record<string, any>) {
+  const r = Object.fromEntries(Object.entries(row).map(([k, v]) => [normaliseHeader(k), v]))
+  if (!r.code && !r.cost_center_code) return null
+  if (!r.name && !r.cost_center_name) return null
+  return {
+    code:      String(r.code ?? r.cost_center_code ?? '').trim().toUpperCase().slice(0, 20),
+    name:      String(r.name ?? r.cost_center_name ?? '').trim().slice(0, 200),
+    is_active: true,
+  }
+}
+
 const TRANSFORMERS: Record<Entity, (row: any) => any> = {
-  products:  transformProduct,
-  assets:    transformAsset,
-  locations: transformLocation,
-  suppliers: transformSupplier,
+  products:     transformProduct,
+  assets:       transformAsset,
+  locations:    transformLocation,
+  suppliers:    transformSupplier,
+  categories:   transformCategory,
+  job_codes:    transformJobCode,
+  cost_centers: transformCostCenter,
 }
 
 const TABLE_NAMES: Record<Entity, string> = {
-  products:  'products',
-  assets:    'fixed_assets',
-  locations: 'locations',
-  suppliers: 'suppliers',
+  products:     'products',
+  assets:       'fixed_assets',
+  locations:    'locations',
+  suppliers:    'suppliers',
+  categories:   'categories',
+  job_codes:    'job_codes',
+  cost_centers: 'cost_centers',
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -241,10 +286,13 @@ export async function GET(
   const { entity } = await params
 
   const TEMPLATES: Record<string, string> = {
-    products:  'name,sku,barcode,unit_of_measure,reorder_point,description\nWD-40 Spray,WD40-350ML,,pcs,10,Lubricant spray',
-    assets:    'name,asset_tag,serial_number,purchase_cost,purchase_date,useful_life_years,depreciation_method,status,notes\nLaptop Dell XPS,LAP-001,SN12345,1200,2024-01-15,5,straight_line,active,IT Equipment',
-    locations: 'name,code,type,address\nMain Warehouse,WH-01,warehouse,123 Industrial Ave',
-    suppliers: 'name,contact_name,email,phone,payment_terms,lead_time_days,notes\nAcme Corp,John Doe,john@acme.com,+1-555-1234,Net 30,7,Preferred supplier',
+    products:     'name,sku,barcode,unit_of_measure,reorder_point,description\nWD-40 Spray,WD40-350ML,,pcs,10,Lubricant spray',
+    assets:       'name,asset_tag,serial_number,purchase_cost,purchase_date,useful_life_years,depreciation_method,status,notes\nLaptop Dell XPS,LAP-001,SN12345,1200,2024-01-15,5,straight_line,active,IT Equipment',
+    locations:    'name,code,type,address\nMain Warehouse,WH-01,warehouse,123 Industrial Ave',
+    suppliers:    'name,contact_name,email,phone,payment_terms,lead_time_days,notes\nAcme Corp,John Doe,john@acme.com,+1-555-1234,Net 30,7,Preferred supplier',
+    categories:   'name,type\nElectronics,inventory\nVehicles,fixed_asset\nOffice Supplies,both',
+    job_codes:    'code,name,description,billing_entity,contact_name,contact_phone,contact_email\nJOB-001,Building Renovation,Phase 1 works,ABC Corp,John Smith,+1-555-0100,john@abc.com',
+    cost_centers: 'code,name\nOPS,Operations\nMKT,Marketing\nFIN,Finance',
   }
 
   const csv = TEMPLATES[entity]

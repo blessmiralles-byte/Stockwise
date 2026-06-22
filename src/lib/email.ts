@@ -58,7 +58,7 @@ export async function sendMaintenanceAlert({
     <body>
       <div class="container">
         <div class="header">
-          <h1>StockWise Maintenance Alert</h1>
+          <h1>Stocked Maintenance Alert</h1>
           <p>${businessName} · ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
         </div>
         <div class="body">
@@ -99,7 +99,7 @@ export async function sendMaintenanceAlert({
           </a>
         </div>
         <div class="footer">
-          Sent by StockWise · You're receiving this because you're the account admin.
+          Sent by Stocked · You're receiving this because you're the account admin.
         </div>
       </div>
     </body>
@@ -107,7 +107,7 @@ export async function sendMaintenanceAlert({
   `
 
   return resend.emails.send({
-    from: process.env.RESEND_FROM_EMAIL ?? 'StockWise <notifications@stockwise.app>',
+    from: process.env.RESEND_FROM_EMAIL ?? 'Stocked <notifications@stocked.tech>',
     to,
     subject,
     html,

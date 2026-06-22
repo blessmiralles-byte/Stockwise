@@ -142,9 +142,15 @@ export default function ValuationReportPage() {
               </button>
             </div>
 
-            {/* Implied formula */}
+            {/* Reconciliation formula */}
             <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-4 py-3 text-sm text-indigo-700 font-mono">
-              {formatCurrency(summary.opening_value)} + {formatCurrency(summary.purchases_value)} − {formatCurrency(summary.issues_value)} ± {formatCurrency(summary.adjustments_value)} = <strong>{formatCurrency(summary.closing_value)}</strong>
+              {formatCurrency(summary.opening_value)}
+              {' + '}{formatCurrency(summary.purchases_value)}
+              {' − '}{formatCurrency(summary.issues_value)}
+              {summary.adjustments_value !== 0 && (
+                <>{' '}{summary.adjustments_value >= 0 ? '+' : '−'}{' '}{formatCurrency(Math.abs(summary.adjustments_value))}</>
+              )}
+              {' = '}<strong>{formatCurrency(summary.closing_value)}</strong>
             </div>
 
             {/* Product breakdown */}
@@ -165,6 +171,7 @@ export default function ValuationReportPage() {
                       <tr>
                         <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Product</th>
                         <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase hidden md:table-cell">Category</th>
+                        <th className="text-right px-4 py-3 font-semibold text-slate-500 text-xs uppercase hidden lg:table-cell">Opening</th>
                         <th className="text-right px-4 py-3 font-semibold text-green-600 text-xs uppercase">Purchases</th>
                         <th className="text-right px-4 py-3 font-semibold text-red-600 text-xs uppercase">Issues</th>
                         <th className="text-right px-4 py-3 font-semibold text-indigo-700 text-xs uppercase">Closing Value</th>
@@ -175,10 +182,11 @@ export default function ValuationReportPage() {
                       {filtered.map((l: any, i: number) => (
                         <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/50">
                           <td className="px-4 py-3">
-                            <p className="font-medium text-slate-900">{l.product?.name}</p>
+                            <p className="font-medium text-slate-900">{l.product?.name ?? '—'}</p>
                             <p className="text-xs text-slate-400 font-mono">{l.product?.sku}</p>
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">{l.product?.category?.name ?? '—'}</td>
+                          <td className="px-4 py-3 text-right tabular-nums text-slate-500 hidden lg:table-cell">{formatCurrency(l.opening_value ?? 0)}</td>
                           <td className="px-4 py-3 text-right tabular-nums text-green-700 font-medium">{formatCurrency(l.purchases_value)}</td>
                           <td className="px-4 py-3 text-right tabular-nums text-red-600">{formatCurrency(l.issues_value)}</td>
                           <td className="px-4 py-3 text-right tabular-nums font-bold text-indigo-700">{formatCurrency(l.closing_value)}</td>

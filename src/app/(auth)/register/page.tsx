@@ -25,7 +25,7 @@ export default function RegisterPage() {
   useEffect(() => {
     const plan = new URLSearchParams(window.location.search).get('plan')
     if (plan === 'starter' || plan === 'pro') {
-      localStorage.setItem('stockwise.intended_plan', plan)
+      localStorage.setItem('stocked.intended_plan', plan)
     }
   }, [])
 

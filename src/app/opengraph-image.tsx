@@ -3,7 +3,7 @@ import { ImageResponse } from 'next/og'
 // Static share card shown when the landing page is posted to Slack, LinkedIn,
 // iMessage, etc. Next wires this into og:image and twitter:image automatically
 // (metadataBase in layout.tsx makes the URL absolute).
-export const alt = 'StockWise — inventory, assets, and field stock in one place'
+export const alt = 'Stocked — inventory, assets, and field stock in one place'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
@@ -37,7 +37,7 @@ export default function OpengraphImage() {
             <div style={{ width: '28px', height: '28px', borderRadius: '7px', border: '5px solid white' }} />
           </div>
           <div style={{ color: 'white', fontSize: '40px', fontWeight: 800, letterSpacing: '-1px' }}>
-            StockWise
+            Stocked
           </div>
         </div>
 

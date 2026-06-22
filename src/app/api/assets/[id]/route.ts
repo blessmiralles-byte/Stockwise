@@ -62,18 +62,36 @@ export async function PATCH(
     }
   }
 
+  // Retirement fields — owner/admin only
+  if ('retirement_reason' in body) {
+    if (!MANAGER_ROLES.has(auth.role)) {
+      return NextResponse.json({ error: 'Operations or owner role required' }, { status: 403 })
+    }
+    update.retirement_reason = body.retirement_reason ?? null
+  }
+
+  // Sale fields — owner/admin only
+  for (const key of ['sale_price', 'sale_buyer', 'sale_notes'] as const) {
+    if (key in body) {
+      if (!MANAGER_ROLES.has(auth.role)) {
+        return NextResponse.json({ error: 'Operations or owner role required' }, { status: 403 })
+      }
+      update[key] = body[key] ?? null
+    }
+  }
+
   if ('status' in update) {
-    const validStatuses = ['active', 'maintenance', 'inactive', 'disposed']
+    const validStatuses = ['active', 'maintenance', 'inactive', 'disposed', 'retired', 'sold']
     if (!validStatuses.includes(update.status)) {
       return NextResponse.json(
-        { error: 'Invalid status. Use: active, maintenance, inactive, or disposed' },
+        { error: 'Invalid status. Use: active, maintenance, inactive, disposed, retired, or sold' },
         { status: 400 }
       )
     }
-    // Disposal is a significant event — require operations or above
-    if (update.status === 'disposed' && !MANAGER_ROLES.has(auth.role)) {
+    // Retirement, sale, and disposal require operations or above
+    if (['disposed', 'retired', 'sold'].includes(update.status) && !MANAGER_ROLES.has(auth.role)) {
       return NextResponse.json(
-        { error: 'Operations or owner role required to dispose an asset' },
+        { error: 'Operations or owner role required to retire or sell an asset' },
         { status: 403 }
       )
     }
@@ -81,10 +99,17 @@ export async function PATCH(
     if (update.status === 'disposed') {
       update.disposed_at = new Date().toISOString()
       update.disposed_by = auth.userId
+    } else if (update.status === 'retired') {
+      update.retired_at = new Date().toISOString()
+      update.retired_by = auth.userId
+    } else if (update.status === 'sold') {
+      update.sold_at = new Date().toISOString()
+      update.sold_by = auth.userId
     } else {
-      // If re-activating from disposed, clear the stamps
-      update.disposed_at = null
-      update.disposed_by = null
+      // Re-activating: clear all end-of-life stamps
+      update.disposed_at = null; update.disposed_by = null
+      update.retired_at  = null; update.retired_by  = null
+      update.sold_at     = null; update.sold_by     = null
     }
   }
 

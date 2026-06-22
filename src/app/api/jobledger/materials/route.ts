@@ -6,7 +6,7 @@ import { createServiceClient } from '@/lib/supabase/service'
  *
  * Returns all consumption transactions tagged with the given job_order_id.
  * Response shape mirrors the old direct-Supabase query in JobLedger's
- * stockwiseClient.ts so the migration is a drop-in swap.
+ * stockedClient.ts so the migration is a drop-in swap.
  *
  * Auth: Authorization: Bearer {JOBLEDGER_API_KEY}
  *
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   // ── API key auth ────────────────────────────────────────────────────────────
   const apiKey = process.env.JOBLEDGER_API_KEY
   if (!apiKey) {
-    return NextResponse.json({ error: 'JOBLEDGER_API_KEY is not configured on StockWise' }, { status: 503 })
+    return NextResponse.json({ error: 'JOBLEDGER_API_KEY is not configured on Stocked' }, { status: 503 })
   }
   const auth = req.headers.get('authorization')
   if (auth !== `Bearer ${apiKey}`) {

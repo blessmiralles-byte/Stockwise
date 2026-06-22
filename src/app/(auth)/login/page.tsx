@@ -93,7 +93,7 @@ function LoginForm() {
       </Button>
 
       <div className="flex items-center justify-between text-sm text-slate-500">
-        <span>New to StockWise?{' '}
+        <span>New to Stocked?{' '}
           <Link href="/register" className="text-indigo-600 font-medium hover:underline">Start free</Link>
         </span>
         <Link href="/forgot-password" className="text-indigo-600 font-medium hover:underline">

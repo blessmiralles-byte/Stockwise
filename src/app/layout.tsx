@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL ??
   process.env.NEXT_PUBLIC_APP_URL ??
-  "https://stockwise.app";
+  "https://stocked.tech";
 
-const TITLE = "StockWise — Stop losing money to stock you can't see";
+const TITLE = "Stocked — Stop losing money to stock you can't see";
 const DESCRIPTION =
   "Real-time inventory, expiry & batch tracking, equipment management, and mobile field access — built for trade contractors, healthcare teams, hospitality operators, and field crews. Free 14-day trial, no credit card.";
 
@@ -25,10 +25,10 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
     default: TITLE,
-    template: "%s · StockWise",
+    template: "%s · Stocked",
   },
   description: DESCRIPTION,
-  applicationName: "StockWise",
+  applicationName: "Stocked",
   keywords: [
     "inventory management",
     "asset management",
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
-    siteName: "StockWise",
+    siteName: "Stocked",
     url: siteUrl,
     title: TITLE,
     description: DESCRIPTION,

@@ -7,7 +7,7 @@ import { createServiceClient } from '@/lib/supabase/service'
  * Product catalog enriched with last PO price + supplier info.
  * Used by JobLedger's BOM (Bill of Materials) planning screen.
  *
- * Response shape matches StockwiseProduct in JobLedger's stockwiseClient.ts.
+ * Response shape matches StockedProduct in JobLedger's stockedClient.ts.
  * Auth: Authorization: Bearer {JOBLEDGER_API_KEY}
  */
 export async function GET(req: NextRequest) {

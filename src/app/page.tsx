@@ -18,7 +18,7 @@ function Nav() {
           <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center">
             <Package className="w-4 h-4 text-white" strokeWidth={2.5} />
           </div>
-          <span className="text-white font-bold text-lg tracking-tight">StockWise</span>
+          <span className="text-white font-bold text-lg tracking-tight">Stocked</span>
         </div>
 
         <div className="hidden sm:flex items-center gap-6 text-sm text-indigo-300">
@@ -323,7 +323,7 @@ function Pricing() {
               ))}
             </ul>
             <a
-              href="mailto:hello@stockwise.app"
+              href="mailto:hello@stocked.tech"
               className="block text-center py-2.5 rounded-xl text-sm font-semibold bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors"
             >
               Contact Sales
@@ -371,17 +371,17 @@ function Footer() {
             <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
               <Package className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
             </div>
-            <span className="text-white font-semibold">StockWise</span>
+            <span className="text-white font-semibold">Stocked</span>
           </div>
 
           <div className="flex gap-6 text-sm">
             <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
             <Link href="/terms"   className="hover:text-white transition-colors">Terms of Service</Link>
-            <a href="mailto:hello@stockwise.app" className="hover:text-white transition-colors">Contact</a>
+            <a href="mailto:hello@stocked.tech" className="hover:text-white transition-colors">Contact</a>
           </div>
 
           <p className="text-xs text-slate-600">
-            © {new Date().getFullYear()} StockWise. All rights reserved.
+            © {new Date().getFullYear()} Stocked. All rights reserved.
           </p>
         </div>
       </div>

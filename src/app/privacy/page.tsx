@@ -2,13 +2,13 @@ import Link from 'next/link'
 import { Package } from 'lucide-react'
 
 export const metadata = {
-  title: 'Privacy Policy — StockWise',
-  description: 'How StockWise collects, uses, and protects your data.',
+  title: 'Privacy Policy — Stocked',
+  description: 'How Stocked collects, uses, and protects your data.',
 }
 
 const EFFECTIVE_DATE = 'June 2, 2026'
-const CONTACT_EMAIL  = 'privacy@stockwise.app'
-const COMPANY_NAME   = 'StockWise'
+const CONTACT_EMAIL  = 'privacy@stocked.tech'
+const COMPANY_NAME   = 'Stocked'
 
 export default function PrivacyPage() {
   return (
@@ -20,7 +20,7 @@ export default function PrivacyPage() {
             <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
               <Package className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
             </div>
-            <span className="font-bold text-slate-900">StockWise</span>
+            <span className="font-bold text-slate-900">Stocked</span>
           </Link>
           <Link href="/" className="text-sm text-slate-500 hover:text-slate-700">← Back to home</Link>
         </div>
@@ -35,7 +35,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-lg font-semibold text-slate-800 mb-3">1. Who we are</h2>
             <p className="text-slate-600">
-              {COMPANY_NAME} (&quot;we&quot;, &quot;our&quot;, &quot;us&quot;) operates the StockWise inventory management
+              {COMPANY_NAME} (&quot;we&quot;, &quot;our&quot;, &quot;us&quot;) operates the Stocked inventory management
               platform accessible at this website and via our mobile applications. This Privacy
               Policy explains how we collect, use, disclose, and safeguard your information when
               you use our service.
@@ -49,7 +49,7 @@ export default function PrivacyPage() {
               address, and the name of your organization. We use this to create and manage your
               account.</p>
               <p><strong>Business data.</strong> We store the inventory records, purchase orders,
-              assets, transactions, and other data that you and your team enter into StockWise.
+              assets, transactions, and other data that you and your team enter into Stocked.
               This data belongs to you.</p>
               <p><strong>Usage data.</strong> We automatically collect information about how you
               interact with the service, including IP addresses, browser type, pages visited, and
@@ -65,7 +65,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-lg font-semibold text-slate-800 mb-3">3. How we use your information</h2>
             <ul className="list-disc pl-5 space-y-1.5 text-slate-600">
-              <li>Provide, maintain, and improve the StockWise service</li>
+              <li>Provide, maintain, and improve the Stocked service</li>
               <li>Process transactions and send billing-related emails</li>
               <li>Send transactional notifications (e.g. invite emails, maintenance alerts)</li>
               <li>Respond to your support requests</li>
@@ -173,7 +173,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-lg font-semibold text-slate-800 mb-3">9. Children</h2>
             <p className="text-slate-600">
-              StockWise is intended for business use by persons 18 years or older. We do not
+              Stocked is intended for business use by persons 18 years or older. We do not
               knowingly collect data from children under 13. If you believe we have inadvertently
               collected such data, contact us immediately.
             </p>

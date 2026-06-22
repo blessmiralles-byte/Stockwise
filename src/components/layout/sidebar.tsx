@@ -7,7 +7,7 @@ import {
   MapPin, Wrench, Settings, ChevronLeft, ChevronRight,
   BarChart3, Building2, TrendingUp,
   Truck, ShoppingCart, ScanBarcode, Cpu, ClipboardList,
-  Shield, Upload, Sliders,
+  Shield, Sliders,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
@@ -21,11 +21,10 @@ const navItems = [
   { href: '/purchase-orders', icon: ShoppingCart,    label: 'Purchase Orders' },
   { href: '/requisitions',    icon: ClipboardList,   label: 'Requisitions'    },
   { href: '/stock-counts',    icon: Truck,           label: 'Stock Counts'    },
-  { href: '/setup',           icon: Sliders,         label: 'Setup'           },
+  { href: '/setup',           icon: Sliders,         label: 'Setup & Import'  },
   { href: '/assets',          icon: Cpu,             label: 'Fixed Assets'    },
   { href: '/maintenance',     icon: Wrench,          label: 'Maintenance'     },
   { href: '/reports',         icon: BarChart3,       label: 'Reports'         },
-  { href: '/import',          icon: Upload,          label: 'Import Data'     },
   { href: '/audit-log',       icon: Shield,          label: 'Audit Log'       },
   { href: '/settings',        icon: Settings,        label: 'Settings'        },
 ]
@@ -55,7 +54,7 @@ export function Sidebar() {
         </div>
         {!collapsed && (
           <div>
-            <span className="text-[15px] font-semibold text-white tracking-tight leading-none">StockWise</span>
+            <span className="text-[15px] font-semibold text-white tracking-tight leading-none">Stocked</span>
             <p className="text-[10px] text-slate-500 mt-0.5 leading-none">Inventory management</p>
           </div>
         )}
