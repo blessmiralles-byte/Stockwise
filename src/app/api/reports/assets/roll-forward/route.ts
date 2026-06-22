@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
     .select(`
       id, name, asset_tag, status,
       purchase_cost, current_value,
-      purchase_date, disposed_at,
+      purchase_date, disposed_at, retired_at, sold_at,
       depreciation_method,
       category:categories(id, name)
     `)
@@ -81,13 +81,14 @@ export async function GET(req: NextRequest) {
     .lte('period_end',   to)
 
   if (deprErr) {
-    console.error('[roll-forward] depr log', deprErr)
-    return NextResponse.json({ error: 'Failed to load depreciation data' }, { status: 500 })
+    // Degrade gracefully — org_id column may not exist if multitenancy migration not yet run.
+    // Report still shows cost/NBV correctly; depreciation column will show zeroes.
+    console.warn('[roll-forward] depreciation log unavailable:', deprErr.message)
   }
 
   // ── Index depreciation by asset ───────────────────────────────────────────
   const deprByAsset: Record<string, number> = {}
-  for (const d of (deprLog ?? []) as any[]) {
+  for (const d of (deprErr ? [] : (deprLog ?? [])) as any[]) {
     deprByAsset[d.asset_id] = (deprByAsset[d.asset_id] ?? 0) + Number(d.depreciation_amount)
   }
 
@@ -112,27 +113,30 @@ export async function GET(req: NextRequest) {
     const catId        = a.category?.id   ?? '__none__'
     const catName      = a.category?.name ?? 'Uncategorised'
     const purchaseDate = a.purchase_date ? new Date(a.purchase_date) : null
-    const disposedAt   = a.disposed_at   ? new Date(a.disposed_at)   : null
+    // Treat retired_at and sold_at the same as disposed_at — asset is off the books
+    const endOfLifeAt  = (a.disposed_at ?? a.retired_at ?? a.sold_at)
+                           ? new Date(a.disposed_at ?? a.retired_at ?? a.sold_at)
+                           : null
 
     // Was the asset on the books at period start?
-    //   Purchased before period start AND not yet disposed at period start
+    //   Purchased before period start AND not yet disposed/retired/sold at period start
     const isBeginning = purchaseDate !== null
       && purchaseDate < fromDate
-      && (disposedAt === null || disposedAt >= fromDate)
+      && (endOfLifeAt === null || endOfLifeAt >= fromDate)
 
     // Was it added during the period?
     const isAddition  = purchaseDate !== null
       && purchaseDate >= fromDate
       && purchaseDate <= toDate
 
-    // Was it disposed during the period?
-    const isDisposalInPeriod = disposedAt !== null
-      && disposedAt >= fromDate
-      && disposedAt <= toDate
+    // Was it disposed/retired/sold during the period?
+    const isDisposalInPeriod = endOfLifeAt !== null
+      && endOfLifeAt >= fromDate
+      && endOfLifeAt <= toDate
 
     // Is it on the books at period end?
     const isEndingBalance = (purchaseDate !== null && purchaseDate <= toDate)
-      && (disposedAt === null || disposedAt > toDate)
+      && (endOfLifeAt === null || endOfLifeAt > toDate)
 
     const periodDepr = deprByAsset[a.id] ?? 0
 

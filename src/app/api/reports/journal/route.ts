@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
     const { data: txs } = await supabase
       .from('inventory_transactions')
       .select(`
-        id, transaction_type, reference_no, quantity, unit_cost, notes, created_at,
+        id, transaction_type, reference_no, quantity, unit_cost, total_cost, notes, created_at,
         product:products(name, sku, category:categories(name)),
         from_location:locations!inventory_transactions_from_location_id_fkey(name),
         to_location:locations!inventory_transactions_to_location_id_fkey(name)
@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
 
     for (const tx of txs ?? []) {
       const t          = tx as any
-      const amount     = Math.abs(t.quantity * (t.unit_cost ?? 0))
+      const amount     = Number(t.total_cost ?? (Math.abs(Number(t.quantity)) * Number(t.unit_cost ?? 0)))
       const productRef = t.product?.sku ? `${t.product.sku} — ${t.product?.name}` : (t.product?.name ?? '')
       const category   = t.product?.category?.name ?? ''
       const ref        = t.reference_no ?? t.id.slice(0, 8).toUpperCase()
@@ -153,7 +153,7 @@ export async function GET(req: NextRequest) {
     const { data: deps } = await supabase
       .from('asset_depreciation_log')
       .select(`
-        id, period_start, amount, notes,
+        id, period_start, depreciation_amount, notes,
         asset:fixed_assets(name, asset_tag, category:categories(name))
       `)
       .eq('org_id', auth.orgId)
@@ -171,7 +171,7 @@ export async function GET(req: NextRequest) {
         description:    `Depreciation — ${assetRef}`,
         debit_account:  'Depreciation Expense',
         credit_account: 'Accumulated Depreciation',
-        amount:         dep.amount,
+        amount:         Number(dep.depreciation_amount ?? 0),
         product:        assetRef,
         category:       dep.asset?.category?.name ?? '',
         notes:          dep.notes ?? '',
