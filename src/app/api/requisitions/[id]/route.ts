@@ -129,18 +129,51 @@ export async function PATCH(
           })
 
           if (rpcErr) {
-            // Fallback: direct insert (balance update skipped until RPC is deployed)
+            console.error(`[requisition ${r.req_number}] RPC error:`, rpcErr.message)
+
+            // Resolve effective cost from balance avg_cost
+            let effectiveCost = 0
+            if (r.location_id) {
+              const { data: bal } = await supabase
+                .from('inventory_balances')
+                .select('avg_cost')
+                .eq('product_id', item.product_id)
+                .eq('location_id', r.location_id)
+                .single()
+              effectiveCost = Number(bal?.avg_cost ?? 0)
+            }
+
             await supabase.from('inventory_transactions').insert({
+              org_id:           auth.orgId,
               transaction_type: 'consumption',
               product_id:       item.product_id,
               quantity:         qty,
-              unit_cost:        0,
+              unit_cost:        effectiveCost,
+              total_cost:       qty * effectiveCost,
               from_location_id: r.location_id ?? null,
               reference_no:     r.req_number,
               notes:            `Requisition ${r.req_number}`,
               created_by:       auth.userId,
               job_order_id:     r.job_reference ?? null,
+              cost_center_id:   r.cost_center_id ?? null,
+              job_code:         r.job_code ?? null,
             })
+
+            // Deduct from balance
+            if (r.location_id) {
+              const { data: bal } = await supabase
+                .from('inventory_balances')
+                .select('id, quantity')
+                .eq('product_id', item.product_id)
+                .eq('location_id', r.location_id)
+                .single()
+              if (bal) {
+                await supabase
+                  .from('inventory_balances')
+                  .update({ quantity: bal.quantity - qty, last_updated: new Date().toISOString() })
+                  .eq('id', bal.id)
+              }
+            }
           }
         }
 
