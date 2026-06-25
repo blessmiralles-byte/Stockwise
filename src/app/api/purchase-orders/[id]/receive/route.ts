@@ -98,6 +98,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       p_batch_no: batch_no || null,
       p_expiration_date: expiration_date || null,
       p_job_order_id: null,
+      p_cost_center_id: null,
+      p_job_code: null,
       p_org_id: auth.orgId,
     })
 

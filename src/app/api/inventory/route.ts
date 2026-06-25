@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
     to_location_id, from_location_id,
     unit_cost, reference_no, customer_id, notes,
     expiration_date, batch_no, job_order_id,
+    cost_center_id, job_code,
     draft, related_po_id,
   } = body
 
@@ -143,6 +144,8 @@ export async function POST(req: NextRequest) {
     p_batch_no:         batch_no         ?? null,
     p_expiration_date:  expiration_date  ?? null,
     p_job_order_id:     job_order_id     ?? null,
+    p_cost_center_id:   cost_center_id   ?? null,
+    p_job_code:         job_code         ?? null,
     p_org_id:           auth.orgId,
   })
 
