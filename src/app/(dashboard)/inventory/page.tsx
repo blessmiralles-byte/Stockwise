@@ -360,10 +360,10 @@ function LedgerTab() {
     : allRows.filter((r: any) => r.transaction_type === typeFilter)
 
   // Totals
-  const totalDebitQty   = rows.reduce((s: number, r: any) => s + r.qty_in,  0)
-  const totalCreditQty  = rows.reduce((s: number, r: any) => s + r.qty_out, 0)
-  const totalDebitVal   = rows.reduce((s: number, r: any) => s + r.qty_in  * r.unit_cost, 0)
-  const totalCreditVal  = rows.reduce((s: number, r: any) => s + r.qty_out * r.unit_cost, 0)
+  const totalDebitQty   = rows.reduce((s: number, r: any) => s + r.qty_in,    0)
+  const totalCreditQty  = rows.reduce((s: number, r: any) => s + r.qty_out,   0)
+  const totalDebitVal   = rows.reduce((s: number, r: any) => s + r.value_in,  0)
+  const totalCreditVal  = rows.reduce((s: number, r: any) => s + r.value_out, 0)
   const closingBalance  = rows.length > 0 ? rows[0].running_balance : 0   // rows are newest-first
 
   return (
@@ -518,8 +518,8 @@ function LedgerTab() {
                       const loc     = r.qty_in > 0 ? r.to_location : r.from_location
                       const debitQty  = r.qty_in
                       const creditQty = r.qty_out
-                      const debitVal  = debitQty  * r.unit_cost
-                      const creditVal = creditQty * r.unit_cost
+                      const debitVal  = r.value_in
+                      const creditVal = r.value_out
                       const isLast    = idx === rows.length - 1
 
                       return (
