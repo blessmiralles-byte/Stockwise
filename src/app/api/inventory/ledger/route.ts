@@ -32,14 +32,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to fetch ledger' }, { status: 500 })
   }
 
+  const OUTBOUND = new Set(['consumption', 'sale'])
   const runningBalance: Record<string, number> = {}
   const rows = (data ?? []).map((t: any) => {
     const pid: string = t.product?.id ?? 'unknown'
-    runningBalance[pid] = (runningBalance[pid] ?? 0) + t.quantity
+    const isOut = OUTBOUND.has(t.transaction_type) || t.quantity < 0
+    const absQty = Math.abs(t.quantity)
+    const delta = isOut ? -absQty : absQty
+    runningBalance[pid] = (runningBalance[pid] ?? 0) + delta
     return {
       ...t,
-      qty_in:          t.quantity > 0 ? t.quantity  : 0,
-      qty_out:         t.quantity < 0 ? -t.quantity : 0,
+      qty_in:          isOut ? 0 : absQty,
+      qty_out:         isOut ? absQty : 0,
       running_balance: runningBalance[pid],
     }
   })
