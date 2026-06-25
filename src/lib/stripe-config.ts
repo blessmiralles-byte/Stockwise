@@ -11,15 +11,28 @@ export const PLAN_CONFIG = {
   },
   starter: {
     label:    'Starter',
-    price:    19,
+    price:    49,
     maxUsers: 5,
-    features: ['Up to 5 users', 'Every feature unlocked', 'Unlimited stock & assets', 'Email support — real humans'],
+    features: [
+      'Up to 5 users',
+      'Inventory & asset management',
+      'Purchase orders & receiving',
+      'Barcode scanning & mobile app',
+      'Email support — real humans',
+    ],
   },
   pro: {
     label:    'Pro',
-    price:    49,
+    price:    99,
     maxUsers: 20,
-    features: ['Up to 20 users', 'All Starter features', 'Priority support', 'Full audit trail export'],
+    features: [
+      'Up to 20 users',
+      'Everything in Starter',
+      'Reports & accounting export',
+      'Forecasting & ABC-XYZ analysis',
+      'Full audit trail export',
+      'Priority support',
+    ],
   },
   enterprise: {
     label:    'Enterprise',
