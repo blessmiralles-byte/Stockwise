@@ -34,8 +34,7 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from('audit_log')
     .select(`
-      id, action, table_name, record_id, old_value, new_value, created_at,
-      actor:user_profiles!actor_id(id, full_name, role)
+      id, action, actor_id, table_name, record_id, old_value, new_value, created_at
     `, { count: 'exact' })
     .eq('org_id', auth.orgId)
     .order('created_at', { ascending: false })
@@ -50,8 +49,25 @@ export async function GET(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  const actorIds = [...new Set((data ?? []).map(r => r.actor_id).filter(Boolean))]
+  let actorMap: Record<string, { id: string; full_name: string; role: string }> = {}
+  if (actorIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('user_profiles')
+      .select('user_id, full_name, role')
+      .in('user_id', actorIds)
+    for (const p of profiles ?? []) {
+      actorMap[p.user_id] = { id: p.user_id, full_name: p.full_name, role: p.role }
+    }
+  }
+
+  const enriched = (data ?? []).map(r => ({
+    ...r,
+    actor: r.actor_id ? actorMap[r.actor_id] ?? { id: r.actor_id, full_name: 'Unknown', role: '' } : null,
+  }))
+
   return NextResponse.json({
-    data,
+    data: enriched,
     meta: { page, limit, total: count ?? 0, pages: Math.ceil((count ?? 0) / limit) },
   })
 }
