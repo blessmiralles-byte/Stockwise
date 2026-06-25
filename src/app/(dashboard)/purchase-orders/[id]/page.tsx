@@ -24,14 +24,12 @@ const STATUS_CFG: Record<string, { label: string; variant: any }> = {
 function GRNDialog({
   po,
   locations,
-  members,
   suppliers,
   onClose,
   onReceived,
 }: {
   po: PurchaseOrder
   locations: Location[]
-  members: { id: string; full_name: string; role: string }[]
   suppliers: { id: string; name: string }[]
   onClose: () => void
   onReceived: (statusMsg?: string) => void
@@ -77,7 +75,6 @@ function GRNDialog({
         condition_notes: '',
       }))
   )
-  const [receivedBy, setReceivedBy] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
 
@@ -86,7 +83,6 @@ function GRNDialog({
   }
 
   async function handleReceive() {
-    if (!receivedBy.trim()) { setError('Please select or enter who is receiving the goods'); return }
     const supplierLines = lines.filter(l => l.source_type === 'supplier')
     if (supplierLines.length > 0 && !supplierId) { setError('Please select the supplier the goods are received from'); return }
     const missing = lines.find(l => l.qty > 0 && !l.to_location_id && l.condition !== 'missing')
@@ -117,7 +113,6 @@ function GRNDialog({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           lines: payload,
-          received_by:  receivedBy.trim() || null,
           supplier_id:  supplierId || null,
         }),
       })
@@ -157,31 +152,6 @@ function GRNDialog({
             <p className="text-center text-slate-400 py-8">All items have already been received.</p>
           ) : (
             <>
-              {/* Received By */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Received By *</label>
-                {members.length > 0 ? (
-                  <select
-                    value={receivedBy}
-                    onChange={e => setReceivedBy(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-                  >
-                    <option value="">— Select staff member —</option>
-                    {members.map(m => (
-                      <option key={m.id} value={m.full_name}>{m.full_name} ({m.role})</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    placeholder="Name of person receiving the goods"
-                    value={receivedBy}
-                    onChange={e => setReceivedBy(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                )}
-              </div>
-
               {lines.map(l => (
                 <div key={l.line_id} className="border border-slate-100 rounded-lg p-4 space-y-3">
                   <div className="flex items-start justify-between">
@@ -526,13 +496,11 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
   const { data: poData, loading, error, refetch } = useApi<{ data: PurchaseOrder }>(`/api/purchase-orders/${id}`)
   const { data: locData }      = useApi<{ data: Location[] }>('/api/locations')
   const { data: prodData }     = useApi<{ data: any[] }>('/api/products')
-  const { data: memberData }   = useApi<{ data: any[] }>('/api/members')
   const { data: supplierData } = useApi<{ data: any[] }>('/api/suppliers')
 
   const po        = poData?.data
   const locations = locData?.data ?? []
   const products  = prodData?.data ?? []
-  const members   = memberData?.data ?? []
   const suppliers = supplierData?.data ?? []
 
   async function markStatus(status: string) {
@@ -777,7 +745,6 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
         <GRNDialog
           po={po}
           locations={locations}
-          members={members}
           suppliers={suppliers}
           onClose={() => setShowGRN(false)}
           onReceived={(msg) => {
