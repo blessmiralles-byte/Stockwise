@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { useApi } from '@/lib/use-api'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { PurchaseOrder, Location } from '@/types'
-import { ArrowLeft, Truck, CheckCircle2, Send, X, FileText, AlertTriangle, Scale, Loader2, Plus, Trash2, Download } from 'lucide-react'
+import { ArrowLeft, Truck, CheckCircle2, Send, X, FileText, AlertTriangle, Scale, Loader2, Plus, Trash2, Download, PackagePlus } from 'lucide-react'
 import Link from 'next/link'
 
 const STATUS_CFG: Record<string, { label: string; variant: any }> = {
@@ -298,17 +298,155 @@ function GRNDialog({
   )
 }
 
+// ── Quick Create Product Modal ───────────────────────────────────────────────
+function QuickCreateProductModal({
+  categories,
+  onClose,
+  onCreated,
+}: {
+  categories: { id: string; name: string }[]
+  onClose: () => void
+  onCreated: (product: any) => void
+}) {
+  const [name, setName]         = useState('')
+  const [sku, setSku]           = useState('')
+  const [categoryId, setCategoryId] = useState('')
+  const [uom, setUom]           = useState('pc')
+  const [costMethod, setCostMethod] = useState('average')
+  const [reorderPt, setReorderPt]   = useState('')
+  const [barcode, setBarcode]   = useState('')
+  const [saving, setSaving]     = useState(false)
+  const [error, setError]       = useState('')
+
+  async function handleSave() {
+    if (!name.trim()) { setError('Item name is required'); return }
+    setSaving(true); setError('')
+    const res = await fetch('/api/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: name.trim(),
+        sku: sku.trim() || undefined,
+        barcode: barcode.trim() || undefined,
+        category_id: categoryId || undefined,
+        unit_of_measure: uom,
+        cost_method: costMethod,
+        reorder_point: reorderPt ? parseInt(reorderPt) : 0,
+      }),
+    })
+    const json = await res.json()
+    setSaving(false)
+    if (!res.ok) { setError(json.error ?? 'Failed to create item'); return }
+    onCreated(json.data)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <Card className="w-full max-w-lg" onClick={e => e.stopPropagation()}>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <PackagePlus className="w-4 h-4 text-indigo-600" />
+            Quick-create item
+          </CardTitle>
+          <Button variant="ghost" size="icon" onClick={onClose}><X className="w-4 h-4" /></Button>
+        </CardHeader>
+        <CardContent className="space-y-3 pt-2">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Item Name *</label>
+            <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Portland Cement 50kg" autoFocus />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">SKU</label>
+              <Input value={sku} onChange={e => setSku(e.target.value)} placeholder="Auto-generated if blank" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Barcode</label>
+              <Input value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="Optional" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Category</label>
+              <select
+                value={categoryId}
+                onChange={e => setCategoryId(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+              >
+                <option value="">— None —</option>
+                {categories.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Unit of Measure</label>
+              <select
+                value={uom}
+                onChange={e => setUom(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+              >
+                {['pc', 'kg', 'g', 'lb', 'oz', 'liter', 'ml', 'gal', 'meter', 'ft', 'box', 'bag', 'roll', 'sheet', 'pair', 'set', 'unit'].map(u => (
+                  <option key={u} value={u}>{u}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Cost Method</label>
+              <select
+                value={costMethod}
+                onChange={e => setCostMethod(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+              >
+                <option value="average">Weighted Average</option>
+                <option value="fifo">FIFO</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Reorder Point</label>
+              <Input type="number" min={0} value={reorderPt} onChange={e => setReorderPt(e.target.value)} placeholder="0" />
+            </div>
+          </div>
+
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0" /> {error}
+            </p>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button onClick={handleSave} disabled={saving} className="gap-1.5">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              Create Item
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 // ── Order Lines Card ──────────────────────────────────────────────────────────
-function OrderLinesCard({ po, products, poId, onUpdated }: { po: PurchaseOrder; products: any[]; poId: string; onUpdated: () => void }) {
+function OrderLinesCard({ po, products, categories, poId, onUpdated, onProductCreated }: {
+  po: PurchaseOrder; products: any[]; categories: { id: string; name: string }[];
+  poId: string; onUpdated: () => void; onProductCreated: (product: any) => void
+}) {
   const canEdit = po.status !== 'received' && po.status !== 'cancelled'
   const isDraft = po.status === 'draft'
 
-  const [newProductId, setNewProductId] = useState('')
-  const [newQty,       setNewQty]       = useState('')
-  const [newCost,      setNewCost]      = useState('')
-  const [adding,       setAdding]       = useState(false)
-  const [addErr,       setAddErr]       = useState('')
-  const [removingId,   setRemovingId]   = useState<string | null>(null)
+  const [newProductId, setNewProductId]       = useState('')
+  const [newQty,       setNewQty]             = useState('')
+  const [newCost,      setNewCost]            = useState('')
+  const [adding,       setAdding]             = useState(false)
+  const [addErr,       setAddErr]             = useState('')
+  const [removingId,   setRemovingId]         = useState<string | null>(null)
+  const [showQuickCreate, setShowQuickCreate] = useState(false)
 
   const total = (po.lines ?? []).reduce((s, l) => s + l.quantity_ordered * l.unit_cost, 0)
 
@@ -398,50 +536,60 @@ function OrderLinesCard({ po, products, poId, onUpdated }: { po: PurchaseOrder; 
               {canEdit && (
                 <tr className="border-t border-dashed border-slate-200 bg-slate-50/60">
                   <td className="px-3 py-2">
-                    <select
-                      value={newProductId}
-                      onChange={e => {
-                        const p = products.find(x => x.id === e.target.value)
-                        setNewProductId(e.target.value)
-                        if (p) setNewCost(String(p.unit_cost ?? ''))
-                        setAddErr('')
-                      }}
-                      className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-                    >
-                      <option value="">— Select item to add —</option>
-                      {(() => {
-                        const grouped = new Map<string, any[]>()
-                        const uncategorized: any[] = []
-                        for (const p of products) {
-                          const catName = p.category?.name
-                          if (catName) {
-                            if (!grouped.has(catName)) grouped.set(catName, [])
-                            grouped.get(catName)!.push(p)
-                          } else {
-                            uncategorized.push(p)
+                    <div className="flex gap-1.5">
+                      <select
+                        value={newProductId}
+                        onChange={e => {
+                          const p = products.find(x => x.id === e.target.value)
+                          setNewProductId(e.target.value)
+                          if (p) setNewCost(String(p.unit_cost ?? ''))
+                          setAddErr('')
+                        }}
+                        className="flex-1 min-w-0 border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                      >
+                        <option value="">— Select item —</option>
+                        {(() => {
+                          const grouped = new Map<string, any[]>()
+                          const uncategorized: any[] = []
+                          for (const p of products) {
+                            const catName = p.category?.name
+                            if (catName) {
+                              if (!grouped.has(catName)) grouped.set(catName, [])
+                              grouped.get(catName)!.push(p)
+                            } else {
+                              uncategorized.push(p)
+                            }
                           }
-                        }
-                        const groups = [...grouped.entries()].sort((a, b) => a[0].localeCompare(b[0]))
-                        return (
-                          <>
-                            {groups.map(([cat, items]) => (
-                              <optgroup key={cat} label={cat}>
-                                {items.map(p => (
-                                  <option key={p.id} value={p.id}>{p.name} {p.sku ? `(${p.sku})` : ''}</option>
-                                ))}
-                              </optgroup>
-                            ))}
-                            {uncategorized.length > 0 && (
-                              <optgroup label="Uncategorized">
-                                {uncategorized.map(p => (
-                                  <option key={p.id} value={p.id}>{p.name} {p.sku ? `(${p.sku})` : ''}</option>
-                                ))}
-                              </optgroup>
-                            )}
-                          </>
-                        )
-                      })()}
-                    </select>
+                          const groups = [...grouped.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+                          return (
+                            <>
+                              {groups.map(([cat, items]) => (
+                                <optgroup key={cat} label={cat}>
+                                  {items.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name} {p.sku ? `(${p.sku})` : ''}</option>
+                                  ))}
+                                </optgroup>
+                              ))}
+                              {uncategorized.length > 0 && (
+                                <optgroup label="Uncategorized">
+                                  {uncategorized.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name} {p.sku ? `(${p.sku})` : ''}</option>
+                                  ))}
+                                </optgroup>
+                              )}
+                            </>
+                          )
+                        })()}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setShowQuickCreate(true)}
+                        className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors whitespace-nowrap"
+                        title="Create a new item"
+                      >
+                        <PackagePlus className="w-3.5 h-3.5" /> New
+                      </button>
+                    </div>
                   </td>
                   <td className="px-2 py-2">
                     <Input
@@ -483,6 +631,19 @@ function OrderLinesCard({ po, products, poId, onUpdated }: { po: PurchaseOrder; 
         </div>
         {addErr && <p className="text-red-500 text-xs px-4 pb-3">{addErr}</p>}
       </CardContent>
+
+      {showQuickCreate && (
+        <QuickCreateProductModal
+          categories={categories}
+          onClose={() => setShowQuickCreate(false)}
+          onCreated={(product) => {
+            setShowQuickCreate(false)
+            onProductCreated(product)
+            setNewProductId(product.id)
+            setAddErr('')
+          }}
+        />
+      )}
     </Card>
   )
 }
@@ -495,13 +656,15 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
 
   const { data: poData, loading, error, refetch } = useApi<{ data: PurchaseOrder }>(`/api/purchase-orders/${id}`)
   const { data: locData }      = useApi<{ data: Location[] }>('/api/locations')
-  const { data: prodData }     = useApi<{ data: any[] }>('/api/products')
+  const { data: prodData, refetch: refetchProducts } = useApi<{ data: any[] }>('/api/products')
   const { data: supplierData } = useApi<{ data: any[] }>('/api/suppliers')
+  const { data: catData }      = useApi<{ data: any[] }>('/api/categories?type=inventory')
 
-  const po        = poData?.data
-  const locations = locData?.data ?? []
-  const products  = prodData?.data ?? []
-  const suppliers = supplierData?.data ?? []
+  const po         = poData?.data
+  const locations  = locData?.data ?? []
+  const products   = prodData?.data ?? []
+  const suppliers  = supplierData?.data ?? []
+  const categories = catData?.data ?? []
 
   async function markStatus(status: string) {
     await fetch(`/api/purchase-orders/${id}`, {
@@ -731,7 +894,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
         <ThreeWayMatch po={po} onUpdated={refetch} />
 
         {/* Lines */}
-        <OrderLinesCard po={po} products={products} poId={id} onUpdated={refetch} />
+        <OrderLinesCard po={po} products={products} categories={categories} poId={id} onUpdated={refetch} onProductCreated={() => refetchProducts()} />
       </div>
 
       {grnSuccess && (
