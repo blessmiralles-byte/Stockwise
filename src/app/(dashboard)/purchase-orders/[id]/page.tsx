@@ -439,9 +439,38 @@ function OrderLinesCard({ po, products, poId, onUpdated }: { po: PurchaseOrder; 
                       className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                     >
                       <option value="">— Select item to add —</option>
-                      {products.map(p => (
-                        <option key={p.id} value={p.id}>{p.name} {p.sku ? `(${p.sku})` : ''}</option>
-                      ))}
+                      {(() => {
+                        const grouped = new Map<string, any[]>()
+                        const uncategorized: any[] = []
+                        for (const p of products) {
+                          const catName = p.category?.name
+                          if (catName) {
+                            if (!grouped.has(catName)) grouped.set(catName, [])
+                            grouped.get(catName)!.push(p)
+                          } else {
+                            uncategorized.push(p)
+                          }
+                        }
+                        const groups = [...grouped.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+                        return (
+                          <>
+                            {groups.map(([cat, items]) => (
+                              <optgroup key={cat} label={cat}>
+                                {items.map(p => (
+                                  <option key={p.id} value={p.id}>{p.name} {p.sku ? `(${p.sku})` : ''}</option>
+                                ))}
+                              </optgroup>
+                            ))}
+                            {uncategorized.length > 0 && (
+                              <optgroup label="Uncategorized">
+                                {uncategorized.map(p => (
+                                  <option key={p.id} value={p.id}>{p.name} {p.sku ? `(${p.sku})` : ''}</option>
+                                ))}
+                              </optgroup>
+                            )}
+                          </>
+                        )
+                      })()}
                     </select>
                   </td>
                   <td className="px-2 py-2">
@@ -705,7 +734,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
                 {po.notes && <p className="text-sm text-slate-500 mt-2">{po.notes}</p>}
               </div>
               <div className="flex gap-2 flex-wrap">
-                <a href={`/api/purchase-orders/${id}/pdf`} download>
+                <a href={`/api/purchase-orders/${id}/pdf`} download={`${po.po_number}.pdf`}>
                   <Button variant="outline" size="sm" className="gap-1">
                     <Download className="w-3.5 h-3.5" /> Download PDF
                   </Button>
