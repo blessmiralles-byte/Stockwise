@@ -77,10 +77,12 @@ BEGIN
     v_new_qty  := v_row.quantity + p_qty_delta;
     v_new_cost := v_row.avg_cost;
 
-    -- Weighted average: recalculate only on inbound
+    -- Weighted average: recalculate only on inbound, guard against division by zero
     IF p_cost_method = 'average' AND p_qty_delta > 0 AND COALESCE(p_unit_cost, 0) > 0 THEN
-      v_new_cost := (v_row.quantity * v_row.avg_cost + p_qty_delta * p_unit_cost)
-                  / (v_row.quantity + p_qty_delta);
+      IF (v_row.quantity + p_qty_delta) > 0 THEN
+        v_new_cost := (v_row.quantity * v_row.avg_cost + p_qty_delta * p_unit_cost)
+                    / (v_row.quantity + p_qty_delta);
+      END IF;
     END IF;
 
     UPDATE public.inventory_balances

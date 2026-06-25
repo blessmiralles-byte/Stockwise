@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
     let q = supabase
       .from('inventory_transactions')
       .select(`
-        id, transaction_type, reference_no, quantity, unit_cost, notes, created_at,
+        id, transaction_type, reference_no, quantity, unit_cost, total_cost, notes, created_at,
         product:products(id, sku, name, category:categories(name)),
         from_location:locations!inventory_transactions_from_location_id_fkey(id, name),
         to_location:locations!inventory_transactions_to_location_id_fkey(id, name)
@@ -100,7 +100,7 @@ export async function GET(req: NextRequest) {
 
     for (const t of txs ?? []) {
       const tx = t as any
-      const amount = Math.abs(tx.quantity * (tx.unit_cost ?? 0))
+      const amount = Number(tx.total_cost ?? Math.abs(tx.quantity * (tx.unit_cost ?? 0)))
       entries.push(mapTransaction(tx, amount))
     }
   }

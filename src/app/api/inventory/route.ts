@@ -260,8 +260,10 @@ async function upsertBalance(
   let newAvgCost = existing.avg_cost
 
   if (cost_method === 'average' && qty_delta > 0 && unit_cost > 0) {
-    newAvgCost = (existing.quantity * existing.avg_cost + qty_delta * unit_cost) /
-                 (existing.quantity + qty_delta)
+    const newTotal = existing.quantity + qty_delta
+    if (newTotal > 0) {
+      newAvgCost = (existing.quantity * existing.avg_cost + qty_delta * unit_cost) / newTotal
+    }
   }
 
   await supabase

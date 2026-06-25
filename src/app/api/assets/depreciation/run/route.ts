@@ -36,9 +36,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'period_start must be before period_end' }, { status: 400 })
   }
 
-  // Period fraction (in years) = days in period / 365
-  const periodDays    = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1
-  const periodFraction = periodDays / 365
+  const periodDays     = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1
+  const yearDays       = ((startDate.getFullYear() % 4 === 0 && startDate.getFullYear() % 100 !== 0) || startDate.getFullYear() % 400 === 0) ? 366 : 365
+  const periodFraction = periodDays / yearDays
 
   const supabase = createServiceClient()
 
@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
         continue
       }
       const rate    = 1 / usefulLife
-      deprAmount    = (bookValue - salvage) * rate * periodFraction
+      deprAmount    = bookValue * rate * periodFraction
 
     } else if (method === 'double_declining') {
       if (usefulLife <= 0) {
