@@ -5,7 +5,7 @@
 -- ============================================================
 
 -- Step 1: Drop every overload regardless of signature
-DO $$
+DO $do_drop$
 DECLARE
   r record;
 BEGIN
@@ -19,7 +19,7 @@ BEGIN
     EXECUTE 'DROP FUNCTION IF EXISTS ' || r.sig || ' CASCADE';
   END LOOP;
 END;
-$$;
+$do_drop$;
 
 -- Step 2: Ensure is_period_open exists (required by the canonical function)
 CREATE OR REPLACE FUNCTION public.is_period_open(p_date date)
@@ -28,7 +28,7 @@ LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
-AS $$
+AS $is_period_open$
 DECLARE v_closed boolean;
 BEGIN
   SELECT EXISTS (
@@ -38,7 +38,7 @@ BEGIN
   ) INTO v_closed;
   RETURN NOT v_closed;
 END;
-$$;
+$is_period_open$;
 
 -- Step 3: Ensure upsert_inventory_balance exists (org-aware version)
 -- Weighted-average costing: avg_cost recomputed only on inbound, guarded
@@ -52,7 +52,7 @@ CREATE OR REPLACE FUNCTION public.upsert_inventory_balance(
   p_cost_method text,
   p_org_id      uuid DEFAULT NULL
 ) RETURNS void
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql AS $upsert_balance$
 DECLARE
   v_row record;
   v_new_qty   numeric;
@@ -87,7 +87,7 @@ BEGIN
      WHERE id = v_row.id;
   END IF;
 END;
-$$;
+$upsert_balance$;
 
 -- Step 3a: FIFO layer consumption — walk open batches oldest-first, decrement
 -- quantity_remaining, and return the actual cost of goods issued (COGS).
@@ -99,7 +99,7 @@ CREATE OR REPLACE FUNCTION public.fifo_consume_batches(
   p_location_id uuid,
   p_qty         integer
 ) RETURNS numeric
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql AS $fifo_consume$
 DECLARE
   v_remaining integer := p_qty;
   v_cogs      numeric := 0;
@@ -133,7 +133,7 @@ BEGIN
 
   RETURN v_cogs;
 END;
-$$;
+$fifo_consume$;
 
 -- Step 3b: Recompute a FIFO product's balance avg_cost from its open layers
 -- so the dashboard "Total Value" (avg_cost × quantity) is always correct.
@@ -141,7 +141,7 @@ CREATE OR REPLACE FUNCTION public.recompute_fifo_balance_cost(
   p_product_id  uuid,
   p_location_id uuid
 ) RETURNS void
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql AS $recompute_fifo$
 DECLARE
   v_qty numeric;
   v_val numeric;
@@ -160,7 +160,7 @@ BEGIN
      WHERE product_id = p_product_id AND location_id = p_location_id;
   END IF;
 END;
-$$;
+$recompute_fifo$;
 
 -- Step 4: Create the ONE canonical record_inventory_movement (16 params)
 -- Reordered: balance/batch updates run FIRST so that for FIFO products the
@@ -185,7 +185,7 @@ CREATE OR REPLACE FUNCTION public.record_inventory_movement(
   p_org_id           uuid       DEFAULT NULL
 ) RETURNS json
 LANGUAGE plpgsql
-SECURITY DEFINER AS $$
+SECURITY DEFINER AS $record_movement$
 DECLARE
   v_product        record;
   v_tx_id          uuid;
@@ -399,7 +399,7 @@ BEGIN
 
   RETURN json_build_object('transaction_id', v_tx_id, 'success', true);
 END;
-$$;
+$record_movement$;
 
 -- Step 4a: Backfill avg_cost on existing FIFO balances from their open layers.
 -- Fixes historic FIFO items showing $0.00 Total Value because avg_cost was
