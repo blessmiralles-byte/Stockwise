@@ -193,9 +193,9 @@ function NewRequestDialog({
   onCreated: () => void
   profile: any
 }) {
-  const [step, setStep]             = useState<1 | 2 | 3>(1)
+  const [step, setStep]             = useState<1 | 2 | 3 | 4>(1)
   const [type, setType]             = useState<ReqType | null>(null)
-  const [items, setItems]           = useState<ReqItem[]>([])
+  const [items, setItems]           = useState<(ReqItem & { available?: number })[]>([])
   const [newItemQty, setNewItemQty] = useState(1)
   const [newItemCost, setNewItemCost] = useState('')
   const [newItemDesc, setNewItemDesc] = useState('')
@@ -209,6 +209,7 @@ function NewRequestDialog({
   const [costCenters, setCCs]         = useState<any[]>([])
   const [submitting, setSubmitting]   = useState(false)
   const [error, setError]             = useState('')
+  const [stockWarning, setStockWarning] = useState<{ name: string; requested: number; available: number } | null>(null)
 
   useEffect(() => {
     if (open) {
@@ -224,14 +225,22 @@ function NewRequestDialog({
     setNewItemQty(1); setNewItemCost(''); setNewItemDesc('')
     setJobRef(''); setRequiredBy(''); setNotes('')
     setLocationId(''); setCcId(''); setJobCode(''); setError('')
+    setStockWarning(null)
   }
 
   const close = () => { reset(); onClose() }
 
-  const addProduct = (p: any) => {
+  const addProduct = async (p: any) => {
     if (items.find(i => i.product_id === p.id)) return
+    let available: number | undefined
+    try {
+      const r = await fetch(`/api/inventory?product_id=${p.id}`)
+      const j = await r.json()
+      const rows = j.data ?? []
+      available = rows.reduce((s: number, b: any) => s + (b.quantity ?? 0), 0)
+    } catch { /* ignore */ }
     setItems(prev => [...prev, {
-      item_type: 'product', product_id: p.id, product: p, quantity: 1,
+      item_type: 'product', product_id: p.id, product: p, quantity: 1, available,
     }])
   }
 
@@ -256,8 +265,22 @@ function NewRequestDialog({
   const removeItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx))
 
   const updateQty = (idx: number, qty: number) => {
-    setItems(prev => prev.map((item, i) => i === idx ? { ...item, quantity: Math.max(1, qty) } : item))
+    const item = items[idx]
+    const safeQty = Math.max(1, qty)
+    if (item.item_type === 'product' && item.available !== undefined && safeQty > item.available) {
+      setStockWarning({
+        name: item.product?.name ?? 'Item',
+        requested: safeQty,
+        available: item.available,
+      })
+      return
+    }
+    setItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: safeQty } : it))
   }
+
+  const hasStockIssues = items.some(item =>
+    item.item_type === 'product' && item.available !== undefined && item.quantity > item.available
+  )
 
   const submit = async () => {
     if (!type || items.length === 0) return
@@ -286,6 +309,8 @@ function NewRequestDialog({
 
   if (!open) return null
 
+  const TOTAL_STEPS = 4
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
@@ -293,7 +318,9 @@ function NewRequestDialog({
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <div>
             <h2 className="text-base font-semibold text-slate-900">New Requisition</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Step {step} of 3</p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Step {step} of {TOTAL_STEPS} — {step === 1 ? 'Type' : step === 2 ? 'Items' : step === 3 ? 'Details' : 'Review'}
+            </p>
           </div>
           <button onClick={close} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors">
             <X className="w-4 h-4" />
@@ -302,7 +329,7 @@ function NewRequestDialog({
 
         {/* Step dots */}
         <div className="flex gap-1.5 px-6 pt-3 pb-1">
-          {[1, 2, 3].map(s => (
+          {[1, 2, 3, 4].map(s => (
             <div key={s} className={cn('h-1 flex-1 rounded-full transition-colors',
               s < step ? 'bg-indigo-500' : s === step ? 'bg-indigo-400' : 'bg-slate-200')} />
           ))}
@@ -389,9 +416,19 @@ function NewRequestDialog({
                 <div className="mt-3 space-y-2">
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Added items</p>
                   {items.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <div key={idx} className={cn(
+                      'flex items-center gap-3 p-3 rounded-lg border',
+                      item.item_type === 'product' && item.available !== undefined && item.quantity > item.available
+                        ? 'bg-red-50 border-red-200'
+                        : 'bg-slate-50 border-slate-200'
+                    )}>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-slate-900 truncate">{itemLabel(item)}</p>
+                        {item.item_type === 'product' && item.available !== undefined && (
+                          <p className={cn('text-xs font-mono', item.quantity > item.available ? 'text-red-500 font-semibold' : 'text-slate-400')}>
+                            Stock: {item.available} {item.product?.unit_of_measure ?? ''}
+                          </p>
+                        )}
                         {item.item_type === 'asset' && item.asset && (
                           <p className="text-xs text-slate-400 font-mono">{item.asset.asset_tag}</p>
                         )}
@@ -400,19 +437,21 @@ function NewRequestDialog({
                         )}
                       </div>
                       {item.item_type !== 'asset' && (
-                        <div className="flex items-center gap-1">
-                          <button type="button"
-                            onClick={() => updateQty(idx, item.quantity - 1)}
-                            className="w-6 h-6 rounded bg-slate-200 flex items-center justify-center hover:bg-slate-300 transition-colors">
-                            <Minus className="w-3 h-3 text-slate-600" />
-                          </button>
-                          <span className="w-8 text-center text-sm font-semibold text-slate-900">{item.quantity}</span>
-                          <button type="button"
-                            onClick={() => updateQty(idx, item.quantity + 1)}
-                            className="w-6 h-6 rounded bg-slate-200 flex items-center justify-center hover:bg-slate-300 transition-colors">
-                            <Plus className="w-3 h-3 text-slate-600" />
-                          </button>
-                        </div>
+                        <input
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={e => {
+                            const val = Number(e.target.value)
+                            if (val >= 1) updateQty(idx, val)
+                          }}
+                          className={cn(
+                            'w-16 text-center text-sm font-semibold rounded-lg border py-1.5 focus:outline-none focus:ring-2',
+                            item.item_type === 'product' && item.available !== undefined && item.quantity > item.available
+                              ? 'border-red-300 text-red-600 focus:ring-red-400'
+                              : 'border-slate-300 text-slate-900 focus:ring-indigo-500'
+                          )}
+                        />
                       )}
                       <button type="button" onClick={() => removeItem(idx)}
                         className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
@@ -490,7 +529,7 @@ function NewRequestDialog({
                     value={locationId}
                     onChange={e => setLocationId(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
-                    <option value="">Any location</option>
+                    <option value="">Any location (auto-detect)</option>
                     {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                   </select>
                 </div>
@@ -506,19 +545,76 @@ function NewRequestDialog({
                   className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                 />
               </div>
+            </div>
+          )}
 
-              {/* Summary */}
-              <div className="bg-slate-50 rounded-lg border border-slate-200 p-3">
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Summary</p>
-                <div className="flex items-center gap-2 mb-1">
-                  {(() => { const Icon = TYPE_CFG[type].icon; return <Icon className={cn('w-3.5 h-3.5', TYPE_CFG[type].color)} /> })()}
-                  <span className="text-sm font-medium text-slate-700">{TYPE_CFG[type].label}</span>
+          {/* Step 4: Review before submit */}
+          {step === 4 && type && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                <AlertCircle className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+                <p className="text-sm text-indigo-800 font-medium">Please review before submitting</p>
+              </div>
+
+              {/* Type */}
+              <div className="bg-white rounded-lg border border-slate-200 divide-y divide-slate-100">
+                <div className="flex items-center gap-3 px-4 py-3">
+                  {(() => { const Icon = TYPE_CFG[type].icon; return <Icon className={cn('w-4 h-4', TYPE_CFG[type].color)} /> })()}
+                  <div>
+                    <p className="text-xs text-slate-400">Request Type</p>
+                    <p className="text-sm font-semibold text-slate-900">{TYPE_CFG[type].label}</p>
+                  </div>
                 </div>
-                <p className="text-xs text-slate-500">{items.length} item{items.length !== 1 ? 's' : ''}</p>
-                {items.slice(0, 2).map((item, i) => (
-                  <p key={i} className="text-xs text-slate-600 mt-0.5">• {itemLabel(item)} — {itemQty(item)}</p>
-                ))}
-                {items.length > 2 && <p className="text-xs text-slate-400 mt-0.5">+{items.length - 2} more</p>}
+
+                {/* Items */}
+                <div className="px-4 py-3">
+                  <p className="text-xs text-slate-400 mb-2">Items ({items.length})</p>
+                  {items.map((item, i) => (
+                    <div key={i} className="flex items-center justify-between py-1.5">
+                      <span className="text-sm text-slate-700">{itemLabel(item)}</span>
+                      <span className="text-sm font-semibold text-slate-900 tabular-nums">{itemQty(item)}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Details */}
+                {(locationId || costCenterId || jobCode || jobRef || requiredBy || notes) && (
+                  <div className="px-4 py-3 space-y-1.5">
+                    <p className="text-xs text-slate-400 mb-1">Details</p>
+                    {locationId && (
+                      <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                        <MapPin className="w-3 h-3" />
+                        {locations.find(l => l.id === locationId)?.name ?? 'Selected location'}
+                      </div>
+                    )}
+                    {costCenterId && (
+                      <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                        <Briefcase className="w-3 h-3" />
+                        {costCenters.find(c => c.id === costCenterId)?.code ?? 'Cost center'}
+                      </div>
+                    )}
+                    {jobCode && (
+                      <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                        <Tag className="w-3 h-3" />{jobCode}
+                      </div>
+                    )}
+                    {jobRef && (
+                      <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                        <Tag className="w-3 h-3 opacity-60" />{jobRef}
+                      </div>
+                    )}
+                    {requiredBy && (
+                      <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                        <CalendarDays className="w-3 h-3" />Needed by {fmt(requiredBy)}
+                      </div>
+                    )}
+                    {notes && (
+                      <div className="flex items-start gap-1.5 text-xs text-slate-600">
+                        <FileText className="w-3 h-3 mt-0.5" />{notes}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {error && (
@@ -534,17 +630,17 @@ function NewRequestDialog({
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl">
           <button
-            onClick={() => step > 1 ? setStep(s => (s - 1) as 1 | 2 | 3) : close()}
+            onClick={() => step > 1 ? setStep(s => (s - 1) as 1 | 2 | 3 | 4) : close()}
             className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors">
             {step === 1 ? 'Cancel' : '← Back'}
           </button>
 
-          {step < 3 ? (
+          {step < TOTAL_STEPS ? (
             <button
-              onClick={() => setStep(s => (s + 1) as 2 | 3)}
-              disabled={step === 1 ? !type : items.length === 0}
+              onClick={() => setStep(s => (s + 1) as 2 | 3 | 4)}
+              disabled={step === 1 ? !type : step === 2 ? (items.length === 0 || hasStockIssues) : false}
               className="px-5 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-40 transition-colors flex items-center gap-2">
-              Next <ChevronRight className="w-4 h-4" />
+              {step === 3 ? 'Review' : 'Next'} <ChevronRight className="w-4 h-4" />
             </button>
           ) : (
             <button onClick={submit} disabled={submitting}
@@ -555,6 +651,30 @@ function NewRequestDialog({
           )}
         </div>
       </div>
+
+      {/* Stock warning popup */}
+      {stockWarning && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-xs p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertCircle className="w-5 h-5 text-amber-500" />
+              <h3 className="text-sm font-semibold text-slate-900">Insufficient Stock</h3>
+            </div>
+            <p className="text-sm text-slate-600 mb-1">
+              <span className="font-semibold">{stockWarning.name}</span>
+            </p>
+            <p className="text-sm text-slate-600 mb-4">
+              Requested: <span className="font-semibold text-red-600">{stockWarning.requested}</span>
+              {' · '}Available: <span className="font-semibold text-slate-900">{stockWarning.available}</span>
+            </p>
+            <button
+              onClick={() => setStockWarning(null)}
+              className="w-full px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 transition-colors">
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

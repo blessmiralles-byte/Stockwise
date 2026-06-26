@@ -161,14 +161,14 @@ BEGIN
   INSERT INTO public.inventory_transactions (
     transaction_type, product_id,
     from_location_id, to_location_id,
-    quantity, unit_cost,
+    quantity, unit_cost, total_cost,
     reference_no, notes, customer_id, created_by,
     cost_center_id, job_code,
     job_order_id, org_id
   ) VALUES (
     p_transaction_type, p_product_id,
     p_from_location_id, p_to_location_id,
-    p_quantity, v_effective_cost,
+    p_quantity, v_effective_cost, ABS(p_quantity) * v_effective_cost,
     p_reference_no, p_notes, p_customer_id, p_created_by,
     p_cost_center_id, p_job_code,
     p_job_order_id, p_org_id

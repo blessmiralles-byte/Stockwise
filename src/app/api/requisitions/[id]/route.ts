@@ -108,13 +108,40 @@ export async function PATCH(
 
           const qty = Math.abs(Number(item.quantity))
 
-          // Try atomic RPC first (deployed via scripts/rpc_record_movement.sql)
+          // Resolve location: use the requisition's location, or auto-detect
+          // from the product's inventory balance (pick the location with stock)
+          let fromLocationId: string | null = r.location_id ?? null
+          if (!fromLocationId) {
+            const { data: balRow } = await supabase
+              .from('inventory_balances')
+              .select('location_id, quantity, avg_cost')
+              .eq('product_id', item.product_id)
+              .gt('quantity', 0)
+              .order('quantity', { ascending: false })
+              .limit(1)
+              .single()
+            if (balRow) fromLocationId = balRow.location_id
+          }
+
+          // Look up cost from balance for proper valuation
+          let balanceCost = 0
+          if (fromLocationId) {
+            const { data: costRow } = await supabase
+              .from('inventory_balances')
+              .select('avg_cost')
+              .eq('product_id', item.product_id)
+              .eq('location_id', fromLocationId)
+              .single()
+            balanceCost = Number(costRow?.avg_cost ?? 0)
+          }
+
+          // Try atomic RPC first
           const { error: rpcErr } = await supabase.rpc('record_inventory_movement', {
             p_transaction_type: 'consumption',
             p_product_id:       item.product_id,
             p_quantity:         qty,
-            p_unit_cost:        0,   // 0 → RPC costs the issue at the balance's book avg_cost
-            p_from_location_id: r.location_id ?? null,
+            p_unit_cost:        balanceCost,
+            p_from_location_id: fromLocationId,
             p_to_location_id:   null,
             p_reference_no:     r.req_number,
             p_notes:            `Requisition ${r.req_number}${r.job_reference ? ' — Job: ' + r.job_reference : ''}`,
@@ -131,26 +158,14 @@ export async function PATCH(
           if (rpcErr) {
             console.error(`[requisition ${r.req_number}] RPC error:`, rpcErr.message)
 
-            // Resolve effective cost from balance avg_cost
-            let effectiveCost = 0
-            if (r.location_id) {
-              const { data: bal } = await supabase
-                .from('inventory_balances')
-                .select('avg_cost')
-                .eq('product_id', item.product_id)
-                .eq('location_id', r.location_id)
-                .single()
-              effectiveCost = Number(bal?.avg_cost ?? 0)
-            }
-
             await supabase.from('inventory_transactions').insert({
               org_id:           auth.orgId,
               transaction_type: 'consumption',
               product_id:       item.product_id,
               quantity:         qty,
-              unit_cost:        effectiveCost,
-              total_cost:       qty * effectiveCost,
-              from_location_id: r.location_id ?? null,
+              unit_cost:        balanceCost,
+              total_cost:       qty * balanceCost,
+              from_location_id: fromLocationId,
               reference_no:     r.req_number,
               notes:            `Requisition ${r.req_number}`,
               created_by:       auth.userId,
@@ -160,12 +175,12 @@ export async function PATCH(
             })
 
             // Deduct from balance
-            if (r.location_id) {
+            if (fromLocationId) {
               const { data: bal } = await supabase
                 .from('inventory_balances')
                 .select('id, quantity')
                 .eq('product_id', item.product_id)
-                .eq('location_id', r.location_id)
+                .eq('location_id', fromLocationId)
                 .single()
               if (bal) {
                 await supabase
