@@ -36,7 +36,7 @@ WITH ledger_net AS (
    GROUP BY product_id
 ),
 single_loc AS (   -- products tracked at exactly one location
-  SELECT product_id, MIN(id) AS bal_id
+  SELECT product_id, (array_agg(id))[1] AS bal_id
     FROM public.inventory_balances
    GROUP BY product_id
   HAVING COUNT(*) = 1
@@ -66,7 +66,7 @@ WITH ledger_net AS (
    GROUP BY product_id
 ),
 single_loc AS (
-  SELECT product_id, MIN(id) AS bal_id
+  SELECT product_id, (array_agg(id))[1] AS bal_id
     FROM public.inventory_balances
    GROUP BY product_id
   HAVING COUNT(*) = 1
