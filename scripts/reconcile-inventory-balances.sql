@@ -33,7 +33,6 @@ WITH ledger_net AS (
                ELSE 0                                     -- transfer: nets to 0
              END) AS net_qty
     FROM public.inventory_transactions
-   WHERE status <> 'draft'
    GROUP BY product_id
 ),
 single_loc AS (   -- products tracked at exactly one location
@@ -64,7 +63,6 @@ WITH ledger_net AS (
                ELSE 0
              END) AS net_qty
     FROM public.inventory_transactions
-   WHERE status <> 'draft'
    GROUP BY product_id
 ),
 single_loc AS (
@@ -111,7 +109,6 @@ WITH ledger_net AS (
                ELSE 0
              END) AS net_qty
     FROM public.inventory_transactions
-   WHERE status <> 'draft'
    GROUP BY product_id
 )
 SELECT p.name, p.sku, b.quantity AS on_hand, ln.net_qty AS ledger_net
