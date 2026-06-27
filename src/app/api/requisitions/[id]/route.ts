@@ -164,7 +164,7 @@ export async function PATCH(
               product_id:       item.product_id,
               quantity:         qty,
               unit_cost:        balanceCost,
-              total_cost:       qty * balanceCost,
+              // total_cost is a generated column (quantity * unit_cost) — never set it
               from_location_id: fromLocationId,
               reference_no:     r.req_number,
               notes:            `Requisition ${r.req_number}`,

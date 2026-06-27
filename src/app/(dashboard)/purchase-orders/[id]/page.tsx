@@ -92,6 +92,7 @@ function GRNDialog({
   // Older open POs for this supplier + the supplier's over-receipt tolerance
   const [tolerancePct, setTolerancePct] = useState(0)
   const [altByProduct, setAltByProduct] = useState<Record<string, Candidate[]>>({})
+  const [capWarning, setCapWarning] = useState<{ name: string; requested: number; max: number } | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -319,8 +320,11 @@ function GRNDialog({
                         onChange={e => {
                           const max    = lineMax(l)
                           const digits = e.target.value.replace(/\D/g, '')
-                          const n      = digits === '' ? 0 : Math.min(parseInt(digits, 10), max)
-                          update(l.line_id, 'qty', n)
+                          const typed  = digits === '' ? 0 : parseInt(digits, 10)
+                          if (typed > max) {
+                            setCapWarning({ name: l.product_name, requested: typed, max })
+                          }
+                          update(l.line_id, 'qty', Math.min(typed, max))
                         }}
                         className="h-8 text-sm disabled:opacity-50"
                       />
@@ -372,6 +376,34 @@ function GRNDialog({
           )}
         </CardContent>
       </Card>
+
+      {/* Over-cap warning popup */}
+      {capWarning && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              <h3 className="text-sm font-semibold text-slate-900">Exceeds order quantity</h3>
+            </div>
+            <p className="text-sm text-slate-600 mb-1">
+              <span className="font-semibold">{capWarning.name}</span>
+            </p>
+            <p className="text-sm text-slate-600 mb-3">
+              You entered <span className="font-semibold text-red-600">{capWarning.requested}</span>, but only{' '}
+              <span className="font-semibold text-slate-900">{capWarning.max}</span> can be received against this PO
+              {tolerancePct > 0 ? ` (including the ${tolerancePct}% over-receipt allowance)` : ''}. It was capped at {capWarning.max}.
+            </p>
+            <p className="text-xs text-slate-400 mb-4">
+              To accept more: raise this supplier&apos;s over-receipt tolerance in Setup → Vendors, or apply the surplus to another open PO.
+            </p>
+            <button
+              onClick={() => setCapWarning(null)}
+              className="w-full px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 transition-colors">
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

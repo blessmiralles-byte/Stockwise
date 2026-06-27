@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
         to_location_id:   to_location_id   ?? null,
         quantity:     qty,
         unit_cost:    unit_cost ?? 0,
-        total_cost:   Math.abs(qty) * (unit_cost ?? 0),
+        // total_cost is a generated column (quantity * unit_cost) — never set it
         reference_no: reference_no ?? null,
         customer_id:  customer_id  ?? null,
         notes:        notes        ?? null,
@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
       to_location_id:   to_location_id   ?? null,
       quantity:     qty,
       unit_cost:    unit_cost ?? 0,
-      total_cost:   Math.abs(qty) * (unit_cost ?? 0),
+      // total_cost is a generated column (quantity * unit_cost) — never set it
       reference_no: reference_no ?? null,
       customer_id:  customer_id  ?? null,
       notes:        notes        ?? null,

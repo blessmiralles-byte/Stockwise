@@ -102,22 +102,20 @@ BEGIN
     RAISE EXCEPTION 'Product not found or inactive: %', p_product_id;
   END IF;
 
-  -- total_cost = |qty| * unit_cost (always positive; direction implicit in type)
-  v_total_cost := ABS(p_quantity) * COALESCE(p_unit_cost, 0);
-
   -- ── Insert transaction record ─────────────────────────────
+  -- NB: total_cost is a GENERATED column (quantity * unit_cost) — never insert it.
   INSERT INTO inventory_transactions (
     org_id,
     transaction_type, product_id,
     from_location_id, to_location_id,
-    quantity, unit_cost, total_cost,
+    quantity, unit_cost,
     reference_no, notes, customer_id, created_by,
     job_order_id
   ) VALUES (
     p_org_id,
     p_transaction_type, p_product_id,
     p_from_location_id, p_to_location_id,
-    p_quantity, COALESCE(p_unit_cost, 0), v_total_cost,
+    p_quantity, COALESCE(p_unit_cost, 0),
     p_reference_no, p_notes, p_customer_id, p_created_by,
     p_job_order_id
   )
