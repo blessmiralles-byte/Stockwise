@@ -282,8 +282,12 @@ function NewRequestDialog({
     item.item_type === 'product' && item.available !== undefined && item.quantity > item.available
   )
 
+  // Cost center + job code are mandatory on every requisition
+  const detailsComplete = !!costCenterId && !!jobCode.trim()
+
   const submit = async () => {
     if (!type || items.length === 0) return
+    if (!detailsComplete) { setError('Cost center and job code are required'); return }
     setSubmitting(true); setError('')
     try {
       const body: Record<string, any> = { type, items }
@@ -476,13 +480,13 @@ function NewRequestDialog({
               {/* Cost Center */}
               <div>
                 <label className="text-xs font-medium text-slate-600 block mb-1.5">
-                  Cost Center <span className="text-slate-400 font-normal">(optional)</span>
+                  Cost Center <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={costCenterId}
                   onChange={e => setCcId(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
-                  <option value="">— No cost center —</option>
+                  <option value="">— Select a cost center —</option>
                   {costCenters.filter(c => c.is_active).map(c => (
                     <option key={c.id} value={c.id}>{c.code} — {c.name}</option>
                   ))}
@@ -492,7 +496,7 @@ function NewRequestDialog({
               {/* Job Code */}
               <div>
                 <label className="text-xs font-medium text-slate-600 block mb-1.5">
-                  Job Code <span className="text-slate-400 font-normal">(optional)</span>
+                  Job Code <span className="text-red-500">*</span>
                 </label>
                 <input
                   value={jobCode}
@@ -617,6 +621,12 @@ function NewRequestDialog({
                 )}
               </div>
 
+              {!detailsComplete && (
+                <p className="text-xs text-slate-400">
+                  Cost center and job code are required to continue.
+                </p>
+              )}
+
               {error && (
                 <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
                   <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
@@ -638,7 +648,7 @@ function NewRequestDialog({
           {step < TOTAL_STEPS ? (
             <button
               onClick={() => setStep(s => (s + 1) as 2 | 3 | 4)}
-              disabled={step === 1 ? !type : step === 2 ? (items.length === 0 || hasStockIssues) : false}
+              disabled={step === 1 ? !type : step === 2 ? (items.length === 0 || hasStockIssues) : step === 3 ? !detailsComplete : false}
               className="px-5 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-40 transition-colors flex items-center gap-2">
               {step === 3 ? 'Review' : 'Next'} <ChevronRight className="w-4 h-4" />
             </button>

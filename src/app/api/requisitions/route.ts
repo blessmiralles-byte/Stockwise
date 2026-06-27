@@ -69,6 +69,12 @@ export async function POST(req: NextRequest) {
   if (!Array.isArray(items) || items.length === 0) {
     return NextResponse.json({ error: 'At least one item is required' }, { status: 400 })
   }
+  if (!cost_center_id) {
+    return NextResponse.json({ error: 'A cost center is required' }, { status: 400 })
+  }
+  if (!job_code || !String(job_code).trim()) {
+    return NextResponse.json({ error: 'A job code is required' }, { status: 400 })
+  }
 
   const supabase = createServiceClient()
 
