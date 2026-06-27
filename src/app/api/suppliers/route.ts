@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
 
+// Over-receipt tolerance is a percentage in [0, 100]; default 0 (strict).
+function clampTolerance(v: unknown): number {
+  const n = Number(v)
+  if (!Number.isFinite(n) || n <= 0) return 0
+  return Math.min(n, 100)
+}
+
 // GET /api/suppliers
 export async function GET(req: NextRequest) {
   const auth = await requireAuth()
@@ -34,7 +41,7 @@ export async function POST(req: NextRequest) {
   if (auth.error) return auth.error
 
   const body = await req.json()
-  const { name, contact_name, email, phone, lead_time_days, payment_terms, notes } = body
+  const { name, contact_name, email, phone, lead_time_days, payment_terms, notes, over_receipt_tolerance_pct } = body
 
   if (!name?.trim()) {
     return NextResponse.json({ error: 'Supplier name is required' }, { status: 400 })
@@ -52,6 +59,7 @@ export async function POST(req: NextRequest) {
       lead_time_days: lead_time_days ?? 7,
       payment_terms: payment_terms?.trim() || null,
       notes: notes?.trim() || null,
+      over_receipt_tolerance_pct: clampTolerance(over_receipt_tolerance_pct),
     })
     .select()
     .single()

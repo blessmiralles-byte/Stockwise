@@ -40,16 +40,30 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: `Cannot receive against a ${po.status} PO` }, { status: 400 })
   }
 
+  // Supplier over-receipt tolerance (percentage; 0 = strict). Same supplier
+  // governs any earlier PO the receiver chooses to allocate to.
+  let tolerancePct = 0
+  if (po.supplier_id) {
+    const { data: supplier } = await supabase
+      .from('suppliers')
+      .select('over_receipt_tolerance_pct')
+      .eq('id', po.supplier_id)
+      .single()
+    tolerancePct = Number(supplier?.over_receipt_tolerance_pct ?? 0)
+  }
+  const maxReceivable = (ordered: number, already: number) =>
+    Math.floor(ordered * (1 + tolerancePct / 100)) - already
+
   const errors: string[] = []
   const successLines: string[] = []
   // POs whose lines changed and need a status recompute (may include earlier POs)
   const affectedPoIds = new Set<string>([id])
-  const redirects: string[] = []
+  const notices: string[] = []
 
   const received_by = auth.userId
 
   for (const recv of lines) {
-    const { line_id, quantity_received, to_location_id, source_type, from_location_id, unit_cost, batch_no, expiration_date, condition, condition_notes } = recv
+    const { line_id, quantity_received, to_location_id, source_type, from_location_id, unit_cost, batch_no, expiration_date, condition, condition_notes, apply_to_po_id, apply_to_line_id } = recv
 
     const poLine = (po.lines as any[]).find((l: any) => l.id === line_id)
     if (!poLine) {
@@ -68,25 +82,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     // Resolve the target PO line. Default: the line on the PO being viewed.
-    // If that line is already fully received, redirect the receipt to the
-    // earliest still-open PO for the SAME supplier + SAME product (by order_date).
+    // The receiver may explicitly choose to apply the receipt to an earlier
+    // open PO for the SAME supplier + SAME product (apply_to_po_id/line_id).
     let targetPoId     = po.id
     let targetPoNumber = po.po_number
     let targetLine     = poLine
 
-    if ((poLine.quantity_ordered - poLine.quantity_received) <= 0 && po.supplier_id) {
-      const earlier = await findEarliestOpenLine(
-        supabase, auth.orgId, po.supplier_id, poLine.product_id, po.id,
+    if (apply_to_po_id && apply_to_po_id !== po.id) {
+      const target = await resolveTarget(
+        supabase, auth.orgId, po.supplier_id, apply_to_po_id, apply_to_line_id, poLine.product_id,
       )
-      if (earlier) {
-        targetPoId     = earlier.po_id
-        targetPoNumber = earlier.po_number
-        targetLine     = earlier.line
-        redirects.push(`line ${line_id}: ${po.po_number} fully received — applied to earlier PO ${earlier.po_number}`)
+      if (!target) {
+        errors.push(`line ${line_id}: chosen PO is not a valid open order for this supplier/product`)
+        continue
       }
+      targetPoId     = target.po_id
+      targetPoNumber = target.po_number
+      targetLine     = target.line
+      notices.push(`line ${line_id}: applied to ${targetPoNumber} (chosen by receiver)`)
     }
-
-    const remaining = targetLine.quantity_ordered - targetLine.quantity_received
 
     if (!to_location_id) {
       errors.push(`line ${line_id}: to_location_id is required`)
@@ -97,9 +111,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       continue
     }
 
-    if (quantity_received <= 0 || quantity_received > remaining) {
+    const cap = maxReceivable(targetLine.quantity_ordered, targetLine.quantity_received)
+    if (quantity_received <= 0 || quantity_received > cap) {
       const where = targetPoId === po.id ? '' : ` on PO ${targetPoNumber}`
-      errors.push(`line ${line_id}: quantity must be 1–${remaining}${where}`)
+      const tolNote = tolerancePct > 0 ? ` (incl. ${tolerancePct}% over-receipt)` : ''
+      errors.push(`line ${line_id}: quantity must be 1–${cap}${where}${tolNote}`)
       continue
     }
 
@@ -178,39 +194,45 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   return NextResponse.json({
     data: { received: successLines.length, new_status: newStatus },
-    warnings: [...redirects, ...errors].length > 0 ? [...redirects, ...errors] : undefined,
+    warnings: [...notices, ...errors].length > 0 ? [...notices, ...errors] : undefined,
   })
 }
 
 /**
- * Find the earliest still-open PO (by order_date, then created_at) for the
- * given supplier that has an open line for the given product.
+ * Validate and load a receiver-chosen target PO line. Confirms the PO belongs
+ * to the same org + supplier, is still open, and carries an open line for the
+ * same product. Returns null if any check fails.
  */
-async function findEarliestOpenLine(
+async function resolveTarget(
   supabase: ReturnType<typeof createServiceClient>,
   orgId: string,
-  supplierId: string,
+  supplierId: string | null,
+  applyPoId: string,
+  applyLineId: string | undefined,
   productId: string,
-  excludePoId: string,
 ) {
-  const { data } = await supabase
+  if (!supplierId) return null
+
+  const { data: cand } = await supabase
     .from('purchase_orders')
     .select(`
-      id, po_number, order_date, created_at,
+      id, po_number, status, supplier_id,
       lines:purchase_order_lines(id, product_id, quantity_ordered, quantity_received, unit_cost)
     `)
+    .eq('id', applyPoId)
     .eq('org_id', orgId)
-    .eq('supplier_id', supplierId)
-    .neq('id', excludePoId)
-    .not('status', 'in', '(received,cancelled)')
-    .order('order_date', { ascending: true, nullsFirst: false })
-    .order('created_at', { ascending: true })
+    .single()
 
-  for (const cand of (data ?? []) as any[]) {
-    const line = (cand.lines as any[]).find(
-      (l: any) => l.product_id === productId && l.quantity_received < l.quantity_ordered,
-    )
-    if (line) return { po_id: cand.id, po_number: cand.po_number, line }
-  }
-  return null
+  if (!cand) return null
+  if (cand.supplier_id !== supplierId) return null
+  if (cand.status === 'received' || cand.status === 'cancelled') return null
+
+  const lines = (cand.lines as any[]) ?? []
+  // Prefer the explicitly chosen line; fall back to any open line for the product
+  const line =
+    (applyLineId && lines.find((l: any) => l.id === applyLineId && l.product_id === productId)) ||
+    lines.find((l: any) => l.product_id === productId && l.quantity_received < l.quantity_ordered)
+
+  if (!line) return null
+  return { po_id: cand.id, po_number: cand.po_number, line }
 }

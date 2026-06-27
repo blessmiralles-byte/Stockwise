@@ -32,10 +32,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params
   const body = await req.json()
 
-  const allowed = ['name', 'contact_name', 'email', 'phone', 'lead_time_days', 'payment_terms', 'notes', 'is_active']
+  const allowed = ['name', 'contact_name', 'email', 'phone', 'lead_time_days', 'payment_terms', 'notes', 'is_active', 'over_receipt_tolerance_pct']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]
+  }
+
+  // Clamp tolerance to a sane percentage [0, 100]
+  if ('over_receipt_tolerance_pct' in updates) {
+    const n = Number(updates.over_receipt_tolerance_pct)
+    updates.over_receipt_tolerance_pct = !Number.isFinite(n) || n <= 0 ? 0 : Math.min(n, 100)
   }
 
   if (Object.keys(updates).length === 0) {

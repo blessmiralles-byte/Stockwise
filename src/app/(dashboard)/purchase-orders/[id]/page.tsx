@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, use } from 'react'
+import { useState, use, useEffect } from 'react'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -36,6 +36,7 @@ function GRNDialog({
 }) {
   type ReceiveLine = {
     line_id: string
+    product_id: string
     product_name: string
     sku: string
     unit: string
@@ -50,6 +51,13 @@ function GRNDialog({
     expiration_date: string
     condition: 'good' | 'damaged' | 'missing'
     condition_notes: string
+    apply_to_po_id: string      // '' = receive against this PO
+    apply_to_line_id: string
+  }
+
+  type Candidate = {
+    po_id: string; po_number: string; order_date: string
+    line_id: string; ordered: number; already: number; remaining: number; unit_cost: number
   }
 
   const [supplierId, setSupplierId] = useState<string>((po as any).supplier_id ?? '')
@@ -59,6 +67,7 @@ function GRNDialog({
       .filter(l => l.quantity_ordered > l.quantity_received)
       .map(l => ({
         line_id: l.id,
+        product_id: (l.product as any)?.id ?? (l as any).product_id ?? '',
         product_name: l.product?.name ?? '—',
         sku: l.product?.sku ?? '',
         unit: l.product?.unit_of_measure ?? '',
@@ -73,10 +82,38 @@ function GRNDialog({
         expiration_date: '',
         condition: 'good',
         condition_notes: '',
+        apply_to_po_id: '',
+        apply_to_line_id: '',
       }))
   )
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
+
+  // Older open POs for this supplier + the supplier's over-receipt tolerance
+  const [tolerancePct, setTolerancePct] = useState(0)
+  const [altByProduct, setAltByProduct] = useState<Record<string, Candidate[]>>({})
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(`/api/purchase-orders/${po.id}/alternates`)
+      .then(r => r.json())
+      .then(j => {
+        if (cancelled) return
+        setTolerancePct(Number(j.tolerance_pct ?? 0))
+        setAltByProduct(j.by_product ?? {})
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [po.id])
+
+  // Tolerance-aware max for a line, against its current target (this PO or a chosen earlier PO)
+  function lineMax(l: ReceiveLine): number {
+    if (l.apply_to_po_id) {
+      const c = (altByProduct[l.product_id] ?? []).find(x => x.po_id === l.apply_to_po_id)
+      if (c) return Math.max(0, Math.floor(c.ordered * (1 + tolerancePct / 100)) - c.already)
+    }
+    return Math.max(0, Math.floor(l.ordered * (1 + tolerancePct / 100)) - l.already)
+  }
 
   function update(id: string, field: keyof ReceiveLine, value: any) {
     setLines(ls => ls.map(l => l.line_id === id ? { ...l, [field]: value } : l))
@@ -106,6 +143,8 @@ function GRNDialog({
           expiration_date:   l.expiration_date || null,
           condition:         l.condition,
           condition_notes:   l.condition_notes || null,
+          apply_to_po_id:    l.apply_to_po_id || null,
+          apply_to_line_id:  l.apply_to_line_id || null,
         }))
 
       const res = await fetch(`/api/purchase-orders/${po.id}/receive`, {
@@ -125,11 +164,13 @@ function GRNDialog({
 
       const j = await res.json()
       const newStatus = j.data?.new_status
-      const statusMsg = newStatus === 'received'
+      const baseMsg = newStatus === 'received'
         ? 'All items received — PO marked as Received.'
         : newStatus === 'partial'
         ? 'Partially received — PO marked as Partial.'
         : ''
+      const warnings: string[] = Array.isArray(j.warnings) ? j.warnings : []
+      const statusMsg = [baseMsg, ...warnings].filter(Boolean).join(' ')
       if (statusMsg) setError('') // clear errors
       onReceived(statusMsg)
     } finally {
@@ -206,6 +247,34 @@ function GRNDialog({
                     )}
                   </div>
 
+                  {/* Apply to PO — only when this supplier has older open POs for this product */}
+                  {l.source_type === 'supplier' && (altByProduct[l.product_id]?.length ?? 0) > 0 && (
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">Apply Receipt To</label>
+                      <select
+                        className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                        value={l.apply_to_po_id}
+                        onChange={e => {
+                          const poId = e.target.value
+                          const cand = (altByProduct[l.product_id] ?? []).find(c => c.po_id === poId)
+                          setLines(ls => ls.map(x => x.line_id === l.line_id
+                            ? { ...x, apply_to_po_id: poId, apply_to_line_id: cand?.line_id ?? '', qty: 0 }
+                            : x))
+                        }}
+                      >
+                        <option value="">This PO — {po.po_number}</option>
+                        {(altByProduct[l.product_id] ?? []).map(c => (
+                          <option key={c.po_id} value={c.po_id}>
+                            {c.po_number} · ordered {formatDate(c.order_date)} · {c.remaining} remaining
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        This supplier has older open orders for this item. Choose where to book the receipt.
+                      </p>
+                    </div>
+                  )}
+
                   {/* Condition */}
                   <div>
                     <label className="block text-xs text-slate-500 mb-1">Item Condition</label>
@@ -239,7 +308,7 @@ function GRNDialog({
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     <div>
                       <label className="block text-xs text-slate-500 mb-1">
-                        Qty to Receive <span className="text-slate-400">(max {l.ordered - l.already})</span>
+                        Qty to Receive <span className="text-slate-400">(max {lineMax(l)}{tolerancePct > 0 ? ` · incl. ${tolerancePct}% over` : ''})</span>
                       </label>
                       <Input
                         type="text"
@@ -248,7 +317,7 @@ function GRNDialog({
                         placeholder="0"
                         disabled={l.condition === 'missing'}
                         onChange={e => {
-                          const max    = l.ordered - l.already
+                          const max    = lineMax(l)
                           const digits = e.target.value.replace(/\D/g, '')
                           const n      = digits === '' ? 0 : Math.min(parseInt(digits, 10), max)
                           update(l.line_id, 'qty', n)

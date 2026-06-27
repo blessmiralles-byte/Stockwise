@@ -699,7 +699,7 @@ function VendorsTab() {
   const { data, loading, refetch } = useApi<{ data: any[] }>('/api/suppliers')
   const vendors = data?.data ?? []
 
-  const blank = { name: '', contact_name: '', email: '', phone: '', address: '', payment_terms: '', lead_time_days: '', notes: '' }
+  const blank = { name: '', contact_name: '', email: '', phone: '', address: '', payment_terms: '', lead_time_days: '', over_receipt_tolerance_pct: '', notes: '' }
   const [showForm, setShowForm] = useState(false)
   const [editId,   setEditId]   = useState<string | null>(null)
   const [form,     setForm]     = useState(blank)
@@ -711,7 +711,7 @@ function VendorsTab() {
   const openAdd  = () => { setEditId(null); setForm(blank); setError(''); setShowForm(true) }
   const openEdit = (v: any) => {
     setEditId(v.id)
-    setForm({ name: v.name ?? '', contact_name: v.contact_name ?? '', email: v.email ?? '', phone: v.phone ?? '', address: v.address ?? '', payment_terms: v.payment_terms ?? '', lead_time_days: String(v.lead_time_days ?? ''), notes: v.notes ?? '' })
+    setForm({ name: v.name ?? '', contact_name: v.contact_name ?? '', email: v.email ?? '', phone: v.phone ?? '', address: v.address ?? '', payment_terms: v.payment_terms ?? '', lead_time_days: String(v.lead_time_days ?? ''), over_receipt_tolerance_pct: String(v.over_receipt_tolerance_pct ?? ''), notes: v.notes ?? '' })
     setError(''); setShowForm(true)
   }
   const cancel = () => { setShowForm(false); setEditId(null); setError('') }
@@ -731,6 +731,7 @@ function VendorsTab() {
         address:        form.address.trim()         || null,
         payment_terms:  form.payment_terms.trim()   || null,
         lead_time_days: form.lead_time_days ? Number(form.lead_time_days) : null,
+        over_receipt_tolerance_pct: form.over_receipt_tolerance_pct ? Number(form.over_receipt_tolerance_pct) : 0,
         notes:          form.notes.trim()           || null,
       }),
     })
@@ -780,6 +781,10 @@ function VendorsTab() {
             <div>
               <label className="text-xs font-medium text-slate-600 block mb-1">Lead Time (days)</label>
               <Input type="number" value={form.lead_time_days} onChange={f('lead_time_days')} placeholder="7" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600 block mb-1">Over-Receipt Tolerance (%)</label>
+              <Input type="number" value={form.over_receipt_tolerance_pct} onChange={f('over_receipt_tolerance_pct')} placeholder="0" />
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 block mb-1">Address</label>
