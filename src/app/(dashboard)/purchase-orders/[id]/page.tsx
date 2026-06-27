@@ -51,8 +51,6 @@ function GRNDialog({
     expiration_date: string
     condition: 'good' | 'damaged' | 'missing'
     condition_notes: string
-    apply_to_po_id: string      // '' = receive against this PO
-    apply_to_line_id: string
   }
 
   type Candidate = {
@@ -82,8 +80,6 @@ function GRNDialog({
         expiration_date: '',
         condition: 'good',
         condition_notes: '',
-        apply_to_po_id: '',
-        apply_to_line_id: '',
       }))
   )
   const [saving, setSaving] = useState(false)
@@ -107,13 +103,20 @@ function GRNDialog({
     return () => { cancelled = true }
   }, [po.id])
 
-  // Tolerance-aware max for a line, against its current target (this PO or a chosen earlier PO)
+  const cap = (ordered: number, already: number) =>
+    Math.max(0, Math.floor(ordered * (1 + tolerancePct / 100)) - already)
+
+  // Combined tolerance-aware max for a line = this PO's remaining plus every
+  // other open PO for the same supplier+product. A receipt cascades earliest-first.
   function lineMax(l: ReceiveLine): number {
-    if (l.apply_to_po_id) {
-      const c = (altByProduct[l.product_id] ?? []).find(x => x.po_id === l.apply_to_po_id)
-      if (c) return Math.max(0, Math.floor(c.ordered * (1 + tolerancePct / 100)) - c.already)
-    }
-    return Math.max(0, Math.floor(l.ordered * (1 + tolerancePct / 100)) - l.already)
+    const here = cap(l.ordered, l.already)
+    const elsewhere = (altByProduct[l.product_id] ?? []).reduce((s, c) => s + cap(c.ordered, c.already), 0)
+    return here + elsewhere
+  }
+
+  // How many open POs (this one + alternates) the receipt can fill for a line
+  function poCount(l: ReceiveLine): number {
+    return 1 + (altByProduct[l.product_id]?.length ?? 0)
   }
 
   function update(id: string, field: keyof ReceiveLine, value: any) {
@@ -144,8 +147,6 @@ function GRNDialog({
           expiration_date:   l.expiration_date || null,
           condition:         l.condition,
           condition_notes:   l.condition_notes || null,
-          apply_to_po_id:    l.apply_to_po_id || null,
-          apply_to_line_id:  l.apply_to_line_id || null,
         }))
 
       const res = await fetch(`/api/purchase-orders/${po.id}/receive`, {
@@ -248,32 +249,12 @@ function GRNDialog({
                     )}
                   </div>
 
-                  {/* Apply to PO — only when this supplier has older open POs for this product */}
+                  {/* Cross-PO note — when this supplier has other open POs for this item */}
                   {l.source_type === 'supplier' && (altByProduct[l.product_id]?.length ?? 0) > 0 && (
-                    <div>
-                      <label className="block text-xs text-slate-500 mb-1">Apply Receipt To</label>
-                      <select
-                        className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-                        value={l.apply_to_po_id}
-                        onChange={e => {
-                          const poId = e.target.value
-                          const cand = (altByProduct[l.product_id] ?? []).find(c => c.po_id === poId)
-                          setLines(ls => ls.map(x => x.line_id === l.line_id
-                            ? { ...x, apply_to_po_id: poId, apply_to_line_id: cand?.line_id ?? '', qty: 0 }
-                            : x))
-                        }}
-                      >
-                        <option value="">This PO — {po.po_number}</option>
-                        {(altByProduct[l.product_id] ?? []).map(c => (
-                          <option key={c.po_id} value={c.po_id}>
-                            {c.po_number} · ordered {formatDate(c.order_date)} · {c.remaining} remaining
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-[11px] text-slate-400 mt-1">
-                        This supplier has older open orders for this item. Choose where to book the receipt.
-                      </p>
-                    </div>
+                    <p className="text-[11px] text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-md px-2.5 py-1.5">
+                      This supplier has {poCount(l)} open orders for this item. The quantity fills the
+                      earliest order first, then spills into the next.
+                    </p>
                   )}
 
                   {/* Condition */}
@@ -309,7 +290,7 @@ function GRNDialog({
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     <div>
                       <label className="block text-xs text-slate-500 mb-1">
-                        Qty to Receive <span className="text-slate-400">(max {lineMax(l)}{tolerancePct > 0 ? ` · incl. ${tolerancePct}% over` : ''})</span>
+                        Qty to Receive <span className="text-slate-400">(max {lineMax(l)}{poCount(l) > 1 ? ` across ${poCount(l)} POs` : ''}{tolerancePct > 0 ? ` · incl. ${tolerancePct}% over` : ''})</span>
                       </label>
                       <Input
                         type="text"
@@ -390,11 +371,11 @@ function GRNDialog({
             </p>
             <p className="text-sm text-slate-600 mb-3">
               You entered <span className="font-semibold text-red-600">{capWarning.requested}</span>, but only{' '}
-              <span className="font-semibold text-slate-900">{capWarning.max}</span> can be received against this PO
+              <span className="font-semibold text-slate-900">{capWarning.max}</span> can be received across this supplier&apos;s open orders for this item
               {tolerancePct > 0 ? ` (including the ${tolerancePct}% over-receipt allowance)` : ''}. It was capped at {capWarning.max}.
             </p>
             <p className="text-xs text-slate-400 mb-4">
-              To accept more: raise this supplier&apos;s over-receipt tolerance in Setup → Vendors, or apply the surplus to another open PO.
+              To accept more: raise this supplier&apos;s over-receipt tolerance in Setup → Vendors, or add another PO for the shortfall.
             </p>
             <button
               onClick={() => setCapWarning(null)}

@@ -52,18 +52,57 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     tolerancePct = Number(supplier?.over_receipt_tolerance_pct ?? 0)
   }
   const maxReceivable = (ordered: number, already: number) =>
-    Math.floor(ordered * (1 + tolerancePct / 100)) - already
+    Math.max(0, Math.floor(ordered * (1 + tolerancePct / 100)) - already)
+
+  // ── Build the cascade pool: every still-open PO line for this supplier,
+  // grouped by product, ordered earliest-first (order_date, then created_at).
+  // A delivery fills the earliest order first, then spills into the next.
+  type Target = {
+    po_id: string; po_number: string; line_id: string
+    ordered: number; already: number; unit_cost: number
+  }
+  const openByProduct: Record<string, Target[]> = {}
+  if (po.supplier_id) {
+    const { data: openPos } = await supabase
+      .from('purchase_orders')
+      .select(`
+        id, po_number, order_date, created_at,
+        lines:purchase_order_lines(id, product_id, quantity_ordered, quantity_received, unit_cost)
+      `)
+      .eq('org_id', auth.orgId)
+      .eq('supplier_id', po.supplier_id)
+      .not('status', 'in', '(received,cancelled)')
+      .order('order_date', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: true })
+
+    for (const cand of (openPos ?? []) as any[]) {
+      for (const ln of (cand.lines as any[])) {
+        if (ln.quantity_received >= ln.quantity_ordered) continue
+        ;(openByProduct[ln.product_id] ??= []).push({
+          po_id:     cand.id,
+          po_number: cand.po_number,
+          line_id:   ln.id,
+          ordered:   ln.quantity_ordered,
+          already:   ln.quantity_received,
+          unit_cost: ln.unit_cost,
+        })
+      }
+    }
+  }
 
   const errors: string[] = []
   const successLines: string[] = []
   // POs whose lines changed and need a status recompute (may include earlier POs)
   const affectedPoIds = new Set<string>([id])
   const notices: string[] = []
+  // Track qty added to each PO line during THIS request so multiple payload
+  // entries for the same product don't double-allocate a shared pool.
+  const addedByLine: Record<string, number> = {}
 
   const received_by = auth.userId
 
   for (const recv of lines) {
-    const { line_id, quantity_received, to_location_id, source_type, from_location_id, unit_cost, batch_no, expiration_date, condition, condition_notes, apply_to_po_id, apply_to_line_id } = recv
+    const { line_id, quantity_received, to_location_id, source_type, from_location_id, batch_no, expiration_date, condition, condition_notes } = recv
 
     const poLine = (po.lines as any[]).find((l: any) => l.id === line_id)
     if (!poLine) {
@@ -81,27 +120,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       continue
     }
 
-    // Resolve the target PO line. Default: the line on the PO being viewed.
-    // The receiver may explicitly choose to apply the receipt to an earlier
-    // open PO for the SAME supplier + SAME product (apply_to_po_id/line_id).
-    let targetPoId     = po.id
-    let targetPoNumber = po.po_number
-    let targetLine     = poLine
-
-    if (apply_to_po_id && apply_to_po_id !== po.id) {
-      const target = await resolveTarget(
-        supabase, auth.orgId, po.supplier_id, apply_to_po_id, apply_to_line_id, poLine.product_id,
-      )
-      if (!target) {
-        errors.push(`line ${line_id}: chosen PO is not a valid open order for this supplier/product`)
-        continue
-      }
-      targetPoId     = target.po_id
-      targetPoNumber = target.po_number
-      targetLine     = target.line
-      notices.push(`line ${line_id}: applied to ${targetPoNumber} (chosen by receiver)`)
-    }
-
     if (!to_location_id) {
       errors.push(`line ${line_id}: to_location_id is required`)
       continue
@@ -110,64 +128,87 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       errors.push(`line ${line_id}: from_location_id is required for location transfers`)
       continue
     }
-
-    const cap = maxReceivable(targetLine.quantity_ordered, targetLine.quantity_received)
-    if (quantity_received <= 0 || quantity_received > cap) {
-      const where = targetPoId === po.id ? '' : ` on PO ${targetPoNumber}`
-      const tolNote = tolerancePct > 0 ? ` (incl. ${tolerancePct}% over-receipt)` : ''
-      errors.push(`line ${line_id}: quantity must be 1–${cap}${where}${tolNote}`)
+    if (quantity_received <= 0) {
+      errors.push(`line ${line_id}: quantity must be at least 1`)
       continue
     }
 
-    const effectiveCost = unit_cost ?? targetLine.unit_cost
+    // Cascade pool for this product (earliest PO first). Falls back to just
+    // the current PO line when the supplier has no other open orders.
+    const pool = openByProduct[poLine.product_id] ?? [{
+      po_id: po.id, po_number: po.po_number, line_id: poLine.id,
+      ordered: poLine.quantity_ordered, already: poLine.quantity_received, unit_cost: poLine.unit_cost,
+    }]
 
     const txType = source_type === 'location' ? 'transfer' : 'purchase'
+    let toAllocate = quantity_received
+    const splits: string[] = []
 
-    const { error: txErr } = await supabase.rpc('record_inventory_movement', {
-      p_transaction_type: txType,
-      p_product_id: targetLine.product_id,
-      p_quantity: quantity_received,
-      p_unit_cost: effectiveCost,
-      p_from_location_id: from_location_id || null,
-      p_to_location_id: to_location_id,
-      p_reference_no: targetPoNumber,
-      p_notes: `GRN against ${targetPoNumber}`,
-      p_customer_id: null,
-      p_created_by: auth.userId,
-      p_batch_no: batch_no || null,
-      p_expiration_date: expiration_date || null,
-      p_job_order_id: null,
-      p_cost_center_id: null,
-      p_job_code: null,
-      p_org_id: auth.orgId,
-    })
+    for (const t of pool) {
+      if (toAllocate <= 0) break
+      const alreadyNow = t.already + (addedByLine[t.line_id] ?? 0)
+      const cap = maxReceivable(t.ordered, alreadyNow)
+      if (cap <= 0) continue
+      const take = Math.min(toAllocate, cap)
 
-    if (txErr) {
-      console.error('[receive] rpc error', txErr)
-      errors.push(`line ${line_id}: inventory update failed — ${txErr.message}`)
-      continue
-    }
-
-    const { error: lineErr } = await supabase
-      .from('purchase_order_lines')
-      .update({
-        quantity_received: targetLine.quantity_received + quantity_received,
-        received_by:       received_by,
-        condition:         condition || 'good',
-        condition_notes:   condition_notes?.trim() || null,
+      const { error: txErr } = await supabase.rpc('record_inventory_movement', {
+        p_transaction_type: txType,
+        p_product_id: poLine.product_id,
+        p_quantity: take,
+        p_unit_cost: t.unit_cost,            // each PO line costed at its own price
+        p_from_location_id: from_location_id || null,
+        p_to_location_id: to_location_id,
+        p_reference_no: t.po_number,
+        p_notes: `GRN against ${t.po_number}`,
+        p_customer_id: null,
+        p_created_by: auth.userId,
+        p_batch_no: batch_no || null,
+        p_expiration_date: expiration_date || null,
+        p_job_order_id: null,
+        p_cost_center_id: null,
+        p_job_code: null,
+        p_org_id: auth.orgId,
       })
-      .eq('id', targetLine.id)
+      if (txErr) {
+        console.error('[receive] rpc error', txErr)
+        errors.push(`line ${line_id}: inventory update failed — ${txErr.message}`)
+        break
+      }
 
-    if (lineErr) {
-      errors.push(`line ${line_id}: failed to update received qty`)
-      continue
+      const { error: lineErr } = await supabase
+        .from('purchase_order_lines')
+        .update({
+          quantity_received: alreadyNow + take,
+          received_by,
+          condition:       condition || 'good',
+          condition_notes: condition_notes?.trim() || null,
+        })
+        .eq('id', t.line_id)
+      if (lineErr) {
+        errors.push(`line ${line_id}: failed to update received qty on ${t.po_number}`)
+        break
+      }
+
+      addedByLine[t.line_id] = (addedByLine[t.line_id] ?? 0) + take
+      affectedPoIds.add(t.po_id)
+      splits.push(`${take} → ${t.po_number}`)
+      toAllocate -= take
     }
 
-    affectedPoIds.add(targetPoId)
-    successLines.push(line_id)
+    if (splits.length > 0) {
+      successLines.push(line_id)
+      if (splits.length > 1) {
+        notices.push(`line ${line_id}: split across ${splits.length} open POs — ${splits.join(', ')}`)
+      }
+    }
+    if (toAllocate > 0) {
+      const poCount = pool.length
+      const tolNote = tolerancePct > 0 ? ` (incl. ${tolerancePct}% over-receipt)` : ''
+      errors.push(`line ${line_id}: ${toAllocate} more than the total open quantity across ${poCount} PO${poCount !== 1 ? 's' : ''} for this supplier${tolNote}`)
+    }
   }
 
-  // Recompute status for every PO whose lines changed (current + any redirected)
+  // Recompute status for every PO whose lines changed (current + any cascaded)
   let newStatus = po.status
   for (const poId of affectedPoIds) {
     const { data: updatedLines } = await supabase
@@ -196,43 +237,4 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     data: { received: successLines.length, new_status: newStatus },
     warnings: [...notices, ...errors].length > 0 ? [...notices, ...errors] : undefined,
   })
-}
-
-/**
- * Validate and load a receiver-chosen target PO line. Confirms the PO belongs
- * to the same org + supplier, is still open, and carries an open line for the
- * same product. Returns null if any check fails.
- */
-async function resolveTarget(
-  supabase: ReturnType<typeof createServiceClient>,
-  orgId: string,
-  supplierId: string | null,
-  applyPoId: string,
-  applyLineId: string | undefined,
-  productId: string,
-) {
-  if (!supplierId) return null
-
-  const { data: cand } = await supabase
-    .from('purchase_orders')
-    .select(`
-      id, po_number, status, supplier_id,
-      lines:purchase_order_lines(id, product_id, quantity_ordered, quantity_received, unit_cost)
-    `)
-    .eq('id', applyPoId)
-    .eq('org_id', orgId)
-    .single()
-
-  if (!cand) return null
-  if (cand.supplier_id !== supplierId) return null
-  if (cand.status === 'received' || cand.status === 'cancelled') return null
-
-  const lines = (cand.lines as any[]) ?? []
-  // Prefer the explicitly chosen line; fall back to any open line for the product
-  const line =
-    (applyLineId && lines.find((l: any) => l.id === applyLineId && l.product_id === productId)) ||
-    lines.find((l: any) => l.product_id === productId && l.quantity_received < l.quantity_ordered)
-
-  if (!line) return null
-  return { po_id: cand.id, po_number: cand.po_number, line }
 }
