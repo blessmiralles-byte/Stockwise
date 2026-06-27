@@ -238,12 +238,21 @@ function GRNDialog({
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     <div>
-                      <label className="block text-xs text-slate-500 mb-1">Qty to Receive</label>
+                      <label className="block text-xs text-slate-500 mb-1">
+                        Qty to Receive <span className="text-slate-400">(max {l.ordered - l.already})</span>
+                      </label>
                       <Input
-                        type="number" min={0} max={l.ordered - l.already}
-                        value={l.qty}
+                        type="text"
+                        inputMode="numeric"
+                        value={l.qty === 0 ? '' : String(l.qty)}
+                        placeholder="0"
                         disabled={l.condition === 'missing'}
-                        onChange={e => update(l.line_id, 'qty', parseInt(e.target.value) || 0)}
+                        onChange={e => {
+                          const max    = l.ordered - l.already
+                          const digits = e.target.value.replace(/\D/g, '')
+                          const n      = digits === '' ? 0 : Math.min(parseInt(digits, 10), max)
+                          update(l.line_id, 'qty', n)
+                        }}
                         className="h-8 text-sm disabled:opacity-50"
                       />
                     </div>
