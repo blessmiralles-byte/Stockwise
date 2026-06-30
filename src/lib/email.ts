@@ -2,6 +2,135 @@ import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
+// ── Role → what the member can do on Stocked ──────────────────────────────────
+export const ROLE_LABELS: Record<string, string> = {
+  owner:       'Owner',
+  procurement: 'Procurement',
+  operations:  'Operations',
+  receiver:    'Receiver',
+  finance:     'Finance',
+  viewer:      'Viewer',
+}
+
+export function roleCapabilities(role: string): string[] {
+  switch (role) {
+    case 'owner':
+      return [
+        'Full administrative access to the workspace',
+        'Invite and manage team members and their roles',
+        'Manage settings, locations, cost centers, and job codes',
+        'Create and approve purchase orders, requisitions, and receipts',
+        'Manage inventory, fixed assets, suppliers, and products',
+        'View all finance reports — valuation, payables, and the journal',
+      ]
+    case 'procurement':
+      return [
+        'Create and manage purchase orders',
+        'Manage suppliers and reorder suggestions',
+        'Raise and track requisitions',
+        'View inventory levels and reports',
+      ]
+    case 'operations':
+      return [
+        'Record inventory movements, transfers, and stock counts',
+        'Raise and approve requisitions',
+        'Manage locations and day-to-day stock',
+        'View inventory and operational reports',
+      ]
+    case 'receiver':
+      return [
+        'Receive goods against purchase orders',
+        'Record deliveries, batches, and item conditions',
+        'View open purchase orders and inventory levels',
+      ]
+    case 'finance':
+      return [
+        'View inventory valuation and the accounting journal',
+        'Review payables and three-way PO matching',
+        'Export financial and expense reports (read-only)',
+      ]
+    default: // viewer
+      return [
+        'Read-only access to inventory and stock levels',
+        'View reports and dashboards',
+      ]
+  }
+}
+
+export async function sendInviteEmail({
+  to,
+  inviterName,
+  businessName,
+  role,
+  actionLink,
+}: {
+  to: string
+  inviterName: string
+  businessName: string
+  role: string
+  actionLink: string
+}) {
+  const roleLabel = ROLE_LABELS[role] ?? 'Team Member'
+  const caps = roleCapabilities(role)
+
+  const subject = `${inviterName} invited you to ${businessName} on Stocked`
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #111; background: #f9fafb; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb; }
+        .header { background: #4f46e5; color: white; padding: 24px 32px; }
+        .header h1 { margin: 0; font-size: 20px; font-weight: 700; }
+        .header p { margin: 4px 0 0; font-size: 14px; opacity: 0.85; }
+        .body { padding: 24px 32px; }
+        .lead { font-size: 15px; line-height: 1.55; color: #374151; margin: 0 0 16px; }
+        .role-pill { display: inline-block; font-size: 13px; font-weight: 600; padding: 4px 12px; border-radius: 999px; background: #e0e7ff; color: #4338ca; }
+        .section-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; margin: 22px 0 10px; }
+        ul.caps { margin: 0; padding-left: 0; list-style: none; }
+        ul.caps li { font-size: 14px; color: #374151; padding: 7px 0 7px 26px; position: relative; border-bottom: 1px solid #f3f4f6; }
+        ul.caps li:before { content: '✓'; position: absolute; left: 0; color: #4f46e5; font-weight: 700; }
+        .btn { display: inline-block; background: #4f46e5; color: white; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; margin-top: 24px; }
+        .footer { padding: 16px 32px; background: #f9fafb; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>You've been invited to Stocked</h1>
+          <p>${businessName}</p>
+        </div>
+        <div class="body">
+          <p class="lead">
+            <strong>${inviterName}</strong>, the owner of <strong>${businessName}</strong>, has given you access to
+            their Stocked workspace as a <span class="role-pill">${roleLabel}</span>.
+          </p>
+          <p class="section-title">What you can do</p>
+          <ul class="caps">
+            ${caps.map(c => `<li>${c}</li>`).join('')}
+          </ul>
+          <a href="${actionLink}" class="btn">Accept invitation &amp; set up your account →</a>
+        </div>
+        <div class="footer">
+          Sent by ${inviterName} via Stocked · stocked.tech<br/>
+          If you weren't expecting this invitation, you can safely ignore this email.
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+
+  return resend.emails.send({
+    from: process.env.RESEND_FROM_EMAIL ?? 'Stocked <notifications@stocked.tech>',
+    to,
+    subject,
+    html,
+  })
+}
+
 export interface MaintenanceAlert {
   asset_name: string
   asset_tag: string
