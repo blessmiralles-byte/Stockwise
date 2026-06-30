@@ -10,7 +10,7 @@ import { TableSkeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/lib/use-api'
 import { formatDate } from '@/lib/utils'
 import { StockCount, Location } from '@/types'
-import { Plus, ClipboardList, X, ChevronRight, Search, MapPin } from 'lucide-react'
+import { Plus, ClipboardList, X, ChevronRight, Search, MapPin, Users, Package } from 'lucide-react'
 import Link from 'next/link'
 
 const STATUS_CFG: Record<string, { label: string; variant: any }> = {
@@ -47,53 +47,91 @@ function buildFlatTree(locs: FlatLoc[]): FlatLoc[] {
   return result
 }
 
+interface CountedItem { product_id: string; name: string; sku: string; qty: string }
+
 function NewCountDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   // Use ?all=true to get every level of the hierarchy
   const { data: locData } = useApi<{ data: FlatLoc[] }>('/api/locations?all=true')
+  const { data: prodData } = useApi<{ data: any[] }>('/api/products?limit=500')
+
   const [location_id, setLocation] = useState('')
+  const [attendees, setAttendees]  = useState<string[]>([])
+  const [attendeeInput, setAttInput] = useState('')
+  const [items, setItems]          = useState<CountedItem[]>([])
+  const [itemSel, setItemSel]      = useState('')
+  const [itemQty, setItemQty]      = useState('')
   const [notes, setNotes]          = useState('')
   const [saving, setSaving]        = useState(false)
   const [error, setError]          = useState('')
 
   const flatLocs = buildFlatTree(locData?.data ?? [])
+  const products = prodData?.data ?? []
+  const selectedLoc = flatLocs.find(l => l.id === location_id)
+
+  const addAttendee = () => {
+    const name = attendeeInput.trim()
+    if (!name || attendees.includes(name)) { setAttInput(''); return }
+    setAttendees(a => [...a, name]); setAttInput('')
+  }
+  const removeAttendee = (n: string) => setAttendees(a => a.filter(x => x !== n))
+
+  const addItem = () => {
+    if (!itemSel) return
+    const p = products.find((x: any) => x.id === itemSel)
+    if (!p) return
+    const qty = itemQty.trim()
+    if (qty === '' || Number(qty) < 0) { setError('Enter a quantity for the item'); return }
+    setItems(prev => {
+      const existing = prev.find(i => i.product_id === itemSel)
+      if (existing) return prev.map(i => i.product_id === itemSel ? { ...i, qty } : i)
+      return [...prev, { product_id: p.id, name: p.name, sku: p.sku ?? '', qty }]
+    })
+    setItemSel(''); setItemQty(''); setError('')
+  }
+  const removeItem = (pid: string) => setItems(prev => prev.filter(i => i.product_id !== pid))
+
+  const canSubmit = !!location_id && attendees.length > 0
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!location_id) { setError('Select a location first'); return }
+    if (attendees.length === 0) { setError('Log at least one person present'); return }
     setSaving(true); setError('')
     try {
       const res = await fetch('/api/stock-counts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ location_id: location_id || null, notes }),
+        body: JSON.stringify({
+          location_id,
+          attendees,
+          notes,
+          counts: items.map(i => ({ product_id: i.product_id, counted_qty: Number(i.qty) })),
+        }),
       })
       if (!res.ok) { const j = await res.json(); setError(j.error ?? 'Failed'); return }
       onSaved()
     } finally { setSaving(false) }
   }
 
-  const selectedLoc = flatLocs.find(l => l.id === location_id)
-
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-slate-900">New Stock Count</h2>
           <Button variant="ghost" size="icon" onClick={onClose}><X className="w-4 h-4" /></Button>
         </div>
-        <p className="text-xs text-slate-500">
-          A snapshot of current inventory will be taken automatically. Scope to a specific warehouse, room, or shelf — or leave blank to count everything.
-        </p>
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* 1. Location (required, first) */}
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">
-              Scope (optional)
+              Location <span className="text-red-500">*</span>
             </label>
             <select
               className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
               value={location_id}
               onChange={e => setLocation(e.target.value)}
             >
-              <option value="">— All locations —</option>
+              <option value="">— Select a location —</option>
               {flatLocs.map(l => (
                 <option key={l.id} value={l.id}>
                   {' '.repeat(l.level * 4)}{LOC_TYPE_ICONS[l.type] ?? '📍'} {l.name}
@@ -103,20 +141,102 @@ function NewCountDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
             {selectedLoc && (
               <p className="mt-1.5 text-xs text-slate-400 flex items-center gap-1">
                 <MapPin className="w-3 h-3" />
-                Counting only items stored in{' '}
-                <strong className="text-slate-600">{selectedLoc.name}</strong>
-                {selectedLoc.level > 0 && ' and sub-locations'}
+                Counting items stored in <strong className="text-slate-600">{selectedLoc.name}</strong>
               </p>
             )}
           </div>
+
+          {/* 2. People present (required) */}
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              People Present <span className="text-red-500">*</span>
+            </label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Users className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <Input
+                  value={attendeeInput}
+                  onChange={e => setAttInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAttendee() } }}
+                  placeholder="Add a name and press Enter"
+                  className="pl-8"
+                />
+              </div>
+              <Button type="button" variant="outline" onClick={addAttendee}>Add</Button>
+            </div>
+            {attendees.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {attendees.map(n => (
+                  <span key={n} className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 text-xs font-medium px-2 py-1 rounded-full">
+                    {n}
+                    <button type="button" onClick={() => removeAttendee(n)} className="hover:text-indigo-900">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 3. Count items: pick an item, enter the quantity */}
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              Count Items <span className="text-slate-400 font-normal">(optional — you can also count later)</span>
+            </label>
+            <div className="flex gap-2">
+              <select
+                className="flex-1 border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                value={itemSel}
+                onChange={e => setItemSel(e.target.value)}
+              >
+                <option value="">— Choose an item —</option>
+                {products.map((p: any) => (
+                  <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>
+                ))}
+              </select>
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={itemQty}
+                onChange={e => setItemQty(e.target.value.replace(/[^\d.]/g, ''))}
+                placeholder="Qty"
+                className="w-24"
+                disabled={!itemSel}
+              />
+              <Button type="button" variant="outline" onClick={addItem} disabled={!itemSel}>
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {items.length > 0 && (
+              <div className="mt-2 space-y-1.5">
+                {items.map(i => (
+                  <div key={i.product_id} className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                    <Package className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-slate-800 truncate">{i.name}</p>
+                      {i.sku && <p className="text-xs text-slate-400 font-mono">{i.sku}</p>}
+                    </div>
+                    <span className="text-sm font-semibold text-slate-900 tabular-nums">{i.qty}</span>
+                    <button type="button" onClick={() => removeItem(i.product_id)}
+                      className="text-slate-400 hover:text-red-500">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Notes</label>
             <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional notes…" />
           </div>
+
           {error && <p className="text-red-500 text-xs">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={saving}>{saving ? 'Creating…' : 'Create & Snapshot'}</Button>
+            <Button type="submit" disabled={saving || !canSubmit}>{saving ? 'Creating…' : 'Create Count'}</Button>
           </div>
         </form>
       </div>

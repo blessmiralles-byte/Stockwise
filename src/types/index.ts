@@ -201,6 +201,7 @@ export interface StockCount {
   count_number: string
   location_id?: string
   status: StockCountStatus
+  attendees?: string
   notes?: string
   created_by?: string
   approved_by?: string

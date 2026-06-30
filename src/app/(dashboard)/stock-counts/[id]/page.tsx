@@ -13,7 +13,7 @@ import { StockCount, StockCountLine } from '@/types'
 import {
   ArrowLeft, CheckCircle2, Save, AlertTriangle,
   MapPin, ChevronRight, LayoutList, Layers, Search,
-  Package,
+  Package, Users,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -280,6 +280,13 @@ export default function StockCountDetailPage({ params }: { params: Promise<{ id:
                   <span className="text-xs text-slate-400">Created {formatDate(sc.created_at)}</span>
                   {sc.approved_at && <span className="text-xs text-slate-400">Approved {formatDate(sc.approved_at)}</span>}
                 </div>
+
+                {sc.attendees && (
+                  <p className="mt-1.5 text-xs text-slate-500 flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-slate-400">Present:</span> {sc.attendees}
+                  </p>
+                )}
 
                 {/* Overall progress */}
                 <div className="mt-3 flex items-center gap-6">
