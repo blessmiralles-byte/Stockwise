@@ -116,6 +116,11 @@ function InviteUserForm({ onSuccess }: { onSuccess: () => void }) {
         </button>
       </div>
 
+      <p className="text-xs text-slate-500 bg-white border border-indigo-100 rounded-lg px-3 py-2 leading-relaxed">
+        They&apos;ll get a branded email noting that you (the owner) invited them, with a list of
+        everything their selected role can do on Stocked and a link to set up their account.
+      </p>
+
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2">
           <label className="text-xs font-medium text-slate-600 block mb-1">Email *</label>
