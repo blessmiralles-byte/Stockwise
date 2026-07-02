@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
+import { createNotification } from '@/lib/notify'
+import { sendPushToUsers } from '@/lib/push'
 
 // GET /api/stock-counts/:id
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -42,7 +44,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: 'Failed to fetch count lines' }, { status: 500 })
   }
 
-  return NextResponse.json({ data: { ...sc, lines: lines ?? [] } })
+  const { data: attendees } = await supabase
+    .from('stock_count_attendees')
+    .select('id, user_id, name, is_external, confirmation_status, confirmed_at, note')
+    .eq('stock_count_id', id)
+    .order('is_external', { ascending: true })
+    .order('name', { ascending: true })
+
+  return NextResponse.json({ data: { ...sc, lines: lines ?? [], attendee_list: attendees ?? [] } })
 }
 
 /**
@@ -69,10 +78,93 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       .update({ status: body.status })
       .eq('id', id)
       .eq('org_id', auth.orgId)
-      .select()
+      .select('id, count_number, org_id')
       .single()
     if (error) return NextResponse.json({ error: 'Failed to update status' }, { status: 500 })
+
+    // Submitting for review → ask each team-member attendee to confirm the
+    // count on their mobile app (in-app notification + Expo push).
+    if (body.status === 'reviewing') {
+      const { data: attendees } = await supabase
+        .from('stock_count_attendees')
+        .select('user_id')
+        .eq('stock_count_id', id)
+        .eq('is_external', false)
+        .eq('confirmation_status', 'pending')
+        .not('user_id', 'is', null)
+
+      const userIds = (attendees ?? []).map((a: any) => a.user_id).filter(Boolean)
+      if (userIds.length > 0) {
+        const title = `Confirm stock count ${data.count_number}`
+        const bodyText = 'Please confirm the counted quantities match what you counted.'
+        await createNotification({
+          userId: userIds,
+          orgId: data.org_id ?? auth.orgId,
+          type: 'stock_count.confirm',
+          title,
+          body: bodyText,
+          data: { stock_count_id: id, count_number: data.count_number },
+          actionUrl: `/stock-counts/${id}`,
+        })
+        await sendPushToUsers(userIds, {
+          title,
+          body: bodyText,
+          data: { type: 'stock_count.confirm', stock_count_id: id, count_number: data.count_number },
+        })
+      }
+    }
+
     return NextResponse.json({ data })
+  }
+
+  // Live counting: add / update counted quantities by product (item + qty)
+  if (Array.isArray(body.add)) {
+    const { data: sc } = await supabase
+      .from('stock_counts')
+      .select('location_id, org_id')
+      .eq('id', id)
+      .eq('org_id', auth.orgId)
+      .single()
+    if (!sc?.location_id) {
+      return NextResponse.json({ error: 'Count location not found' }, { status: 400 })
+    }
+
+    for (const a of body.add) {
+      const productId = a.product_id
+      const countedQty = Number(a.counted_qty)
+      if (!productId || !Number.isFinite(countedQty) || countedQty < 0) continue
+
+      const { data: existing } = await supabase
+        .from('stock_count_lines')
+        .select('id')
+        .eq('stock_count_id', id)
+        .eq('product_id', productId)
+        .eq('location_id', sc.location_id)
+        .maybeSingle()
+
+      if (existing) {
+        await supabase.from('stock_count_lines')
+          .update({ counted_qty: countedQty })
+          .eq('id', existing.id)
+      } else {
+        // Item not in the snapshot (system shows zero here) — add at system_qty 0
+        const { data: bal } = await supabase
+          .from('inventory_balances')
+          .select('quantity')
+          .eq('product_id', productId)
+          .eq('location_id', sc.location_id)
+          .maybeSingle()
+        await supabase.from('stock_count_lines').insert({
+          org_id: sc.org_id ?? auth.orgId,
+          stock_count_id: id,
+          product_id: productId,
+          location_id: sc.location_id,
+          system_qty: Number(bal?.quantity ?? 0),
+          counted_qty: countedQty,
+        })
+      }
+    }
+    return NextResponse.json({ data: { added: body.add.length } })
   }
 
   if (Array.isArray(body.lines)) {

@@ -151,7 +151,9 @@ function SectionProgress({ total, counted, variances }: { total: number; counted
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function StockCountDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const { data, loading, error, refetch } = useApi<{ data: StockCount & { lines: any[] } }>(`/api/stock-counts/${id}`)
+  const { data, loading, error, refetch } = useApi<{ data: StockCount & { lines: any[]; attendee_list?: any[] } }>(`/api/stock-counts/${id}`)
+  const { data: prodData } = useApi<{ data: any[] }>('/api/products?limit=500')
+  const { data: profile }  = useApi<any>('/api/user/profile')
 
   const [counts, setCounts]       = useState<Record<string, string>>({})
   const [saving, setSaving]       = useState(false)
@@ -160,16 +162,27 @@ export default function StockCountDetailPage({ params }: { params: Promise<{ id:
   const [viewMode, setViewMode]   = useState<'grouped' | 'flat'>('grouped')
   const [locationFilter, setLocationFilter] = useState<string>('__all__')
   const [search, setSearch]       = useState('')
+  const [addSel, setAddSel]       = useState('')
+  const [addQty, setAddQty]       = useState('')
+  const [adding, setAdding]       = useState(false)
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({})
+
+  const products = prodData?.data ?? []
 
   const sc    = data?.data
   const lines = sc?.lines ?? []
 
-  // Initialise counts from server data (only once)
-  if (sc && Object.keys(counts).length === 0 && lines.length > 0) {
-    const initial: Record<string, string> = {}
-    for (const l of lines) initial[l.id] = l.counted_qty !== null ? String(l.counted_qty) : ''
-    setCounts(initial)
+  // Seed counts from server data, and merge in any lines added since (e.g. via
+  // the quick-add entry) without clobbering in-progress edits.
+  if (sc && lines.length > 0) {
+    const missing = lines.filter((l: any) => counts[l.id] === undefined)
+    if (missing.length > 0) {
+      setCounts(c => {
+        const next = { ...c }
+        for (const l of missing) next[l.id] = l.counted_qty !== null ? String(l.counted_qty) : ''
+        return next
+      })
+    }
   }
 
   // Build sections (memo so we don't rebuild on every keystroke)
@@ -231,6 +244,32 @@ export default function StockCountDetailPage({ params }: { params: Promise<{ id:
     } finally { setApproving(false) }
   }
 
+  async function addCountItem() {
+    if (!addSel || addQty.trim() === '' || Number(addQty) < 0) return
+    setAdding(true)
+    try {
+      const res = await fetch(`/api/stock-counts/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ add: [{ product_id: addSel, counted_qty: Number(addQty) }] }),
+      })
+      if (res.ok) { setAddSel(''); setAddQty(''); refetch() }
+    } finally { setAdding(false) }
+  }
+
+  async function confirmCount(status: 'confirmed' | 'disputed') {
+    let note: string | undefined
+    if (status === 'disputed') {
+      note = window.prompt('Optionally describe the discrepancy:') ?? undefined
+    }
+    const res = await fetch(`/api/stock-counts/${id}/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, note }),
+    })
+    if (res.ok) refetch()
+  }
+
   function jumpTo(locationId: string) {
     const el = sectionRefs.current[locationId]
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -252,6 +291,15 @@ export default function StockCountDetailPage({ params }: { params: Promise<{ id:
   const isEditable = sc.status === 'open' || sc.status === 'counting'
   const canReview  = sc.status === 'counting'
   const canApprove = sc.status === 'reviewing'
+
+  const attendeeList: any[] = (sc as any).attendee_list ?? []
+  const myAttendee = attendeeList.find(a => a.user_id && profile?.id && a.user_id === profile.id)
+  const confirmStatusCfg: Record<string, { label: string; cls: string }> = {
+    pending:      { label: 'Awaiting confirmation', cls: 'bg-amber-100 text-amber-700' },
+    confirmed:    { label: 'Confirmed',              cls: 'bg-green-100 text-green-700' },
+    disputed:     { label: 'Disputed',               cls: 'bg-red-100 text-red-700' },
+    not_required: { label: 'Recorded',               cls: 'bg-slate-100 text-slate-500' },
+  }
 
   return (
     <div>
@@ -329,6 +377,87 @@ export default function StockCountDetailPage({ params }: { params: Promise<{ id:
             </div>
           </CardContent>
         </Card>
+
+        {/* ── Attendees & confirmations ── */}
+        {attendeeList.length > 0 && (
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-slate-400" /> People Present
+                </p>
+                {myAttendee?.confirmation_status === 'pending' && (
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" className="gap-1 text-red-600 border-red-200 hover:bg-red-50"
+                      onClick={() => confirmCount('disputed')}>
+                      Dispute
+                    </Button>
+                    <Button size="sm" className="gap-1 bg-green-600 hover:bg-green-700"
+                      onClick={() => confirmCount('confirmed')}>
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Confirm my count
+                    </Button>
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {attendeeList.map(a => {
+                  const cfg = confirmStatusCfg[a.confirmation_status] ?? confirmStatusCfg.not_required
+                  return (
+                    <div key={a.id} className="inline-flex items-center gap-2 border border-slate-200 rounded-lg px-2.5 py-1.5">
+                      <span className="text-sm text-slate-700">{a.name}</span>
+                      {a.is_external && <span className="text-[10px] uppercase tracking-wide text-slate-400">auditor</span>}
+                      <span className={cn('text-[11px] font-medium px-1.5 py-0.5 rounded-full', cfg.cls)}>{cfg.label}</span>
+                    </div>
+                  )
+                })}
+              </div>
+              {attendeeList.some(a => a.confirmation_status === 'pending') && (
+                <p className="text-xs text-slate-400 mt-2">
+                  Team members are notified on their mobile app to confirm when the count is submitted for review.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ── Active counting: add an item + its counted quantity ── */}
+        {isEditable && (
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-sm font-semibold text-slate-800 mb-2 flex items-center gap-2">
+                <Package className="w-4 h-4 text-slate-400" /> Count an Item
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <select
+                  className="flex-1 min-w-48 border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                  value={addSel}
+                  onChange={e => setAddSel(e.target.value)}
+                >
+                  <option value="">— Choose an item —</option>
+                  {products.map((p: any) => (
+                    <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>
+                  ))}
+                </select>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  value={addQty}
+                  onChange={e => setAddQty(e.target.value.replace(/[^\d.]/g, ''))}
+                  placeholder="Counted qty"
+                  className="w-32"
+                  disabled={!addSel}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCountItem() } }}
+                />
+                <Button onClick={addCountItem} disabled={!addSel || addQty.trim() === '' || adding} className="gap-1">
+                  {adding ? 'Adding…' : 'Add'}
+                </Button>
+              </div>
+              <p className="text-xs text-slate-400 mt-2">
+                Add each item as you count it. New items not in the snapshot are added and flagged as a variance.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* ── Variance warning ── */}
         {variantLines > 0 && (

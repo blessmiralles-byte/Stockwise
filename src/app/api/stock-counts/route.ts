@@ -37,22 +37,45 @@ export async function POST(req: NextRequest) {
   if (auth.error) return auth.error
 
   const body = await req.json()
-  const { location_id, notes, attendees, counts } = body
+  const { location_id, notes, counts } = body
 
   // Location is required — a count is always scoped to one place
   if (!location_id) {
     return NextResponse.json({ error: 'A location is required' }, { status: 400 })
   }
 
-  // People present must be logged for audit
-  const attendeeList: string[] = Array.isArray(attendees)
-    ? attendees.map((a: any) => String(a).trim()).filter(Boolean)
-    : String(attendees ?? '').split(',').map(s => s.trim()).filter(Boolean)
-  if (attendeeList.length === 0) {
+  const supabase = createServiceClient()
+
+  // Attendees: team members (each must confirm from their mobile app) plus
+  // external people such as auditors (free text, no confirmation required).
+  const userIds: string[] = Array.isArray(body.attendee_user_ids)
+    ? body.attendee_user_ids.filter(Boolean)
+    : []
+  const externalNames: string[] = Array.isArray(body.external_attendees)
+    ? body.external_attendees.map((s: any) => String(s).trim()).filter(Boolean)
+    : Array.isArray(body.attendees)   // legacy field
+      ? body.attendees.map((s: any) => String(s).trim()).filter(Boolean)
+      : []
+
+  if (userIds.length + externalNames.length === 0) {
     return NextResponse.json({ error: 'Log at least one person present during the count' }, { status: 400 })
   }
 
-  const supabase = createServiceClient()
+  // Resolve team-member display names
+  let userAttendees: { user_id: string; name: string }[] = []
+  if (userIds.length > 0) {
+    const { data: profs } = await supabase
+      .from('user_profiles')
+      .select('id, full_name, email')
+      .eq('org_id', auth.orgId)
+      .in('id', userIds)
+    userAttendees = (profs ?? []).map((p: any) => ({
+      user_id: p.id,
+      name: p.full_name?.trim() || p.email || 'Team member',
+    }))
+  }
+
+  const allNames = [...userAttendees.map(u => u.name), ...externalNames]
 
   // H-3: Atomic DB sequence prevents duplicate count numbers under concurrency
   const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
@@ -70,7 +93,7 @@ export async function POST(req: NextRequest) {
       org_id: auth.orgId,
       count_number,
       location_id,
-      attendees: attendeeList.join(', '),
+      attendees: allNames.join(', '),
       notes: notes?.trim() || null,
       created_by: auth.userId,
       status: 'open',
@@ -81,6 +104,21 @@ export async function POST(req: NextRequest) {
   if (scErr) {
     console.error('[POST /api/stock-counts] header', scErr)
     return NextResponse.json({ error: 'Failed to create stock count' }, { status: 500 })
+  }
+
+  // Attendee rows: users start 'pending' (must confirm), externals 'not_required'
+  const attendeeRows = [
+    ...userAttendees.map(u => ({
+      org_id: auth.orgId, stock_count_id: sc.id, user_id: u.user_id,
+      name: u.name, is_external: false, confirmation_status: 'pending',
+    })),
+    ...externalNames.map(n => ({
+      org_id: auth.orgId, stock_count_id: sc.id, user_id: null,
+      name: n, is_external: true, confirmation_status: 'not_required',
+    })),
+  ]
+  if (attendeeRows.length > 0) {
+    await supabase.from('stock_count_attendees').insert(attendeeRows)
   }
 
   // Snapshot current inventory_balances at this location as system_qty

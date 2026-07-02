@@ -53,10 +53,13 @@ function NewCountDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
   // Use ?all=true to get every level of the hierarchy
   const { data: locData } = useApi<{ data: FlatLoc[] }>('/api/locations?all=true')
   const { data: prodData } = useApi<{ data: any[] }>('/api/products?limit=500')
+  const { data: teamData } = useApi<{ data: any[] }>('/api/users/team')
 
   const [location_id, setLocation] = useState('')
-  const [attendees, setAttendees]  = useState<string[]>([])
-  const [attendeeInput, setAttInput] = useState('')
+  const [userIds, setUserIds]      = useState<string[]>([])   // team-member attendees
+  const [userSel, setUserSel]      = useState('')
+  const [externals, setExternals]  = useState<string[]>([])   // auditors / free text
+  const [extInput, setExtInput]    = useState('')
   const [items, setItems]          = useState<CountedItem[]>([])
   const [itemSel, setItemSel]      = useState('')
   const [itemQty, setItemQty]      = useState('')
@@ -66,14 +69,25 @@ function NewCountDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
 
   const flatLocs = buildFlatTree(locData?.data ?? [])
   const products = prodData?.data ?? []
+  const team = teamData?.data ?? []
   const selectedLoc = flatLocs.find(l => l.id === location_id)
-
-  const addAttendee = () => {
-    const name = attendeeInput.trim()
-    if (!name || attendees.includes(name)) { setAttInput(''); return }
-    setAttendees(a => [...a, name]); setAttInput('')
+  const userName = (uid: string) => {
+    const u = team.find((t: any) => t.id === uid)
+    return u?.full_name || u?.email || 'Team member'
   }
-  const removeAttendee = (n: string) => setAttendees(a => a.filter(x => x !== n))
+
+  const addUser = (uid: string) => {
+    if (!uid || userIds.includes(uid)) { setUserSel(''); return }
+    setUserIds(a => [...a, uid]); setUserSel('')
+  }
+  const removeUser = (uid: string) => setUserIds(a => a.filter(x => x !== uid))
+
+  const addExternal = () => {
+    const name = extInput.trim()
+    if (!name || externals.includes(name)) { setExtInput(''); return }
+    setExternals(a => [...a, name]); setExtInput('')
+  }
+  const removeExternal = (n: string) => setExternals(a => a.filter(x => x !== n))
 
   const addItem = () => {
     if (!itemSel) return
@@ -90,12 +104,12 @@ function NewCountDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
   }
   const removeItem = (pid: string) => setItems(prev => prev.filter(i => i.product_id !== pid))
 
-  const canSubmit = !!location_id && attendees.length > 0
+  const canSubmit = !!location_id && (userIds.length + externals.length) > 0
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!location_id) { setError('Select a location first'); return }
-    if (attendees.length === 0) { setError('Log at least one person present'); return }
+    if (userIds.length + externals.length === 0) { setError('Log at least one person present'); return }
     setSaving(true); setError('')
     try {
       const res = await fetch('/api/stock-counts', {
@@ -103,7 +117,8 @@ function NewCountDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           location_id,
-          attendees,
+          attendee_user_ids: userIds,
+          external_attendees: externals,
           notes,
           counts: items.map(i => ({ product_id: i.product_id, counted_qty: Number(i.qty) })),
         }),
@@ -146,30 +161,61 @@ function NewCountDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
             )}
           </div>
 
-          {/* 2. People present (required) */}
+          {/* 2. People present (required) — team members + external auditors */}
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">
-              People Present <span className="text-red-500">*</span>
+              Team Members Present <span className="text-red-500">*</span>
+            </label>
+            <select
+              className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+              value={userSel}
+              onChange={e => addUser(e.target.value)}
+            >
+              <option value="">— Add a team member —</option>
+              {team.filter((t: any) => !userIds.includes(t.id)).map((t: any) => (
+                <option key={t.id} value={t.id}>{t.full_name || t.email}{t.role ? ` · ${t.role}` : ''}</option>
+              ))}
+            </select>
+            {userIds.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {userIds.map(uid => (
+                  <span key={uid} className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 text-xs font-medium px-2 py-1 rounded-full">
+                    <Users className="w-3 h-3" /> {userName(uid)}
+                    <button type="button" onClick={() => removeUser(uid)} className="hover:text-indigo-900">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <p className="text-[11px] text-slate-400 mt-1.5">
+              Team members will be asked to confirm the count on their mobile app.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              Others Present <span className="text-slate-400 font-normal">(auditors, visitors — optional)</span>
             </label>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Users className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                 <Input
-                  value={attendeeInput}
-                  onChange={e => setAttInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAttendee() } }}
+                  value={extInput}
+                  onChange={e => setExtInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addExternal() } }}
                   placeholder="Add a name and press Enter"
                   className="pl-8"
                 />
               </div>
-              <Button type="button" variant="outline" onClick={addAttendee}>Add</Button>
+              <Button type="button" variant="outline" onClick={addExternal}>Add</Button>
             </div>
-            {attendees.length > 0 && (
+            {externals.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
-                {attendees.map(n => (
-                  <span key={n} className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 text-xs font-medium px-2 py-1 rounded-full">
+                {externals.map(n => (
+                  <span key={n} className="inline-flex items-center gap-1 bg-slate-100 text-slate-600 text-xs font-medium px-2 py-1 rounded-full">
                     {n}
-                    <button type="button" onClick={() => removeAttendee(n)} className="hover:text-indigo-900">
+                    <button type="button" onClick={() => removeExternal(n)} className="hover:text-slate-900">
                       <X className="w-3 h-3" />
                     </button>
                   </span>
