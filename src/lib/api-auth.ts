@@ -1,6 +1,37 @@
 import { NextResponse } from 'next/server'
+import { headers } from 'next/headers'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+
+/**
+ * Resolve the authenticated user from either an Authorization: Bearer <jwt>
+ * header (mobile app / API clients) or the session cookie (web). Returns the
+ * user id, or null if neither is valid.
+ */
+async function resolveUserId(): Promise<string | null> {
+  // 1. Bearer token — used by the Expo mobile app
+  try {
+    const h = await headers()
+    const authz = h.get('authorization') ?? ''
+    if (authz.toLowerCase().startsWith('bearer ')) {
+      const token = authz.slice(7).trim()
+      if (token) {
+        const sb = createSupabaseClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        )
+        const { data: { user } } = await sb.auth.getUser(token)
+        if (user) return user.id
+      }
+    }
+  } catch { /* fall through to cookie auth */ }
+
+  // 2. Session cookie — used by the web app
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  return user?.id ?? null
+}
 
 // ── SOD roles ─────────────────────────────────────────────────────────────────
 // owner       — full access, assigns roles (was: admin)
@@ -63,10 +94,9 @@ export interface AuthResult {
  *   // auth.userId and auth.role are safe to use
  */
 export async function requireAuth(): Promise<AuthResult> {
-  const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
+  const userId = await resolveUserId()
 
-  if (error || !user) {
+  if (!userId) {
     return { userId: '', role: 'viewer', orgId: '', error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
   }
 
@@ -76,13 +106,13 @@ export async function requireAuth(): Promise<AuthResult> {
     const { data: profile } = await service
       .from('user_profiles')
       .select('role, is_active, org_id')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single()
 
     // C-2: Deactivated users are blocked at the auth layer regardless of role
     if (profile?.is_active === false) {
       return {
-        userId: user.id,
+        userId,
         role: 'viewer',
         orgId: profile?.org_id ?? '',
         error: NextResponse.json(
@@ -94,10 +124,10 @@ export async function requireAuth(): Promise<AuthResult> {
 
     const role  = (profile?.role as Role) ?? 'viewer'
     const orgId = profile?.org_id ?? ''
-    return { userId: user.id, role, orgId, error: null }
+    return { userId, role, orgId, error: null }
   } catch {
     // user_profiles table missing (setup not yet run) — grant owner to prevent lockout
-    return { userId: user.id, role: 'owner', orgId: '', error: null }
+    return { userId, role: 'owner', orgId: '', error: null }
   }
 }
 
