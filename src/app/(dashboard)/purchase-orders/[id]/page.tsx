@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useApi } from '@/lib/use-api'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, receivableCap } from '@/lib/utils'
 import { PurchaseOrder, Location } from '@/types'
 import { ArrowLeft, Truck, CheckCircle2, Send, X, FileText, AlertTriangle, Scale, Loader2, Plus, Trash2, Download, PackagePlus } from 'lucide-react'
 import Link from 'next/link'
@@ -103,8 +103,7 @@ function GRNDialog({
     return () => { cancelled = true }
   }, [po.id])
 
-  const cap = (ordered: number, already: number) =>
-    Math.max(0, Math.floor(ordered * (1 + tolerancePct / 100)) - already)
+  const cap = (ordered: number, already: number) => receivableCap(ordered, already, tolerancePct)
 
   // Combined tolerance-aware max for a line = this PO's remaining plus every
   // other open PO for the same supplier+product. A receipt cascades earliest-first.

@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
-
-// Over-receipt tolerance is a percentage in [0, 100]; default 0 (strict).
-function clampTolerance(v: unknown): number {
-  const n = Number(v)
-  if (!Number.isFinite(n) || n <= 0) return 0
-  return Math.min(n, 100)
-}
+import { clampTolerance } from '@/lib/utils'
 
 // GET /api/suppliers
 export async function GET(req: NextRequest) {

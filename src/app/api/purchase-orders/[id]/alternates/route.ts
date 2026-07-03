@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
+import { fetchOpenSupplierPOs } from '@/lib/purchase-orders'
 
 /**
  * GET /api/purchase-orders/:id/alternates
@@ -49,22 +50,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .single()
   const tolerance_pct = Number(supplier?.over_receipt_tolerance_pct ?? 0)
 
-  // Other open POs for the same supplier
-  const { data: others } = await supabase
-    .from('purchase_orders')
-    .select(`
-      id, po_number, order_date, created_at,
-      lines:purchase_order_lines(id, product_id, quantity_ordered, quantity_received, unit_cost)
-    `)
-    .eq('org_id', auth.orgId)
-    .eq('supplier_id', po.supplier_id)
-    .neq('id', id)
-    .not('status', 'in', '(received,cancelled)')
-    .order('order_date', { ascending: true, nullsFirst: false })
-    .order('created_at', { ascending: true })
+  // Other open POs for the same supplier (excludes the one being received)
+  const others = (await fetchOpenSupplierPOs(supabase, auth.orgId, po.supplier_id))
+    .filter((p: any) => p.id !== id)
 
   const by_product: Record<string, any[]> = {}
-  for (const cand of (others ?? []) as any[]) {
+  for (const cand of others as any[]) {
     for (const line of (cand.lines as any[])) {
       const remaining = line.quantity_ordered - line.quantity_received
       if (remaining <= 0) continue

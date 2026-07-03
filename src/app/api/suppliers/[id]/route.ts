@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireRole } from '@/lib/api-auth'
+import { clampTolerance } from '@/lib/utils'
 
 // GET /api/suppliers/:id
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -40,8 +41,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   // Clamp tolerance to a sane percentage [0, 100]
   if ('over_receipt_tolerance_pct' in updates) {
-    const n = Number(updates.over_receipt_tolerance_pct)
-    updates.over_receipt_tolerance_pct = !Number.isFinite(n) || n <= 0 ? 0 : Math.min(n, 100)
+    updates.over_receipt_tolerance_pct = clampTolerance(updates.over_receipt_tolerance_pct)
   }
 
   if (Object.keys(updates).length === 0) {

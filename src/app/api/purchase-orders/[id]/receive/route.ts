@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
+import { fetchOpenSupplierPOs } from '@/lib/purchase-orders'
+import { receivableCap } from '@/lib/utils'
 
 /**
  * POST /api/purchase-orders/:id/receive
@@ -52,7 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     tolerancePct = Number(supplier?.over_receipt_tolerance_pct ?? 0)
   }
   const maxReceivable = (ordered: number, already: number) =>
-    Math.max(0, Math.floor(ordered * (1 + tolerancePct / 100)) - already)
+    receivableCap(ordered, already, tolerancePct)
 
   // ── Build the cascade pool: every still-open PO line for this supplier,
   // grouped by product, ordered earliest-first (order_date, then created_at).
@@ -63,21 +65,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
   const openByProduct: Record<string, Target[]> = {}
   if (po.supplier_id) {
-    const { data: openPos } = await supabase
-      .from('purchase_orders')
-      .select(`
-        id, po_number, order_date, created_at,
-        lines:purchase_order_lines(id, product_id, quantity_ordered, quantity_received, unit_cost)
-      `)
-      .eq('org_id', auth.orgId)
-      .eq('supplier_id', po.supplier_id)
-      // Only cascade into POs actually issued to the supplier — never a draft
-      // (still being edited, never sent) or a closed one.
-      .not('status', 'in', '(draft,received,cancelled)')
-      .order('order_date', { ascending: true, nullsFirst: false })
-      .order('created_at', { ascending: true })
-
-    for (const cand of (openPos ?? []) as any[]) {
+    const openPos = await fetchOpenSupplierPOs(supabase, auth.orgId, po.supplier_id)
+    for (const cand of openPos) {
       for (const ln of (cand.lines as any[])) {
         if (ln.quantity_received >= ln.quantity_ordered) continue
         ;(openByProduct[ln.product_id] ??= []).push({
