@@ -81,6 +81,7 @@ export async function PATCH(
   }
 
   const now = new Date().toISOString()
+  const approvalWarnings: string[] = []
 
   switch (action) {
 
@@ -156,7 +157,18 @@ export async function PATCH(
           })
 
           if (rpcErr) {
-            console.error(`[requisition ${r.req_number}] RPC error:`, rpcErr.message)
+            // Only fall back to manual posting when the RPC isn't deployed yet.
+            // A real RPC rejection (insufficient stock, closed period) must NOT
+            // be force-posted — that would drive the balance negative or write
+            // into a closed period. Skip the item and surface a warning.
+            const isRpcMissing =
+              rpcErr.message?.toLowerCase().includes('function') ||
+              (rpcErr as any).code === 'PGRST202'
+            if (!isRpcMissing) {
+              console.error(`[requisition ${r.req_number}] consumption rejected:`, rpcErr.message)
+              approvalWarnings.push(rpcErr.message)
+              continue
+            }
 
             await supabase.from('inventory_transactions').insert({
               org_id:           auth.orgId,
@@ -192,11 +204,14 @@ export async function PATCH(
           }
         }
 
-        // Mark fulfilled — stock already deducted
-        await supabase
-          .from('requisitions')
-          .update({ status: 'fulfilled', fulfilled_at: now })
-          .eq('id', id)
+        // Mark fulfilled only if every item was consumed cleanly; otherwise
+        // leave it 'approved' so an operator can resolve the shortfall.
+        if (approvalWarnings.length === 0) {
+          await supabase
+            .from('requisitions')
+            .update({ status: 'fulfilled', fulfilled_at: now })
+            .eq('id', id)
+        }
       }
 
       break
@@ -294,5 +309,8 @@ export async function PATCH(
     .eq('id', id)
     .single()
 
-  return NextResponse.json({ data: updated })
+  return NextResponse.json({
+    data: updated,
+    warnings: approvalWarnings.length ? approvalWarnings : undefined,
+  })
 }

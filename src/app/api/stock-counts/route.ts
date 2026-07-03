@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
   // Attendees: team members (each must confirm from their mobile app) plus
   // external people such as auditors (free text, no confirmation required).
   const userIds: string[] = Array.isArray(body.attendee_user_ids)
-    ? body.attendee_user_ids.filter(Boolean)
+    ? [...new Set(body.attendee_user_ids.filter(Boolean))] as string[]  // dedup: unique index on (count,user)
     : []
   const externalNames: string[] = Array.isArray(body.external_attendees)
     ? body.external_attendees.map((s: any) => String(s).trim()).filter(Boolean)

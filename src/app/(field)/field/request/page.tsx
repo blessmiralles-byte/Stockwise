@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   ArrowRightLeft, PackagePlus, Boxes,
   Search, Plus, Minus, X, Loader2, CheckCircle2,
@@ -115,11 +115,20 @@ export default function FieldRequestPage() {
   const [newQty, setNewQty]         = useState(1)
   const [newCost, setNewCost]       = useState('')
   const [jobRef, setJobRef]         = useState('')
+  const [jobCode, setJobCode]       = useState('')
+  const [costCenterId, setCcId]     = useState('')
+  const [costCenters, setCCs]       = useState<any[]>([])
   const [requiredBy, setRequiredBy] = useState('')
   const [notes, setNotes]           = useState('')
   const [submitting, setSub]        = useState(false)
   const [error, setError]           = useState('')
   const [reqNumber, setReqNumber]   = useState('')
+
+  useEffect(() => {
+    fetch('/api/cost-centers').then(r => r.json()).then(j => setCCs(j.data ?? [])).catch(() => {})
+  }, [])
+
+  const detailsComplete = !!costCenterId && !!jobCode.trim()
 
   const addProduct = (p: any) => {
     if (items.find(i => i.product_id === p.id)) return
@@ -149,9 +158,10 @@ export default function FieldRequestPage() {
 
   const submit = async () => {
     if (!type || items.length === 0) return
+    if (!detailsComplete) { setError('Cost center and job code are required'); return }
     setSub(true); setError('')
     try {
-      const body: Record<string, any> = { type, items }
+      const body: Record<string, any> = { type, items, cost_center_id: costCenterId, job_code: jobCode.trim() }
       if (jobRef.trim())  body.job_reference = jobRef.trim()
       if (requiredBy)     body.required_by   = requiredBy
       if (notes.trim())   body.notes         = notes.trim()
@@ -377,11 +387,35 @@ export default function FieldRequestPage() {
 
             <div className="space-y-3">
               <div>
+                <label className="text-sm font-semibold text-gray-600 block mb-2">Cost Center <span className="text-red-500">*</span></label>
+                <select
+                  value={costCenterId}
+                  onChange={e => setCcId(e.target.value)}
+                  className="w-full h-14 px-4 rounded-2xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                >
+                  <option value="">— Select a cost center —</option>
+                  {costCenters.filter((c: any) => c.is_active).map((c: any) => (
+                    <option key={c.id} value={c.id}>{c.code} — {c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-gray-600 block mb-2">Job Code <span className="text-red-500">*</span></label>
+                <input
+                  value={jobCode}
+                  onChange={e => setJobCode(e.target.value)}
+                  placeholder="e.g. JOB-2026-0042"
+                  className="w-full h-14 px-4 rounded-2xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                />
+              </div>
+
+              <div>
                 <label className="text-sm font-semibold text-gray-600 block mb-2">Job Reference <span className="font-normal text-gray-400">(optional)</span></label>
                 <input
                   value={jobRef}
                   onChange={e => setJobRef(e.target.value)}
-                  placeholder="e.g. JOB-2026-0042"
+                  placeholder="Work order / project reference"
                   className="w-full h-14 px-4 rounded-2xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
                 />
               </div>
@@ -430,7 +464,10 @@ export default function FieldRequestPage() {
               </div>
             )}
 
-            <button onClick={submit} disabled={submitting}
+            {!detailsComplete && (
+              <p className="text-xs text-gray-400 text-center">Cost center and job code are required.</p>
+            )}
+            <button onClick={submit} disabled={submitting || !detailsComplete}
               className="w-full h-14 rounded-2xl bg-indigo-600 text-white text-base font-bold active:bg-indigo-700 disabled:opacity-50 transition-colors shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 mt-2">
               {submitting
                 ? <Loader2 className="w-5 h-5 animate-spin" />

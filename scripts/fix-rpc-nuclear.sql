@@ -126,8 +126,16 @@ BEGIN
     v_remaining := v_remaining - v_take;
   END LOOP;
 
-  -- Cost any shortfall (no matching layer) at the last layer's cost
+  -- Cost any shortfall (fewer/zero layers than requested — e.g. legacy stock
+  -- that predates batch tracking) at the last layer's cost, or if there were
+  -- no layers at all, at the balance's book avg_cost rather than zero.
   IF v_remaining > 0 THEN
+    IF v_last_cost = 0 THEN
+      SELECT avg_cost INTO v_last_cost
+        FROM public.inventory_balances
+       WHERE product_id = p_product_id AND location_id = p_location_id;
+      v_last_cost := COALESCE(v_last_cost, 0);
+    END IF;
     v_cogs := v_cogs + v_remaining * v_last_cost;
   END IF;
 

@@ -71,7 +71,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       `)
       .eq('org_id', auth.orgId)
       .eq('supplier_id', po.supplier_id)
-      .not('status', 'in', '(received,cancelled)')
+      // Only cascade into POs actually issued to the supplier — never a draft
+      // (still being edited, never sent) or a closed one.
+      .not('status', 'in', '(draft,received,cancelled)')
       .order('order_date', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: true })
 
@@ -102,7 +104,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const received_by = auth.userId
 
   for (const recv of lines) {
-    const { line_id, quantity_received, to_location_id, source_type, from_location_id, batch_no, expiration_date, condition, condition_notes } = recv
+    const { line_id, quantity_received, to_location_id, source_type, from_location_id, unit_cost, batch_no, expiration_date, condition, condition_notes } = recv
 
     const poLine = (po.lines as any[]).find((l: any) => l.id === line_id)
     if (!poLine) {
@@ -151,11 +153,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (cap <= 0) continue
       const take = Math.min(toAllocate, cap)
 
+      // Honor a receiver-entered cost, but only for the PO they're viewing;
+      // spillover into other POs is costed at each PO line's own price.
+      const effectiveCost =
+        t.po_id === po.id && unit_cost != null ? unit_cost : t.unit_cost
+
       const { error: txErr } = await supabase.rpc('record_inventory_movement', {
         p_transaction_type: txType,
         p_product_id: poLine.product_id,
         p_quantity: take,
-        p_unit_cost: t.unit_cost,            // each PO line costed at its own price
+        p_unit_cost: effectiveCost,
         p_from_location_id: from_location_id || null,
         p_to_location_id: to_location_id,
         p_reference_no: t.po_number,

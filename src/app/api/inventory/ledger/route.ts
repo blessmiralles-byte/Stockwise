@@ -40,7 +40,9 @@ export async function GET(req: NextRequest) {
     const isOut = OUTBOUND.has(t.transaction_type) || t.quantity < 0
     const absQty = Math.abs(t.quantity)
     const delta = isOut ? -absQty : absQty
-    const txValue = Number(t.total_cost ?? Math.abs(t.quantity * (t.unit_cost ?? 0)))
+    // total_cost is signed (quantity * unit_cost) and quantity can be negative
+    // for adjustments — take the magnitude so an outbound never *adds* value.
+    const txValue = Math.abs(Number(t.total_cost ?? (t.quantity * (t.unit_cost ?? 0))))
     const valueDelta = isOut ? -txValue : txValue
     runningBalance[pid] = (runningBalance[pid] ?? 0) + delta
     runningValue[pid] = Math.max(0, (runningValue[pid] ?? 0) + valueDelta)

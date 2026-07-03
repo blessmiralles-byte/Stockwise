@@ -260,7 +260,9 @@ export default function StockCountDetailPage({ params }: { params: Promise<{ id:
   async function confirmCount(status: 'confirmed' | 'disputed') {
     let note: string | undefined
     if (status === 'disputed') {
-      note = window.prompt('Optionally describe the discrepancy:') ?? undefined
+      const input = window.prompt('Optionally describe the discrepancy:')
+      if (input === null) return   // user cancelled — do not record a dispute
+      note = input || undefined
     }
     const res = await fetch(`/api/stock-counts/${id}/confirm`, {
       method: 'POST',
