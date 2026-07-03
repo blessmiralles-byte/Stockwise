@@ -117,7 +117,14 @@ export async function POST(req: NextRequest) {
     }
 
     userId = linkData.user?.id ?? null
-    const actionLink = (linkData.properties as any)?.action_link
+
+    // Build our own confirmation link to the server-side token-hash flow, which
+    // sets the session cookie and lands the invitee on the set-password page.
+    // (The default hash-fragment action_link can't be read server-side.)
+    const hashedToken = (linkData.properties as any)?.hashed_token
+    const actionLink = hashedToken
+      ? `${req.nextUrl.origin}/auth/confirm?token_hash=${encodeURIComponent(hashedToken)}&type=invite&next=${encodeURIComponent('/reset-password')}`
+      : (linkData.properties as any)?.action_link
 
     try {
       await sendInviteEmail({
