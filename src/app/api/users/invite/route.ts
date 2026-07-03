@@ -129,9 +129,10 @@ export async function POST(req: NextRequest) {
       })
     } catch (mailErr) {
       console.error('[POST /api/users/invite] sendInviteEmail', mailErr)
-      // User exists; surface a soft failure so the owner can resend
+      // User exists; surface the real reason so the owner can fix the sender config
+      const reason = (mailErr as Error)?.message ?? 'unknown error'
       return NextResponse.json(
-        { error: 'Invite created but the email failed to send. Please try again.' },
+        { error: `Invite created but the email could not be sent: ${reason}` },
         { status: 502 }
       )
     }

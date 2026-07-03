@@ -123,12 +123,19 @@ export async function sendInviteEmail({
     </html>
   `
 
-  return resend.emails.send({
+  const { data, error } = await resend.emails.send({
     from: process.env.RESEND_FROM_EMAIL ?? 'Stocked <notifications@stocked.tech>',
     to,
     subject,
     html,
   })
+  // The Resend SDK returns { error } instead of throwing — surface it so the
+  // caller doesn't report a "sent" invite that Resend actually rejected
+  // (e.g. an unverified sender domain).
+  if (error) {
+    throw new Error(error.message ?? 'Email provider rejected the message')
+  }
+  return data
 }
 
 export interface MaintenanceAlert {
