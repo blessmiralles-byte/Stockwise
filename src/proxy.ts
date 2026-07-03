@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
 const PUBLIC_PATHS = [
-  '/', '/login', '/register', '/auth/callback', '/forgot-password', '/reset-password',
+  '/', '/login', '/register', '/auth/callback', '/auth/confirm', '/forgot-password', '/reset-password',
   '/onboarding', '/privacy', '/terms', '/one-pager',
   // Public SEO / social-share assets — must be reachable by unauthenticated
   // crawlers (Slackbot, LinkedIn, Twitterbot, Googlebot), not redirected to login.
@@ -80,6 +80,12 @@ export async function proxy(request: NextRequest) {
   // API routes — exempt specific paths, block everything else if unauthenticated
   if (pathname.startsWith('/api/')) {
     if (API_EXEMPT_PATHS.some(p => pathname.startsWith(p))) {
+      return NextResponse.next()
+    }
+    // Bearer-authenticated clients (the Expo mobile app) don't carry the
+    // session cookie this middleware validates. Let them through — the route's
+    // requireAuth() validates the Bearer JWT itself.
+    if (request.headers.get('authorization')?.toLowerCase().startsWith('bearer ')) {
       return NextResponse.next()
     }
     const { data: { user } } = await supabase.auth.getUser()
