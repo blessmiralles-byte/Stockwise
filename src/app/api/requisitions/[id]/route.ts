@@ -110,8 +110,11 @@ export async function PATCH(
           const qty = Math.abs(Number(item.quantity))
 
           // Resolve location: use the requisition's location, or auto-detect
-          // from the product's inventory balance (pick the location with stock)
+          // from the product's inventory balance (pick the location with stock).
+          // The auto-detect query already returns avg_cost, so only the explicit
+          // -location path needs a separate cost lookup.
           let fromLocationId: string | null = r.location_id ?? null
+          let balanceCost = 0
           if (!fromLocationId) {
             const { data: balRow } = await supabase
               .from('inventory_balances')
@@ -121,12 +124,11 @@ export async function PATCH(
               .order('quantity', { ascending: false })
               .limit(1)
               .single()
-            if (balRow) fromLocationId = balRow.location_id
-          }
-
-          // Look up cost from balance for proper valuation
-          let balanceCost = 0
-          if (fromLocationId) {
+            if (balRow) {
+              fromLocationId = balRow.location_id
+              balanceCost    = Number(balRow.avg_cost ?? 0)
+            }
+          } else {
             const { data: costRow } = await supabase
               .from('inventory_balances')
               .select('avg_cost')

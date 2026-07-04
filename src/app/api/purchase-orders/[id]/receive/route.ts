@@ -204,26 +204,31 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
   }
 
-  // Recompute status for every PO whose lines changed (current + any cascaded)
+  // Recompute status for every PO whose lines changed (current + any cascaded).
+  // Fetch all affected POs' lines in one query, then fire the updates together.
   let newStatus = po.status
-  for (const poId of affectedPoIds) {
-    const { data: updatedLines } = await supabase
-      .from('purchase_order_lines')
-      .select('quantity_ordered, quantity_received')
-      .eq('purchase_order_id', poId)
+  const poIds = [...affectedPoIds]
+  const { data: allLines } = await supabase
+    .from('purchase_order_lines')
+    .select('purchase_order_id, quantity_ordered, quantity_received')
+    .in('purchase_order_id', poIds)
 
-    if (!updatedLines || updatedLines.length === 0) continue
+  const byPo = new Map<string, { ordered: number; received: number }>()
+  for (const l of (allLines ?? []) as any[]) {
+    const agg = byPo.get(l.purchase_order_id) ?? { ordered: 0, received: 0 }
+    agg.ordered  += l.quantity_ordered
+    agg.received += l.quantity_received
+    byPo.set(l.purchase_order_id, agg)
+  }
 
-    const totalOrdered  = updatedLines.reduce((s: number, l: any) => s + l.quantity_ordered, 0)
-    const totalReceived = updatedLines.reduce((s: number, l: any) => s + l.quantity_received, 0)
-
-    // Nothing received against this PO — leave its status untouched
-    if (totalReceived <= 0) continue
-
-    const status = totalReceived >= totalOrdered ? 'received' : 'partial'
-    await supabase.from('purchase_orders').update({ status }).eq('id', poId)
+  const statusUpdates: Promise<any>[] = []
+  for (const [poId, agg] of byPo) {
+    if (agg.received <= 0) continue   // nothing received — leave status untouched
+    const status = agg.received >= agg.ordered ? 'received' : 'partial'
+    statusUpdates.push(supabase.from('purchase_orders').update({ status }).eq('id', poId))
     if (poId === id) newStatus = status
   }
+  await Promise.all(statusUpdates)
 
   if (errors.length > 0 && successLines.length === 0) {
     return NextResponse.json({ error: errors.join('; ') }, { status: 400 })
