@@ -66,6 +66,25 @@ export async function PATCH(req: NextRequest) {
   }
 
   const supabase = createServiceClient()
+
+  // One-time attribution stamp: signup carried first-touch channel data in the
+  // owner's auth metadata; persist it on the org the first time it's updated
+  // (i.e. during onboarding) so trials/customers can be reported by channel.
+  try {
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('attribution')
+      .eq('id', auth.orgId)
+      .single()
+    if (org && org.attribution == null) {
+      const { data: userData } = await supabase.auth.admin.getUserById(auth.userId)
+      const attribution = userData?.user?.user_metadata?.attribution
+      if (attribution && typeof attribution === 'object') {
+        updates.attribution = attribution
+      }
+    }
+  } catch { /* attribution is best-effort — never block an org update on it */ }
+
   const { data, error } = await supabase
     .from('organizations')
     .update(updates)

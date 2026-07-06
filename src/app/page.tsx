@@ -1,6 +1,8 @@
 'use client'
 
+import { useEffect } from 'react'
 import Link from 'next/link'
+import { captureAttribution } from '@/lib/attribution'
 import {
   Package, BarChart3, Truck, ClipboardList, Wrench,
   CheckCircle2, ArrowRight, Shield, Zap, Users, Star,
@@ -391,6 +393,9 @@ function Footer() {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function LandingPage() {
+  // Record first-touch UTM/referrer so signups can be attributed to a channel
+  useEffect(() => { captureAttribution() }, [])
+
   return (
     <div className="min-h-screen">
       <Nav />

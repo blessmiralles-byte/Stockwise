@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Eye, EyeOff, UserPlus, Mail } from 'lucide-react'
+import { captureAttribution, getAttribution } from '@/lib/attribution'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -27,6 +28,9 @@ export default function RegisterPage() {
     if (plan === 'starter' || plan === 'pro') {
       localStorage.setItem('stocked.intended_plan', plan)
     }
+    // Direct arrivals (ad → /register, shared link) still get first-touch
+    // attribution even if they never saw the landing page
+    captureAttribution()
   }, [])
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -51,10 +55,17 @@ export default function RegisterPage() {
     setError(null)
 
     const supabase = createClient()
+    const attribution = getAttribution()
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName.trim().slice(0, 100) } },
+      options: {
+        data: {
+          full_name: fullName.trim().slice(0, 100),
+          // First-touch channel data — stamped onto the organization at onboarding
+          ...(attribution ? { attribution } : {}),
+        },
+      },
     })
 
     if (error) {
