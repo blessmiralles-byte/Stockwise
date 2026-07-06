@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
 import { logAudit } from '@/lib/audit'
+import { computePeriodDepreciation, type DepreciableAsset } from '@/lib/depreciation'
 
 /**
  * POST /api/assets/depreciation/run
@@ -36,9 +37,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'period_start must be before period_end' }, { status: 400 })
   }
 
-  const periodDays     = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1
-  const yearDays       = ((startDate.getFullYear() % 4 === 0 && startDate.getFullYear() % 100 !== 0) || startDate.getFullYear() % 400 === 0) ? 366 : 365
-  const periodFraction = periodDays / yearDays
+  const periodDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24) + 1
 
   const supabase = createServiceClient()
 
@@ -85,66 +84,23 @@ export async function POST(req: NextRequest) {
       continue
     }
 
-    const bookValue    = Number(asset.current_value ?? asset.purchase_cost ?? 0)
-    const cost         = Number(asset.purchase_cost  ?? 0)
-    const salvage      = Number(asset.salvage_value  ?? 0)
-    const usefulLife   = Number(asset.useful_life_years ?? 0)
-    const method       = asset.depreciation_method as string
+    // Shared math (also used by the disposal catch-up) — keeps the two in sync
+    const result = computePeriodDepreciation(asset as DepreciableAsset, startDate, endDate)
 
-    if (bookValue <= salvage) {
-      skipped.push({ ...asset, book_value_before: bookValue, depreciation_amount: 0, book_value_after: bookValue, skipped_reason: 'Fully depreciated (book value ≤ salvage value)' })
+    if (result.skipped_reason) {
+      skipped.push({ ...asset, book_value_before: result.bookBefore, depreciation_amount: 0, book_value_after: result.bookBefore, skipped_reason: result.skipped_reason })
       continue
     }
-
-    let deprAmount = 0
-
-    if (method === 'straight_line') {
-      if (usefulLife <= 0) {
-        skipped.push({ ...asset, book_value_before: bookValue, depreciation_amount: 0, book_value_after: bookValue, skipped_reason: 'useful_life_years not set' })
-        continue
-      }
-      const annualDepr = (cost - salvage) / usefulLife
-      deprAmount       = annualDepr * periodFraction
-
-    } else if (method === 'declining_balance') {
-      if (usefulLife <= 0) {
-        skipped.push({ ...asset, book_value_before: bookValue, depreciation_amount: 0, book_value_after: bookValue, skipped_reason: 'useful_life_years not set' })
-        continue
-      }
-      const rate    = 1 / usefulLife
-      deprAmount    = bookValue * rate * periodFraction
-
-    } else if (method === 'double_declining') {
-      if (usefulLife <= 0) {
-        skipped.push({ ...asset, book_value_before: bookValue, depreciation_amount: 0, book_value_after: bookValue, skipped_reason: 'useful_life_years not set' })
-        continue
-      }
-      const rate    = 2 / usefulLife
-      deprAmount    = bookValue * rate * periodFraction
-
-    } else if (method === 'units_of_production') {
-      skipped.push({ ...asset, book_value_before: bookValue, depreciation_amount: 0, book_value_after: bookValue, skipped_reason: 'Units of production requires manual entry' })
-      continue
-    } else {
-      continue
-    }
-
-    // Cap at remaining depreciable amount so we never go below salvage
-    deprAmount = Math.min(deprAmount, bookValue - salvage)
-    deprAmount = Math.round(deprAmount * 100) / 100  // round to cents
-
-    if (deprAmount <= 0) continue
-
-    const newBookValue = Math.round((bookValue - deprAmount) * 100) / 100
+    if (result.amount <= 0) continue
 
     lines.push({
       asset_id:            asset.id,
       asset_tag:           asset.asset_tag,
       name:                asset.name,
-      method,
-      book_value_before:   bookValue,
-      depreciation_amount: deprAmount,
-      book_value_after:    newBookValue,
+      method:              result.method,
+      book_value_before:   result.bookBefore,
+      depreciation_amount: result.amount,
+      book_value_after:    result.bookAfter,
     })
   }
 

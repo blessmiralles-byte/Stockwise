@@ -15,9 +15,9 @@ import { requireAnyRole } from '@/lib/api-auth'
  *   • Purchases credit Accounts Payable at goods receipt (a GRNI
  *     simplification); review period-end cutoff for received-not-invoiced.
  *   • No sales tax / VAT is computed or accrued anywhere in these entries.
- *   • Asset disposals assume no proceeds (the system does not capture a sale
- *     price); if an asset was sold, book the proceeds against the loss line
- *     manually.
+ *   • Disposals: catch-up depreciation is posted through the disposal date at
+ *     status change, and recorded sale proceeds (sale_price) are journaled to
+ *     Undeposited Funds against Gain/Loss on Asset Disposal.
  *
  * Query params:
  *   from   YYYY-MM-DD  required
@@ -36,7 +36,8 @@ import { requireAnyRole } from '@/lib/api-auth'
  *   depreciation   → Dr Depreciation Expense     / Cr Accumulated Depreciation
  *   asset_purchase → Dr Fixed Assets             / Cr Accounts Payable
  *   asset_disposal → Dr Accumulated Depreciation / Cr Fixed Assets (accum. portion)
- *                    Dr Loss on Asset Disposal   / Cr Fixed Assets (remaining book value)
+ *                    Dr Gain/Loss on Asset Disposal / Cr Fixed Assets (remaining book value)
+ *                    Dr Undeposited Funds        / Cr Gain/Loss on Asset Disposal (sale proceeds)
  *   ppv            → Dr Purchase Price Variance  / Cr Accounts Payable (invoice > GRN)
  *                    Dr Accounts Payable         / Cr Purchase Price Variance (invoice < GRN)
  */
@@ -236,14 +237,15 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Fixed-asset disposals / retirements / sales ─────────────────────────────
-  // Removes the asset at cost: accumulated depreciation is relieved, and any
-  // remaining book value is written off to Loss on Asset Disposal. Sale
-  // proceeds are not tracked in the system — book them manually against the
-  // loss line when the asset was sold.
+  // Removes the asset at cost. Accumulated depreciation (complete to the
+  // disposal date via catch-up posting) is relieved, remaining book value goes
+  // to Gain/Loss on Asset Disposal, and recorded sale proceeds are debited to
+  // Undeposited Funds against the same gain/loss account — its net balance is
+  // the gain or loss on the sale.
   if (include('asset_disposal')) {
     const { data: assets } = await supabase
       .from('fixed_assets')
-      .select('id, asset_tag, name, status, purchase_cost, current_value, disposed_at, retired_at, sold_at, category:categories(name)')
+      .select('id, asset_tag, name, status, purchase_cost, current_value, sale_price, disposed_at, retired_at, sold_at, category:categories(name)')
       .eq('org_id', auth.orgId)
       .in('status', ['disposed', 'retired', 'sold'])
 
@@ -253,15 +255,19 @@ export async function GET(req: NextRequest) {
       const date = String(when).slice(0, 10)
       if (date < from || date > to) continue
 
-      const cost  = Number(a.purchase_cost ?? 0)
-      const book  = Math.max(0, Math.min(cost, Number(a.current_value ?? 0)))
-      const accum = Math.max(0, cost - book)
+      const cost     = Number(a.purchase_cost ?? 0)
+      const book     = Math.max(0, Math.min(cost, Number(a.current_value ?? 0)))
+      const accum    = Math.max(0, cost - book)
+      const proceeds = a.status === 'sold' && a.sale_price != null ? Number(a.sale_price) : null
       if (cost <= 0) continue
 
       const assetRef = a.asset_tag ? `${a.asset_tag} — ${a.name}` : (a.name ?? '')
       const ref      = a.asset_tag ?? a.id.slice(0, 8).toUpperCase()
-      const soldNote = a.status === 'sold'
-        ? 'Asset marked sold — proceeds not tracked; record cash received against the loss line manually.'
+      const category = a.category?.name ?? ''
+      const note = a.status === 'sold'
+        ? (proceeds != null
+            ? `Sold for ${proceeds.toFixed(2)}; net gain/(loss) = ${(proceeds - book).toFixed(2)}`
+            : 'Asset marked sold but no sale price recorded — book the proceeds against Gain/Loss on Asset Disposal manually.')
         : ''
 
       if (accum > 0) {
@@ -271,21 +277,27 @@ export async function GET(req: NextRequest) {
           debit_account:  'Accumulated Depreciation',
           credit_account: 'Fixed Assets',
           amount:         accum,
-          product:        assetRef,
-          category:       a.category?.name ?? '',
-          notes:          soldNote,
+          product:        assetRef, category, notes: note,
         })
       }
       if (book > 0) {
         entries.push({
           date, reference: ref, type: 'Asset Disposal',
           description:    `Disposal — ${assetRef} (write off remaining book value)`,
-          debit_account:  'Loss on Asset Disposal',
+          debit_account:  'Gain/Loss on Asset Disposal',
           credit_account: 'Fixed Assets',
           amount:         book,
-          product:        assetRef,
-          category:       a.category?.name ?? '',
-          notes:          soldNote,
+          product:        assetRef, category, notes: note,
+        })
+      }
+      if (proceeds != null && proceeds > 0) {
+        entries.push({
+          date, reference: ref, type: 'Asset Disposal',
+          description:    `Disposal — ${assetRef} (sale proceeds)`,
+          debit_account:  'Undeposited Funds',
+          credit_account: 'Gain/Loss on Asset Disposal',
+          amount:         proceeds,
+          product:        assetRef, category, notes: note,
         })
       }
     }

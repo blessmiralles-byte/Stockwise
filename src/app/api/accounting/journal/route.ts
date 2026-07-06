@@ -189,10 +189,13 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Fixed-asset disposals / retirements / sales ─────────────────────────────
+  // Accumulated depreciation is complete to the disposal date (catch-up posts
+  // at status change); recorded sale proceeds go to Undeposited Funds against
+  // Gain/Loss on Asset Disposal, whose net balance is the gain or loss.
   if (inc('asset_disposal')) {
     const { data: assets } = await supabase
       .from('fixed_assets')
-      .select('id, asset_tag, name, status, purchase_cost, current_value, disposed_at, retired_at, sold_at, category:categories(name)')
+      .select('id, asset_tag, name, status, purchase_cost, current_value, sale_price, disposed_at, retired_at, sold_at, category:categories(name)')
       .eq('org_id', orgId)
       .in('status', ['disposed', 'retired', 'sold'])
 
@@ -202,9 +205,10 @@ export async function GET(req: NextRequest) {
       const date = String(when).slice(0, 10)
       if (date < from || date > to) continue
 
-      const cost  = Number(a.purchase_cost ?? 0)
-      const book  = Math.max(0, Math.min(cost, Number(a.current_value ?? 0)))
-      const accum = Math.max(0, cost - book)
+      const cost     = Number(a.purchase_cost ?? 0)
+      const book     = Math.max(0, Math.min(cost, Number(a.current_value ?? 0)))
+      const accum    = Math.max(0, cost - book)
+      const proceeds = a.status === 'sold' && a.sale_price != null ? Number(a.sale_price) : null
       if (cost <= 0) continue
 
       const base = {
@@ -218,7 +222,9 @@ export async function GET(req: NextRequest) {
         product_name: a.name ?? null,
         category:     a.category?.name ?? null,
         notes: a.status === 'sold'
-          ? 'Asset marked sold — proceeds not tracked; record cash received against the loss line manually.'
+          ? (proceeds != null
+              ? `Sold for ${proceeds.toFixed(2)}; net gain/(loss) = ${(proceeds - book).toFixed(2)}`
+              : 'Asset marked sold but no sale price recorded — book the proceeds against Gain/Loss on Asset Disposal manually.')
           : null,
       }
       if (accum > 0) {
@@ -236,9 +242,19 @@ export async function GET(req: NextRequest) {
           ...base,
           id: `ad-${a.id}-loss`,
           description:    `Disposal — ${a.asset_tag ?? ''} ${a.name ?? ''} (write off remaining book value)`.trim(),
-          debit_account:  'Loss on Asset Disposal',
+          debit_account:  'Gain/Loss on Asset Disposal',
           credit_account: 'Fixed Assets',
           amount:         book,
+        })
+      }
+      if (proceeds != null && proceeds > 0) {
+        entries.push({
+          ...base,
+          id: `ad-${a.id}-proceeds`,
+          description:    `Disposal — ${a.asset_tag ?? ''} ${a.name ?? ''} (sale proceeds)`.trim(),
+          debit_account:  'Undeposited Funds',
+          credit_account: 'Gain/Loss on Asset Disposal',
+          amount:         proceeds,
         })
       }
     }

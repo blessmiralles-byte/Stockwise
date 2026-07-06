@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireAnyRole } from '@/lib/api-auth'
+import { postCatchUpDepreciation } from '@/lib/depreciation'
 
 // M-5: Role-split PATCH — field workers can update status/notes only;
 //      financial fields and reassignment require operations/owner.
@@ -118,6 +119,15 @@ export async function PATCH(
   }
 
   const supabase = createServiceClient()
+
+  // End-of-life: post catch-up depreciation through the disposal date BEFORE
+  // stamping, so accumulated depreciation (and the disposal journal entry
+  // derived from current_value) is complete to the date of disposal.
+  if (['disposed', 'retired', 'sold'].includes(update.status)) {
+    const today = new Date().toISOString().slice(0, 10)
+    await postCatchUpDepreciation(supabase, auth.orgId, auth.userId, id, today)
+  }
+
   const { data, error } = await supabase
     .from('fixed_assets')
     .update(update)
