@@ -10,11 +10,16 @@ import { requireAuth } from '@/lib/api-auth'
  *   1. Session cookie (browser / same-origin)
  *   2. API key header: Authorization: Bearer {ACCOUNTING_API_KEY}
  *
+ * SCOPE: entries cover INVENTORY and FIXED ASSETS only — no revenue entries
+ * (sales are invoiced and journaled in JobLedger) and no sales tax / VAT.
+ * Purchases credit Accounts Payable at goods receipt (GRNI simplification).
+ *
  * Query params:
  *   from     YYYY-MM-DD   required
  *   to       YYYY-MM-DD   required
  *   cursor   ISO datetime  optional — return only entries after this timestamp (for incremental sync)
- *   types    csv list      optional — purchase,sale,consumption,adjustment,transfer,depreciation
+ *   types    csv list      optional — purchase,sale,consumption,adjustment,transfer,
+ *            depreciation,asset_purchase,asset_disposal,ppv
  *   limit    number        optional — max 500, default 200
  *
  * Response:
@@ -23,8 +28,9 @@ import { requireAuth } from '@/lib/api-auth'
  *   meta: { count, next_cursor, has_more, period: { from, to } }
  * }
  *
- * Each entry is a balanced double-entry line ready for import.
- * Poll on a schedule (e.g. hourly) using cursor for incremental updates.
+ * Each entry is a balanced double-entry line ready for import; dedupe by `id`
+ * (asset_purchase/asset_disposal/ppv entries are period-scoped, not
+ * cursor-scoped, so they can reappear across cursor polls).
  */
 export async function GET(req: NextRequest) {
   // ── Auth: API key or session ───────────────────────────────────────────────
@@ -83,6 +89,8 @@ export async function GET(req: NextRequest) {
       .from('inventory_transactions')
       .select(`
         id, transaction_type, reference_no, quantity, unit_cost, total_cost, notes, created_at,
+        job_order_id, job_code,
+        cost_center:cost_centers(code, name),
         product:products(id, sku, name, category:categories(name)),
         from_location:locations!inventory_transactions_from_location_id_fkey(id, name),
         to_location:locations!inventory_transactions_to_location_id_fkey(id, name)
@@ -147,6 +155,136 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ── Fixed-asset acquisitions ────────────────────────────────────────────────
+  if (inc('asset_purchase')) {
+    const { data: acquired } = await supabase
+      .from('fixed_assets')
+      .select('id, asset_tag, name, purchase_date, purchase_cost, category:categories(name)')
+      .eq('org_id', orgId)
+      .gte('purchase_date', from)
+      .lte('purchase_date', to)
+      .gt('purchase_cost', 0)
+      .order('purchase_date')
+      .limit(limit)
+
+    for (const a of (acquired ?? []) as any[]) {
+      entries.push({
+        id:             `ap-${a.id}`,
+        timestamp:      a.purchase_date,
+        date:           String(a.purchase_date).slice(0, 10),
+        reference:      a.asset_tag ?? a.id.slice(0, 8).toUpperCase(),
+        source:         'fixed_assets',
+        type:           'Asset Purchase',
+        description:    `Asset acquisition — ${a.asset_tag ?? ''} ${a.name ?? ''}`.trim(),
+        debit_account:  'Fixed Assets',
+        credit_account: 'Accounts Payable',
+        amount:         Number(a.purchase_cost),
+        currency:       'USD',
+        product_sku:    a.asset_tag ?? null,
+        product_name:   a.name ?? null,
+        category:       a.category?.name ?? null,
+        notes:          null,
+      })
+    }
+  }
+
+  // ── Fixed-asset disposals / retirements / sales ─────────────────────────────
+  if (inc('asset_disposal')) {
+    const { data: assets } = await supabase
+      .from('fixed_assets')
+      .select('id, asset_tag, name, status, purchase_cost, current_value, disposed_at, retired_at, sold_at, category:categories(name)')
+      .eq('org_id', orgId)
+      .in('status', ['disposed', 'retired', 'sold'])
+
+    for (const a of (assets ?? []) as any[]) {
+      const when = a.disposed_at ?? a.retired_at ?? a.sold_at
+      if (!when) continue
+      const date = String(when).slice(0, 10)
+      if (date < from || date > to) continue
+
+      const cost  = Number(a.purchase_cost ?? 0)
+      const book  = Math.max(0, Math.min(cost, Number(a.current_value ?? 0)))
+      const accum = Math.max(0, cost - book)
+      if (cost <= 0) continue
+
+      const base = {
+        timestamp:    when,
+        date,
+        reference:    a.asset_tag ?? a.id.slice(0, 8).toUpperCase(),
+        source:       'fixed_assets',
+        type:         'Asset Disposal',
+        currency:     'USD',
+        product_sku:  a.asset_tag ?? null,
+        product_name: a.name ?? null,
+        category:     a.category?.name ?? null,
+        notes: a.status === 'sold'
+          ? 'Asset marked sold — proceeds not tracked; record cash received against the loss line manually.'
+          : null,
+      }
+      if (accum > 0) {
+        entries.push({
+          ...base,
+          id: `ad-${a.id}-accum`,
+          description:    `Disposal — ${a.asset_tag ?? ''} ${a.name ?? ''} (relieve accumulated depreciation)`.trim(),
+          debit_account:  'Accumulated Depreciation',
+          credit_account: 'Fixed Assets',
+          amount:         accum,
+        })
+      }
+      if (book > 0) {
+        entries.push({
+          ...base,
+          id: `ad-${a.id}-loss`,
+          description:    `Disposal — ${a.asset_tag ?? ''} ${a.name ?? ''} (write off remaining book value)`.trim(),
+          debit_account:  'Loss on Asset Disposal',
+          credit_account: 'Fixed Assets',
+          amount:         book,
+        })
+      }
+    }
+  }
+
+  // ── Purchase price variance (invoice vs GRN, from three-way match) ──────────
+  if (inc('ppv')) {
+    const { data: matchedPos } = await supabase
+      .from('purchase_orders')
+      .select(`
+        id, po_number, supplier_invoice_no, supplier_invoice_date, supplier_invoice_amount,
+        lines:purchase_order_lines(quantity_received, unit_cost)
+      `)
+      .eq('org_id', orgId)
+      .not('supplier_invoice_amount', 'is', null)
+      .gte('supplier_invoice_date', from)
+      .lte('supplier_invoice_date', to)
+      .order('supplier_invoice_date')
+      .limit(limit)
+
+    for (const p of (matchedPos ?? []) as any[]) {
+      const grn      = ((p.lines ?? []) as any[]).reduce((s, l) => s + l.quantity_received * l.unit_cost, 0)
+      const variance = Number(p.supplier_invoice_amount) - grn
+      if (Math.abs(variance) <= 0.01) continue   // matched — no entry
+
+      const over = variance > 0
+      entries.push({
+        id:             `ppv-${p.id}`,
+        timestamp:      p.supplier_invoice_date,
+        date:           String(p.supplier_invoice_date).slice(0, 10),
+        reference:      p.supplier_invoice_no ?? p.po_number,
+        source:         'three_way_match',
+        type:           'Purchase Price Variance',
+        description:    `Invoice ${p.supplier_invoice_no ?? ''} vs GRN on ${p.po_number} — ${over ? 'over' : 'under'}-invoiced`,
+        debit_account:  over ? 'Purchase Price Variance' : 'Accounts Payable',
+        credit_account: over ? 'Accounts Payable' : 'Purchase Price Variance',
+        amount:         Math.abs(variance),
+        currency:       'USD',
+        product_sku:    null,
+        product_name:   p.po_number,
+        category:       null,
+        notes:          `Invoice ${Number(p.supplier_invoice_amount).toFixed(2)} vs received ${grn.toFixed(2)}`,
+      })
+    }
+  }
+
   // Sort by timestamp, apply limit
   entries.sort((a, b) => (a.timestamp > b.timestamp ? 1 : -1))
   const page       = entries.slice(0, limit)
@@ -178,8 +316,8 @@ function mapTransaction(tx: any, amount: number) {
     case 'consumption':
       debit = 'Operating Expense'; credit = 'Inventory Asset'; type = 'Consumption'; break
     case 'adjustment':
-      if (tx.quantity >= 0) { debit = 'Inventory Asset'; credit = 'Inventory Adjustment' }
-      else                  { debit = 'Inventory Adjustment'; credit = 'Inventory Asset' }
+      if (tx.quantity >= 0) { debit = 'Inventory Asset'; credit = 'Inventory Shrinkage' }
+      else                  { debit = 'Inventory Shrinkage'; credit = 'Inventory Asset' }
       type = tx.quantity >= 0 ? 'Adjustment (+)' : 'Adjustment (−)'; break
     case 'transfer':
       debit  = `Inventory — ${tx.to_location?.name   ?? 'Destination'}`
@@ -206,6 +344,10 @@ function mapTransaction(tx: any, amount: number) {
     product_sku:    product,
     product_name:   tx.product?.name ?? null,
     category:       tx.product?.category?.name ?? null,
+    // Job-costing dimensions for WIP/job reclassification and JobLedger reconciliation
+    job_order:      tx.job_order_id ?? null,
+    job_code:       tx.job_code ?? null,
+    cost_center:    tx.cost_center ? `${tx.cost_center.code} — ${tx.cost_center.name}` : null,
     notes:          tx.notes ?? null,
   }
 }

@@ -5,25 +5,40 @@ import { requireAnyRole } from '@/lib/api-auth'
 /**
  * GET /api/reports/journal
  *
- * Returns inventory transactions and asset depreciation formatted as
- * double-entry journal entries suitable for import into accounting systems
+ * Returns inventory and fixed-asset activity formatted as double-entry
+ * journal entries suitable for import into accounting systems
  * (QuickBooks, Xero, MYOB, Wave, etc.)
+ *
+ * SCOPE (read before importing):
+ *   • Entries cover INVENTORY and FIXED ASSETS only. No revenue entries are
+ *     produced — sales revenue is invoiced and journaled in JobLedger.
+ *   • Purchases credit Accounts Payable at goods receipt (a GRNI
+ *     simplification); review period-end cutoff for received-not-invoiced.
+ *   • No sales tax / VAT is computed or accrued anywhere in these entries.
+ *   • Asset disposals assume no proceeds (the system does not capture a sale
+ *     price); if an asset was sold, book the proceeds against the loss line
+ *     manually.
  *
  * Query params:
  *   from   YYYY-MM-DD  required
  *   to     YYYY-MM-DD  required
- *   types  comma-separated: purchase,sale,consumption,adjustment,transfer,depreciation
- *          defaults to all
+ *   types  comma-separated: purchase,sale,consumption,adjustment,transfer,
+ *          depreciation,asset_purchase,asset_disposal,ppv — defaults to all
  *   format json (default) | csv
  *
  * Journal entry mapping:
- *   purchase    → Dr Inventory Asset        / Cr Accounts Payable
- *   sale        → Dr Cost of Goods Sold     / Cr Inventory Asset
- *   consumption → Dr Operating Expense      / Cr Inventory Asset
- *   adjustment+ → Dr Inventory Asset        / Cr Inventory Adjustment
- *   adjustment- → Dr Inventory Adjustment   / Cr Inventory Asset
- *   transfer    → Dr Inventory (to-loc)     / Cr Inventory (from-loc)
- *   depreciation→ Dr Depreciation Expense   / Cr Accumulated Depreciation
+ *   purchase       → Dr Inventory Asset          / Cr Accounts Payable
+ *   sale           → Dr Cost of Goods Sold       / Cr Inventory Asset   (COGS side only)
+ *   consumption    → Dr Operating Expense        / Cr Inventory Asset   (job/cost-center dimensions included)
+ *   adjustment+    → Dr Inventory Asset          / Cr Inventory Shrinkage
+ *   adjustment-    → Dr Inventory Shrinkage      / Cr Inventory Asset
+ *   transfer       → Dr Inventory (to-loc)       / Cr Inventory (from-loc)
+ *   depreciation   → Dr Depreciation Expense     / Cr Accumulated Depreciation
+ *   asset_purchase → Dr Fixed Assets             / Cr Accounts Payable
+ *   asset_disposal → Dr Accumulated Depreciation / Cr Fixed Assets (accum. portion)
+ *                    Dr Loss on Asset Disposal   / Cr Fixed Assets (remaining book value)
+ *   ppv            → Dr Purchase Price Variance  / Cr Accounts Payable (invoice > GRN)
+ *                    Dr Accounts Payable         / Cr Purchase Price Variance (invoice < GRN)
  */
 export async function GET(req: NextRequest) {
   const auth = await requireAnyRole('owner', 'finance')
@@ -65,6 +80,8 @@ export async function GET(req: NextRequest) {
       .from('inventory_transactions')
       .select(`
         id, transaction_type, reference_no, quantity, unit_cost, total_cost, notes, created_at,
+        job_order_id, job_code,
+        cost_center:cost_centers(code, name),
         product:products(name, sku, category:categories(name)),
         from_location:locations!inventory_transactions_from_location_id_fkey(name),
         to_location:locations!inventory_transactions_to_location_id_fkey(name)
@@ -87,6 +104,13 @@ export async function GET(req: NextRequest) {
       const ref        = t.reference_no ?? t.id.slice(0, 8).toUpperCase()
       const date       = t.created_at.slice(0, 10)
       const notes      = t.notes ?? ''
+      // Job-costing dimensions so consumption can be reclassified to WIP /
+      // job cost by the accountant (and reconciled to JobLedger)
+      const dims = {
+        job_order:   t.job_order_id ?? '',
+        job_code:    t.job_code ?? '',
+        cost_center: t.cost_center ? `${t.cost_center.code} — ${t.cost_center.name}` : '',
+      }
 
       switch (t.transaction_type) {
         case 'purchase':
@@ -95,7 +119,7 @@ export async function GET(req: NextRequest) {
             description: `Purchase — ${productRef}`,
             debit_account:  'Inventory Asset',
             credit_account: 'Accounts Payable',
-            amount, product: productRef, category, notes,
+            amount, product: productRef, category, notes, ...dims,
           })
           break
 
@@ -105,7 +129,7 @@ export async function GET(req: NextRequest) {
             description: `COGS — ${productRef}`,
             debit_account:  'Cost of Goods Sold',
             credit_account: 'Inventory Asset',
-            amount, product: productRef, category, notes,
+            amount, product: productRef, category, notes, ...dims,
           })
           break
 
@@ -115,7 +139,7 @@ export async function GET(req: NextRequest) {
             description: `Consumption — ${productRef}`,
             debit_account:  'Operating Expense',
             credit_account: 'Inventory Asset',
-            amount, product: productRef, category, notes,
+            amount, product: productRef, category, notes, ...dims,
           })
           break
 
@@ -125,16 +149,16 @@ export async function GET(req: NextRequest) {
               date, reference: ref, type: 'Adjustment (+)',
               description: `Inventory adjustment (increase) — ${productRef}`,
               debit_account:  'Inventory Asset',
-              credit_account: 'Inventory Adjustment',
-              amount, product: productRef, category, notes,
+              credit_account: 'Inventory Shrinkage',
+              amount, product: productRef, category, notes, ...dims,
             })
           } else {
             entries.push({
               date, reference: ref, type: 'Adjustment (−)',
               description: `Inventory adjustment (decrease) — ${productRef}`,
-              debit_account:  'Inventory Adjustment',
+              debit_account:  'Inventory Shrinkage',
               credit_account: 'Inventory Asset',
-              amount, product: productRef, category, notes,
+              amount, product: productRef, category, notes, ...dims,
             })
           }
           break
@@ -145,7 +169,7 @@ export async function GET(req: NextRequest) {
             description: `Stock transfer — ${productRef} · ${t.from_location?.name ?? '?'} → ${t.to_location?.name ?? '?'}`,
             debit_account:  `Inventory (${t.to_location?.name   ?? 'Destination'})`,
             credit_account: `Inventory (${t.from_location?.name ?? 'Source'})`,
-            amount, product: productRef, category, notes,
+            amount, product: productRef, category, notes, ...dims,
           })
           break
       }
@@ -183,17 +207,138 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ── Fixed-asset acquisitions ────────────────────────────────────────────────
+  if (include('asset_purchase')) {
+    const { data: acquired } = await supabase
+      .from('fixed_assets')
+      .select('id, asset_tag, name, purchase_date, purchase_cost, category:categories(name)')
+      .eq('org_id', auth.orgId)
+      .gte('purchase_date', from)
+      .lte('purchase_date', to)
+      .gt('purchase_cost', 0)
+      .order('purchase_date')
+
+    for (const a of (acquired ?? []) as any[]) {
+      const assetRef = a.asset_tag ? `${a.asset_tag} — ${a.name}` : (a.name ?? '')
+      entries.push({
+        date:           a.purchase_date.slice(0, 10),
+        reference:      a.asset_tag ?? a.id.slice(0, 8).toUpperCase(),
+        type:           'Asset Purchase',
+        description:    `Asset acquisition — ${assetRef}`,
+        debit_account:  'Fixed Assets',
+        credit_account: 'Accounts Payable',
+        amount:         Number(a.purchase_cost),
+        product:        assetRef,
+        category:       a.category?.name ?? '',
+        notes:          '',
+      })
+    }
+  }
+
+  // ── Fixed-asset disposals / retirements / sales ─────────────────────────────
+  // Removes the asset at cost: accumulated depreciation is relieved, and any
+  // remaining book value is written off to Loss on Asset Disposal. Sale
+  // proceeds are not tracked in the system — book them manually against the
+  // loss line when the asset was sold.
+  if (include('asset_disposal')) {
+    const { data: assets } = await supabase
+      .from('fixed_assets')
+      .select('id, asset_tag, name, status, purchase_cost, current_value, disposed_at, retired_at, sold_at, category:categories(name)')
+      .eq('org_id', auth.orgId)
+      .in('status', ['disposed', 'retired', 'sold'])
+
+    for (const a of (assets ?? []) as any[]) {
+      const when = a.disposed_at ?? a.retired_at ?? a.sold_at
+      if (!when) continue
+      const date = String(when).slice(0, 10)
+      if (date < from || date > to) continue
+
+      const cost  = Number(a.purchase_cost ?? 0)
+      const book  = Math.max(0, Math.min(cost, Number(a.current_value ?? 0)))
+      const accum = Math.max(0, cost - book)
+      if (cost <= 0) continue
+
+      const assetRef = a.asset_tag ? `${a.asset_tag} — ${a.name}` : (a.name ?? '')
+      const ref      = a.asset_tag ?? a.id.slice(0, 8).toUpperCase()
+      const soldNote = a.status === 'sold'
+        ? 'Asset marked sold — proceeds not tracked; record cash received against the loss line manually.'
+        : ''
+
+      if (accum > 0) {
+        entries.push({
+          date, reference: ref, type: 'Asset Disposal',
+          description:    `Disposal — ${assetRef} (relieve accumulated depreciation)`,
+          debit_account:  'Accumulated Depreciation',
+          credit_account: 'Fixed Assets',
+          amount:         accum,
+          product:        assetRef,
+          category:       a.category?.name ?? '',
+          notes:          soldNote,
+        })
+      }
+      if (book > 0) {
+        entries.push({
+          date, reference: ref, type: 'Asset Disposal',
+          description:    `Disposal — ${assetRef} (write off remaining book value)`,
+          debit_account:  'Loss on Asset Disposal',
+          credit_account: 'Fixed Assets',
+          amount:         book,
+          product:        assetRef,
+          category:       a.category?.name ?? '',
+          notes:          soldNote,
+        })
+      }
+    }
+  }
+
+  // ── Purchase price variance (invoice vs GRN, from three-way match) ──────────
+  if (include('ppv')) {
+    const { data: matchedPos } = await supabase
+      .from('purchase_orders')
+      .select(`
+        id, po_number, supplier_invoice_no, supplier_invoice_date, supplier_invoice_amount,
+        lines:purchase_order_lines(quantity_received, unit_cost)
+      `)
+      .eq('org_id', auth.orgId)
+      .not('supplier_invoice_amount', 'is', null)
+      .gte('supplier_invoice_date', from)
+      .lte('supplier_invoice_date', to)
+      .order('supplier_invoice_date')
+
+    for (const p of (matchedPos ?? []) as any[]) {
+      const grn      = ((p.lines ?? []) as any[]).reduce((s, l) => s + l.quantity_received * l.unit_cost, 0)
+      const variance = Number(p.supplier_invoice_amount) - grn
+      if (Math.abs(variance) <= 0.01) continue   // matched — no entry
+
+      const over = variance > 0
+      entries.push({
+        date:           String(p.supplier_invoice_date).slice(0, 10),
+        reference:      p.supplier_invoice_no ?? p.po_number,
+        type:           'Purchase Price Variance',
+        description:    `Invoice ${p.supplier_invoice_no ?? ''} vs GRN on ${p.po_number} — ${over ? 'over' : 'under'}-invoiced`,
+        debit_account:  over ? 'Purchase Price Variance' : 'Accounts Payable',
+        credit_account: over ? 'Accounts Payable' : 'Purchase Price Variance',
+        amount:         Math.abs(variance),
+        product:        p.po_number,
+        category:       '',
+        notes:          `Invoice ${Number(p.supplier_invoice_amount).toFixed(2)} vs received ${grn.toFixed(2)}`,
+      })
+    }
+  }
+
   // Sort all entries by date
   entries.sort((a, b) => a.date.localeCompare(b.date))
 
   // ── CSV output ──────────────────────────────────────────────────────────────
   if (format === 'csv') {
-    const headers = ['Date','Reference','Type','Description','Debit Account','Credit Account','Amount','Product / Asset','Category','Notes']
+    const headers = ['Date','Reference','Type','Description','Debit Account','Credit Account','Amount','Product / Asset','Category','Job Order','Job Code','Cost Center','Notes']
     const rows    = entries.map(e => [
       e.date, e.reference, e.type, e.description,
       e.debit_account, e.credit_account,
       e.amount.toFixed(2),
-      e.product, e.category, e.notes,
+      e.product, e.category,
+      e.job_order ?? '', e.job_code ?? '', e.cost_center ?? '',
+      e.notes,
     ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
 
     const csv = [headers.join(','), ...rows].join('\r\n')
@@ -229,4 +374,8 @@ interface JournalEntry {
   product:        string
   category:       string
   notes:          string
+  // Job-costing dimensions (inventory transactions only)
+  job_order?:     string
+  job_code?:      string
+  cost_center?:   string
 }
