@@ -77,7 +77,11 @@ export async function GET(req: NextRequest) {
 
     for (const tx of txs ?? []) {
       const t          = tx as any
-      const amount     = Number(t.total_cost ?? (Math.abs(Number(t.quantity)) * Number(t.unit_cost ?? 0)))
+      // total_cost is signed (quantity × unit_cost; adjustments carry negative
+      // quantity). Direction is expressed by the debit/credit accounts, so the
+      // journal amount must always be the magnitude — a signed amount imported
+      // into QuickBooks/Xero would reverse the entry.
+      const amount     = Math.abs(Number(t.total_cost ?? (Number(t.quantity) * Number(t.unit_cost ?? 0))))
       const productRef = t.product?.sku ? `${t.product.sku} — ${t.product?.name}` : (t.product?.name ?? '')
       const category   = t.product?.category?.name ?? ''
       const ref        = t.reference_no ?? t.id.slice(0, 8).toUpperCase()

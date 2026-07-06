@@ -100,23 +100,28 @@ export async function GET(req: NextRequest) {
 
     for (const t of txs ?? []) {
       const tx = t as any
-      const amount = Number(tx.total_cost ?? Math.abs(tx.quantity * (tx.unit_cost ?? 0)))
+      // Magnitude only — direction lives in the debit/credit accounts, and
+      // total_cost is signed for negative-quantity adjustments.
+      const amount = Math.abs(Number(tx.total_cost ?? (tx.quantity * (tx.unit_cost ?? 0))))
       entries.push(mapTransaction(tx, amount))
     }
   }
 
   // ── Depreciation ────────────────────────────────────────────────────────────
   if (inc('depreciation')) {
+    // NB: the log's columns are depreciation_amount / run_at (not amount /
+    // created_at) — selecting the wrong names silently dropped every
+    // depreciation entry from this feed.
     let q = supabase
       .from('asset_depreciation_log')
-      .select(`id, period_start, amount, notes, created_at, asset:fixed_assets(name, asset_tag, category:categories(name))`)
+      .select(`id, period_start, depreciation_amount, notes, run_at, asset:fixed_assets(name, asset_tag, category:categories(name))`)
       .eq('org_id', orgId)
       .gte('period_start', from)
       .lte('period_start', to)
       .order('period_start', { ascending: true })
       .limit(limit)
 
-    if (cursor) q = q.gt('created_at', cursor)
+    if (cursor) q = q.gt('run_at', cursor)
 
     const { data: deps } = await q
 
@@ -124,7 +129,7 @@ export async function GET(req: NextRequest) {
       const dep = d as any
       entries.push({
         id:             dep.id,
-        timestamp:      dep.created_at ?? dep.period_start,
+        timestamp:      dep.run_at ?? dep.period_start,
         date:           dep.period_start?.slice(0, 10),
         reference:      dep.id.slice(0, 8).toUpperCase(),
         source:         'depreciation',
@@ -132,7 +137,7 @@ export async function GET(req: NextRequest) {
         description:    `Depreciation — ${dep.asset?.asset_tag ?? ''} ${dep.asset?.name ?? ''}`.trim(),
         debit_account:  'Depreciation Expense',
         credit_account: 'Accumulated Depreciation',
-        amount:         dep.amount,
+        amount:         Number(dep.depreciation_amount ?? 0),
         currency:       'USD',
         product_sku:    dep.asset?.asset_tag ?? null,
         product_name:   dep.asset?.name ?? null,
