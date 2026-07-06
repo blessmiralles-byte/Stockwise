@@ -4,7 +4,7 @@ import Link from 'next/link'
 import {
   Package, BarChart3, Truck, ClipboardList, Wrench,
   CheckCircle2, ArrowRight, Shield, Zap, Users, Star,
-  ChevronRight, Globe, Lock, Smartphone, CalendarClock,
+  ChevronRight, Smartphone,
   Hammer, HardHat, HeartPulse, UtensilsCrossed, Building2, MapPin,
 } from 'lucide-react'
 import { PLAN_CONFIG } from '@/lib/stripe-config'
@@ -51,14 +51,14 @@ function Hero() {
         </div>
 
         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-tight mb-6">
-          Stop losing money<br />
-          <span className="text-indigo-300">to stock you can't see</span>
+          Stop losing materials<br />
+          <span className="text-indigo-300">between the warehouse and the job</span>
         </h1>
 
         <p className="text-lg text-indigo-200 max-w-2xl mx-auto mb-10">
-          Built for operations and services businesses — trade contractors, healthcare teams,
-          hospitality operators, and field crews. Real-time stock, expiry tracking, equipment
-          management, and mobile field access, all in one place.
+          Your crew requests materials from their phone. You approve. Stock deducts against
+          the job — automatically. Purchase orders, receiving, tool tracking, and stock counts
+          in one system, so nothing walks off site unaccounted for.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -90,10 +90,10 @@ function TrustBar() {
       <div className="max-w-4xl mx-auto px-6">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 text-center">
           {[
-            { icon: Smartphone,    label: 'Field-ready',         sub: 'Update stock from any job site' },
-            { icon: CalendarClock, label: 'Expiry tracking',     sub: 'Alerts before stock expires' },
-            { icon: Lock,          label: 'Private by default',  sub: 'Your data invisible to others' },
-            { icon: Users,         label: '6 team roles',        sub: 'Right access for every job title' },
+            { icon: ClipboardList, label: 'Request → approve → deduct', sub: 'Materials booked to the job, not lost' },
+            { icon: Smartphone,    label: 'Field-ready',         sub: 'Scan and update stock from any job site' },
+            { icon: Shield,        label: 'Counts with sign-off', sub: 'Stock counts logged with who was present' },
+            { icon: Users,         label: '6 team roles',        sub: 'Orderers can\'t approve their own receipts' },
           ].map(item => (
             <div key={item.label} className="space-y-1">
               <item.icon className="w-6 h-6 text-indigo-500 mx-auto" />
@@ -110,14 +110,19 @@ function TrustBar() {
 // ── Features ──────────────────────────────────────────────────────────────────
 const FEATURES = [
   {
-    icon:  Package,
-    title: 'Real-time Inventory',
-    desc:  'Always know what you have and where it is across every location. Set reorder points so you get alerted before you run out — not after a job falls through.',
+    icon:  ClipboardList,
+    title: 'Requisitions & Job Costing',
+    desc:  'Crews request materials from their phone with a cost center and job code. You approve, stock deducts automatically, and every unit is booked to the job that consumed it — so you finally know what each job really cost.',
   },
   {
-    icon:  CalendarClock,
-    title: 'Expiry & Batch Tracking',
-    desc:  'Set expiry dates on any product or batch — medicines, food supplies, chemicals, and consumables. Get automatic alerts before stock expires so nothing goes to waste and compliance stays intact.',
+    icon:  Package,
+    title: 'Real-time Inventory',
+    desc:  'Always know what you have and where it is across every location. Reorder points alert you before you run out, and expiry and batch tracking keep dated stock from going to waste.',
+  },
+  {
+    icon:  Truck,
+    title: 'Purchase Orders & Receiving',
+    desc:  'Create POs, send them to suppliers, and receive goods in a few taps. Built-in controls mean the person who orders can\'t also approve the receipt — keeping your process clean.',
   },
   {
     icon:  Smartphone,
@@ -130,14 +135,9 @@ const FEATURES = [
     desc:  'Track every tool, vehicle, and piece of equipment — where it is, who has it, and what it\'s worth. Automated depreciation, maintenance schedules, and a full audit trail from purchase to disposal.',
   },
   {
-    icon:  Truck,
-    title: 'Purchase Orders',
-    desc:  'Create POs, send them to suppliers, and receive goods in a few taps. Built-in controls mean the person who orders can\'t also approve the receipt — keeping your process clean.',
-  },
-  {
     icon:  BarChart3,
-    title: 'Financial Reports',
-    desc:  'Inventory value, stock movement, cost of goods, and asset depreciation schedules — export-ready whenever your accountant asks for them.',
+    title: 'Reports & Accounting Export',
+    desc:  'Inventory valuation, stock movement, cost of goods, per-job material costs, and depreciation schedules — export-ready whenever your accountant asks for them.',
   },
 ]
 
@@ -345,10 +345,10 @@ function CtaBanner() {
   return (
     <section className="py-20 bg-indigo-600">
       <div className="max-w-3xl mx-auto px-6 text-center text-white">
-        <h2 className="text-3xl font-bold mb-4">Your operations deserve better than a spreadsheet.</h2>
+        <h2 className="text-3xl font-bold mb-4">Your materials deserve better than a spreadsheet.</h2>
         <p className="text-indigo-200 mb-8">
-          Set up in minutes. Your team — in the office, the ward, the kitchen, or out on a job —
-          will be scanning, ordering, and tracking stock by tomorrow.
+          Import your product list, set up your locations, and your crew is requesting,
+          scanning, and receiving from their phones — with every unit booked to a job.
         </p>
         <Link
           href="/register"
