@@ -38,6 +38,8 @@ export function BarcodeScanner({ onScan, onError, className, id = 'qr-reader' }:
           await scannerRef.current.stop()
         }
       } catch {}
+      // Remove any DOM html5-qrcode injected so React can own the empty div again
+      try { scannerRef.current.clear() } catch {}
       scannerRef.current = null
     }
     setScanning(false)
@@ -110,20 +112,24 @@ export function BarcodeScanner({ onScan, onError, className, id = 'qr-reader' }:
   return (
     <div className={cn('flex flex-col items-center gap-4', className)}>
       <div className="relative w-full max-w-sm">
+        {/* html5-qrcode injects a <video> into this node and manages its DOM.
+            It MUST have no React-rendered children, or React's reconciliation
+            (e.g. removing a conditional placeholder) collides with the library
+            and throws removeChild — crashing the page. Keep it empty. */}
         <div
           id={id}
           className={cn(
             'w-full rounded-2xl overflow-hidden bg-slate-900',
-            scanning ? 'min-h-[280px]' : 'min-h-[200px] flex items-center justify-center'
+            scanning ? 'min-h-[280px]' : 'min-h-[200px]'
           )}
-        >
-          {!scanning && (
-            <div className="flex flex-col items-center gap-3 text-slate-500 p-8">
-              <CameraOff className="w-12 h-12 opacity-30" />
-              <p className="text-sm">Camera inactive</p>
-            </div>
-          )}
-        </div>
+        />
+
+        {!scanning && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-500 p-8 pointer-events-none">
+            <CameraOff className="w-12 h-12 opacity-30" />
+            <p className="text-sm">Camera inactive</p>
+          </div>
+        )}
 
         {scanning && (
           <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
