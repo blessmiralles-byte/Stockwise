@@ -8,6 +8,11 @@
 
   --background: #ffffff;
   --foreground: #0f172a;
+
+  /* Stocked is a light-only design (white cards, slate text). Pin the color
+     scheme so a device in OS dark mode doesn't recolor the body/foreground and
+     make white-background inputs render with white (invisible) text. */
+  color-scheme: light;
 }
 
 @theme inline {
@@ -17,17 +22,19 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0f172a;
-    --foreground: #f8fafc;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+}
+
+/* Belt-and-suspenders: form controls always render dark text on their light
+   backgrounds regardless of any inherited color. */
+input, textarea, select {
+  color: #0f172a; /* slate-900 */
+}
+input::placeholder, textarea::placeholder {
+  color: #94a3b8; /* slate-400 */
 }
 
 /* ── Print utilities ─────────────────────────────────────────────────────────

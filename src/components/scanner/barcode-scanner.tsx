@@ -22,16 +22,11 @@ export function BarcodeScanner({ onScan, onError, className, id = 'qr-reader' }:
   const containerRef = useRef<HTMLDivElement>(null)
   const scannedRef = useRef(false)
 
+  // Don't enumerate cameras on mount — on mobile that prompts for permission
+  // before the user asks to scan, and often returns an empty list until
+  // permission is granted anyway. We enumerate *after* a successful start.
   useEffect(() => {
-    Html5Qrcode.getCameras()
-      .then(devices => {
-        if (devices.length) setCameras(devices)
-      })
-      .catch(() => {})
-
-    return () => {
-      stopScanner()
-    }
+    return () => { stopScanner() }
   }, [])
 
   const stopScanner = async () => {
@@ -50,8 +45,8 @@ export function BarcodeScanner({ onScan, onError, className, id = 'qr-reader' }:
   }
 
   const startScanner = async () => {
-    if (!cameras.length) {
-      setError('No camera found. Please allow camera access.')
+    if (!window.isSecureContext) {
+      setError('Camera scanning needs a secure (https) connection.')
       return
     }
 
@@ -61,10 +56,22 @@ export function BarcodeScanner({ onScan, onError, className, id = 'qr-reader' }:
     const scanner = new Html5Qrcode(id)
     scannerRef.current = scanner
 
+    // Prefer a known camera id (after we've enumerated), else ask the browser
+    // for the rear camera directly — this triggers the permission prompt on
+    // mobile and works without a prior getCameras() call.
+    const camConfig = cameras[activeCameraIdx]?.id ?? { facingMode: 'environment' as const }
+
+    // Size the scan box to the viewfinder so small phone screens don't throw
+    // "qrbox dimensions greater than the video".
+    const qrbox = (vw: number, vh: number) => {
+      const edge = Math.floor(Math.min(vw, vh) * 0.8)
+      return { width: edge, height: Math.floor(edge * 0.55) }
+    }
+
     try {
       await scanner.start(
-        cameras[activeCameraIdx]?.id || { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 260, height: 120 } },
+        camConfig,
+        { fps: 10, qrbox },
         (decodedText) => {
           if (!scannedRef.current) {
             scannedRef.current = true
@@ -75,9 +82,21 @@ export function BarcodeScanner({ onScan, onError, className, id = 'qr-reader' }:
         () => {}
       )
       setScanning(true)
+
+      // Permission is now granted — enumerate cameras so the switch button can
+      // appear if there's more than one.
+      if (!cameras.length) {
+        Html5Qrcode.getCameras().then(d => { if (d.length) setCameras(d) }).catch(() => {})
+      }
     } catch (err: any) {
-      setError(err?.message || 'Failed to start camera')
-      onError?.(err?.message)
+      const raw = String(err?.name || err?.message || '')
+      const msg = /NotAllowed|Permission|denied/i.test(raw)
+        ? 'Camera permission denied. Enable camera access for this site in your browser settings, then try again.'
+        : /NotFound|no camera|OverconstrainedError/i.test(raw)
+        ? 'No camera available on this device. You can type the barcode instead.'
+        : (err?.message || 'Could not start the camera. You can type the barcode instead.')
+      setError(msg)
+      onError?.(msg)
       scannerRef.current = null
     }
   }
