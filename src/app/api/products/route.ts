@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabase
     .from('products')
-    .select('id, sku, barcode, name, unit_of_measure, cost_method, attributes, track_expiry, reorder_point, category:categories(id, name)')
+    .select('id, sku, barcode, name, unit_of_measure, cost_method, attributes, track_expiry, reorder_point, needs_review, category:categories(id, name)')
     .eq('org_id', auth.orgId)
     .eq('is_active', true)
     .order('name')

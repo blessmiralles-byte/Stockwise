@@ -41,10 +41,20 @@ function AttrChips({ attrs }: { attrs?: Record<string, string> }) {
 // ─── Stock tab ────────────────────────────────────────────────────────────────
 function StockTab() {
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<'all' | 'low' | 'out'>('all')
+  const [filter, setFilter] = useState<'all' | 'low' | 'out' | 'review'>('all')
 
-  const { data, loading, error } = useApi<{ data: any[] }>('/api/inventory')
+  const { data, loading, error, refetch } = useApi<{ data: any[] }>('/api/inventory')
   const balances = data?.data ?? []
+  const reviewCount = balances.filter((b: any) => b.product?.needs_review).length
+
+  async function markReviewed(productId: string) {
+    await fetch(`/api/products/${productId}`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ needs_review: false }),
+    })
+    refetch()
+  }
 
   const filtered = balances.filter((b: any) => {
     const name: string = b.product?.name ?? ''
@@ -60,7 +70,10 @@ function StockTab() {
 
     const reorder = b.product?.reorder_point ?? 0
     const status = b.quantity === 0 ? 'out' : b.quantity <= reorder ? 'low' : 'ok'
-    const matchesFilter = filter === 'all' || status === filter
+    const matchesFilter =
+      filter === 'all'    ? true
+      : filter === 'review' ? !!b.product?.needs_review
+      : status === filter
     return matchesSearch && matchesFilter
   })
 
@@ -83,6 +96,16 @@ function StockTab() {
                 {f === 'all' ? 'All' : f === 'low' ? 'Low Stock' : 'Out of Stock'}
               </Button>
             ))}
+            {reviewCount > 0 && (
+              <Button
+                size="sm"
+                variant={filter === 'review' ? 'default' : 'outline'}
+                onClick={() => setFilter('review')}
+                className={filter === 'review' ? '' : 'border-amber-300 text-amber-700 hover:bg-amber-50'}
+              >
+                Needs Review ({reviewCount})
+              </Button>
+            )}
           </div>
         </div>
         <div className="flex gap-2">
@@ -125,7 +148,17 @@ function StockTab() {
                       <tr key={b.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                         <td className="px-4 py-3">
                           <div>
-                            <p className="font-medium text-slate-900">{b.product?.name}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-slate-900">{b.product?.name}</p>
+                              {b.product?.needs_review && (
+                                <button
+                                  onClick={() => markReviewed(b.product.id)}
+                                  title="Auto-created during receiving — click to mark reviewed"
+                                  className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors">
+                                  <AlertTriangle className="w-2.5 h-2.5" /> Review
+                                </button>
+                              )}
+                            </div>
                             <p className="text-xs text-slate-400">{b.product?.category?.name}</p>
                             <AttrChips attrs={b.product?.attributes} />
                           </div>

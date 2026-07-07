@@ -158,18 +158,39 @@ export default function FieldLogPage() {
     try {
       const res  = await fetch(`/api/scan?barcode=${encodeURIComponent(barcode)}`)
       const json = await res.json()
-      if (!res.ok || !json.data) {
-        setScanError(`Barcode "${barcode}" not found.`)
-      } else {
+      if (res.ok && json.data) {
         setProduct(json.data)
         setStep('details')
+        return
       }
+
+      // Not in the catalog. When receiving, auto-create the item (prefilled from
+      // the global barcode catalog when known) so the dock isn't blocked — it's
+      // flagged for a manager to review afterwards. Other log types still error.
+      if (isPurchase) {
+        const created = await fetch('/api/products/from-barcode', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ barcode }),
+        })
+        const cj = await created.json()
+        if (created.ok && cj.data) {
+          setProduct(cj.data)
+          setScanError(cj.created
+            ? `New item added from barcode${cj.source === 'global' ? ' (matched online)' : ''} — flagged for review.`
+            : '')
+          setStep('details')
+          return
+        }
+      }
+
+      setScanError(`Barcode "${barcode}" not found.`)
     } catch {
       setScanError('Network error — please try again.')
     } finally {
       setScanLookup(false)
     }
-  }, [])
+  }, [isPurchase])
 
   function selectPOLine(po: any, line: any) {
     setSelectedPO(po)

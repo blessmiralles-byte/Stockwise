@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     .from('inventory_balances')
     .select(`
       id, quantity, avg_cost, last_updated,
-      product:products(id, sku, barcode, name, unit_of_measure, cost_method, reorder_point, attributes, track_expiry, category:categories(name)),
+      product:products(id, sku, barcode, name, unit_of_measure, cost_method, reorder_point, attributes, track_expiry, needs_review, category:categories(name)),
       location:locations(id, name, code)
     `)
     .eq('org_id', auth.orgId)
