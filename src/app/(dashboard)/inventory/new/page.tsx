@@ -205,6 +205,12 @@ function CategorySelector({
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function NewProductPage() {
   const router = useRouter()
+  // Prefill from a global-catalog scan (/inventory/new?barcode=&name=)
+  const [{ prefillBarcode, prefillName }] = useState(() => {
+    if (typeof window === 'undefined') return { prefillBarcode: '', prefillName: '' }
+    const p = new URLSearchParams(window.location.search)
+    return { prefillBarcode: p.get('barcode') ?? '', prefillName: p.get('name') ?? '' }
+  })
   const [submitted,      setSubmitted]      = useState(false)
   const [attrs,          setAttrs]          = useState<AttrRow[]>([])
   const [trackExpiry,    setTrackExpiry]    = useState(false)
@@ -301,13 +307,13 @@ export default function NewProductPage() {
                     </div>
                     <div>
                       <label className="text-sm font-medium text-slate-700 block mb-1">Barcode</label>
-                      <Input name="barcode" placeholder="Scan or enter barcode" />
+                      <Input name="barcode" placeholder="Scan or enter barcode" defaultValue={prefillBarcode} />
                     </div>
                   </div>
 
                   <div>
                     <label className="text-sm font-medium text-slate-700 block mb-1">Item Name <span className="text-red-500">*</span></label>
-                    <Input name="name" placeholder="e.g. Ergonomic Office Chair" required />
+                    <Input name="name" placeholder="e.g. Ergonomic Office Chair" required defaultValue={prefillName} />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">

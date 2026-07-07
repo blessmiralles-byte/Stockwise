@@ -19,6 +19,7 @@ const TYPE_CFG: Record<string, { icon: any; color: string; label: string }> = {
   requisition:    { icon: ClipboardList, color: 'bg-blue-50 text-blue-600',      label: 'Requisition'    },
   purchase_order: { icon: ShoppingCart,  color: 'bg-amber-50 text-amber-600',    label: 'Purchase Order' },
   stock_count:    { icon: BarChart3,     color: 'bg-teal-50 text-teal-600',      label: 'Stock Count'    },
+  external_barcode: { icon: Package,     color: 'bg-slate-100 text-slate-500',   label: 'Global Catalog' },
 }
 
 function fmt(n: number) {
@@ -123,13 +124,34 @@ function ResultCard({ result, onPrint }: { result: any; onPrint: () => void }) {
           </button>
           <Link href={result.action_url}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-colors">
-            Open <ExternalLink className="w-3 h-3" />
+            {result.type === 'external_barcode' ? 'Add to catalog' : 'Open'} <ExternalLink className="w-3 h-3" />
           </Link>
         </div>
       </div>
 
       {/* Detail grid */}
       <div className="px-5 py-4">
+        {result.type === 'external_barcode' && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-100 text-amber-800 text-xs">
+              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+              Not in your catalog yet — matched in the global barcode database.
+            </div>
+            <div className="flex gap-3">
+              {d.image_url && (
+                <img src={d.image_url} alt="" className="w-16 h-16 rounded-lg object-cover border border-slate-100 flex-shrink-0" />
+              )}
+              <dl className="flex-1 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                <dt className="text-slate-400">Name</dt>   <dd className="text-slate-800 text-right">{d.name ?? '—'}</dd>
+                {d.brand    && (<><dt className="text-slate-400">Brand</dt>    <dd className="text-slate-800 text-right">{d.brand}</dd></>)}
+                {d.category && (<><dt className="text-slate-400">Category</dt> <dd className="text-slate-800 text-right">{d.category}</dd></>)}
+                <dt className="text-slate-400">Barcode</dt> <dd className="text-slate-800 text-right font-mono">{d.barcode}</dd>
+                <dt className="text-slate-400">Source</dt>  <dd className="text-slate-500 text-right">{String(d.source).replace(/_/g, ' ')}</dd>
+              </dl>
+            </div>
+          </div>
+        )}
+
         {result.type === 'product' && (
           <div className="space-y-3">
             <div className="grid grid-cols-3 gap-3 text-center">

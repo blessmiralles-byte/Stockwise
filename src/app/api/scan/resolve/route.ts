@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
+import { lookupBarcode } from '@/lib/barcode-lookup'
 
 /**
  * GET /api/scan/resolve?q=<any_code>
@@ -198,7 +199,32 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  // ── Nothing found ─────────────────────────────────────────────────────────
+  // ── Not in this org — try the global barcode catalog before giving up ──────
+  const external = await lookupBarcode(q)
+  if (external?.found) {
+    return NextResponse.json({
+      data: {
+        type:        'external_barcode',
+        id:          null,
+        display:     external.name ?? q,
+        code:        q,
+        match_field: 'global_catalog',
+        // Prefill the New Item form
+        action_url:  `/inventory/new?barcode=${encodeURIComponent(q)}&name=${encodeURIComponent(external.name ?? '')}`,
+        data: {
+          barcode:   q,
+          name:      external.name ?? null,
+          brand:     external.brand ?? null,
+          category:  external.category ?? null,
+          image_url: external.image_url ?? null,
+          source:    external.source,
+          in_catalog: false,
+        },
+      },
+    })
+  }
+
+  // ── Nothing found anywhere ──────────────────────────────────────────────────
   return NextResponse.json(
     { data: null, error: `No record found for code: ${q}` },
     { status: 404 }
