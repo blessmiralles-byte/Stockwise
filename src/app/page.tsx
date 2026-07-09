@@ -6,7 +6,7 @@ import { captureAttribution } from '@/lib/attribution'
 import {
   Package, BarChart3, Truck, ClipboardList, Wrench,
   CheckCircle2, ArrowRight, Shield, Zap, Users, Star,
-  ChevronRight, Smartphone,
+  ChevronRight, Smartphone, TrendingDown, CalendarClock, History,
   Hammer, HardHat, HeartPulse, UtensilsCrossed, Building2, MapPin,
 } from 'lucide-react'
 import { PLAN_CONFIG } from '@/lib/stripe-config'
@@ -25,6 +25,7 @@ function Nav() {
 
         <div className="hidden sm:flex items-center gap-6 text-sm text-indigo-300">
           <a href="#features"   className="hover:text-white transition-colors">Features</a>
+          <a href="#assets"     className="hover:text-white transition-colors">Assets</a>
           <a href="#industries" className="hover:text-white transition-colors">Industries</a>
           <a href="#pricing"    className="hover:text-white transition-colors">Pricing</a>
         </div>
@@ -167,6 +168,97 @@ function Features() {
               <p className="text-sm text-slate-500 leading-relaxed">{f.desc}</p>
             </div>
           ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ── Fixed Assets module ───────────────────────────────────────────────────────
+const ASSET_FEATURES = [
+  {
+    icon:  Building2,
+    title: 'Full asset register',
+    desc:  'Every tool, vehicle, and machine with its own tag, serial number, location, custodian, purchase cost, and current book value — one source of truth for what you own.',
+  },
+  {
+    icon:  TrendingDown,
+    title: 'Automated depreciation',
+    desc:  'Straight-line, declining balance, double-declining, or units of production. Run it per period in a click; assets even depreciate through to their exact disposal date.',
+  },
+  {
+    icon:  CalendarClock,
+    title: 'Maintenance schedules',
+    desc:  'Set service intervals and get alerted before maintenance is due. Log what was done, by whom, and what it cost — the full service history stays with the asset.',
+  },
+  {
+    icon:  Users,
+    title: 'Check-out & custody',
+    desc:  'Assign or lend equipment to a person or job and always know who is holding what. Field staff check tools in and out from their phone.',
+  },
+  {
+    icon:  History,
+    title: 'Disposal & audit trail',
+    desc:  'Retire, sell, or dispose of an asset with the correct accounting entries posted automatically — accumulated depreciation relieved, gain or loss recognised — and a complete history from purchase to disposal.',
+  },
+  {
+    icon:  BarChart3,
+    title: 'Reports & accounting export',
+    desc:  'Depreciation schedules, an asset roll-forward (opening cost, additions, disposals, closing net book value), and journal entries ready to import into QuickBooks, Xero, or MYOB.',
+  },
+]
+
+function Assets() {
+  return (
+    <section className="py-24 bg-slate-900 text-white" id="assets">
+      <div className="max-w-6xl mx-auto px-6">
+        <div className="grid lg:grid-cols-[1fr_1.4fr] gap-12 items-start">
+          {/* Left: pitch */}
+          <div>
+            <div className="inline-flex items-center gap-2 bg-indigo-500/15 border border-indigo-400/30 text-indigo-300 text-xs font-semibold px-3 py-1.5 rounded-full mb-5">
+              <Wrench className="w-3.5 h-3.5" />
+              Fixed Asset Management
+            </div>
+            <h2 className="text-3xl font-bold mb-4 leading-tight">
+              It&apos;s a fixed-asset register too — not just inventory
+            </h2>
+            <p className="text-slate-300 leading-relaxed mb-6">
+              Your tools, vehicles, and equipment are assets on your books, not consumables.
+              Stocked tracks them from purchase to disposal — with depreciation, maintenance,
+              and custody built in — so your fixed-asset register and your accountant stay in
+              sync without a separate system.
+            </p>
+            <ul className="space-y-2.5 mb-8">
+              {[
+                'Barcode & asset-tag scanning from any phone',
+                'GAAP-aligned depreciation and disposal entries',
+                'One audit trail from acquisition to write-off',
+              ].map(point => (
+                <li key={point} className="flex items-start gap-2.5 text-sm text-slate-200">
+                  <CheckCircle2 className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
+                  {point}
+                </li>
+              ))}
+            </ul>
+            <Link
+              href="/register"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-semibold text-sm transition-colors">
+              Start free trial <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          {/* Right: capability grid */}
+          <div className="grid sm:grid-cols-2 gap-4">
+            {ASSET_FEATURES.map(f => (
+              <div key={f.title} className="p-5 rounded-2xl bg-slate-800/60 border border-slate-700/60">
+                <div className="w-9 h-9 bg-indigo-500/20 rounded-lg flex items-center justify-center mb-3">
+                  <f.icon className="w-4 h-4 text-indigo-300" />
+                </div>
+                <h3 className="font-semibold text-white text-sm mb-1.5">{f.title}</h3>
+                <p className="text-xs text-slate-400 leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </section>
@@ -403,6 +495,7 @@ export default function LandingPage() {
         <Hero />
         <TrustBar />
         <Features />
+        <Assets />
         <Industries />
         <Pricing />
         <CtaBanner />
