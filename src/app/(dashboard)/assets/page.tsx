@@ -14,7 +14,7 @@ import {
   Search, Plus, ScanBarcode, Building2, MoreVertical, User, MapPin,
   X, AlertCircle, Loader2, Shield, TrendingDown, Wrench, ChevronRight,
   Calendar, Info, CheckCircle2, Users, Pencil, Trash2, Printer, Tag,
-  Archive, DollarSign, RefreshCw,
+  Archive, DollarSign, RefreshCw, LogOut, LogIn, Clock, Lock,
 } from 'lucide-react'
 import Link from 'next/link'
 import { PrintLabelsDialog, type LabelAsset } from '@/components/print-labels'
@@ -516,6 +516,7 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons }: {
   const { data: locData }    = useApi<{ data: any[] }>('/api/locations?all=true')
   // Always fetch persons — GET is open to all authenticated users now
   const { data: personData } = useApi<{ data: any[] }>('/api/accountable-persons')
+  const { data: orgData }    = useApi<{ data: any }>('/api/org')
 
   const categories = catData?.data ?? []
   const locations  = locData?.data ?? []
@@ -532,6 +533,9 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons }: {
   const [personId,    setPersonId]    = useState('')
   const [description, setDescription] = useState('')
   const [status,      setStatus]      = useState('active')
+  // Tool tracking: require approval to check out (default from org setting)
+  const [reqApproval,     setReqApproval]     = useState<boolean | null>(null)
+  const requiresApproval = reqApproval ?? !!orgData?.data?.require_checkout_approval
 
   // ── Financials / Depreciation ───────────────────────────────
   const [purchaseDate,     setPurchaseDate]     = useState(new Date().toISOString().split('T')[0])
@@ -589,6 +593,7 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons }: {
         depreciation_method:   deprMethod,
         useful_life_years:     usefulLifeYears ? Number(usefulLifeYears) : undefined,
         salvage_value:         salvageValue    ? Number(salvageValue)    : 0,
+        requires_checkout_approval: requiresApproval,
       }
       if (hasWarranty) {
         Object.assign(assetBody, {
@@ -764,6 +769,18 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons }: {
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                   />
                 </div>
+                <label className="col-span-2 flex items-center gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={requiresApproval}
+                    onChange={e => setReqApproval(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">Require approval to check out</p>
+                    <p className="text-xs text-slate-400">Someone must approve before this tool can leave. Defaults to your org setting.</p>
+                  </div>
+                </label>
               </div>
             </div>
           )}
@@ -1088,6 +1105,212 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons }: {
   )
 }
 
+// ── Tool custody helpers ──────────────────────────────────────────────────────
+type Custody = { label: string; tone: 'available' | 'out' | 'overdue' | 'pending' }
+function custodyOf(asset: any): Custody {
+  if (!asset.current_checkout_id) return { label: 'Available', tone: 'available' }
+  if (!asset.checked_out_to)      return { label: 'Pending approval', tone: 'pending' }
+  const overdue = asset.checkout_due_at && new Date(asset.checkout_due_at).getTime() < Date.now()
+  return {
+    label: `Out — ${asset.checked_out_to}${asset.checkout_due_at ? ` · due ${formatDate(asset.checkout_due_at)}` : ''}`,
+    tone: overdue ? 'overdue' : 'out',
+  }
+}
+const CUSTODY_TONE: Record<Custody['tone'], string> = {
+  available: 'text-green-600',
+  out:       'text-indigo-600',
+  overdue:   'text-red-600',
+  pending:   'text-amber-600',
+}
+
+// ── Check-out Dialog ──────────────────────────────────────────────────────────
+function CheckoutDialog({ asset, onClose, onDone }: { asset: any; onClose: () => void; onDone: (msg: string) => void }) {
+  const { data: personData } = useApi<{ data: any[] }>('/api/accountable-persons')
+  const persons = personData?.data ?? []
+  const [holder, setHolder]   = useState('')
+  const [personId, setPersonId] = useState('')
+  const [job, setJob]         = useState('')
+  const [due, setDue]         = useState('')
+  const [notes, setNotes]     = useState('')
+  const [saving, setSaving]   = useState(false)
+  const [error, setError]     = useState('')
+
+  const submit = async () => {
+    if (!holder.trim()) { setError('Enter who is taking the tool'); return }
+    setSaving(true); setError('')
+    try {
+      const res = await fetch(`/api/assets/${asset.id}/checkout`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          holder_name: holder.trim(),
+          holder_person_id: personId || null,
+          job_code: job.trim() || null,
+          due_at: due ? new Date(due).toISOString() : null,
+          notes: notes.trim() || null,
+        }),
+      })
+      const j = await res.json()
+      if (!res.ok) { setError(j.error ?? 'Failed to check out'); return }
+      onDone(j.pending
+        ? `Checkout request sent for approval — ${asset.name}.`
+        : `${asset.name} checked out to ${holder.trim()}.`)
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+            <LogOut className="w-4 h-4 text-indigo-600" /> Check out — {asset.name}
+          </h2>
+          <Button variant="ghost" size="icon" onClick={onClose}><X className="w-4 h-4" /></Button>
+        </div>
+        {asset.requires_checkout_approval && (
+          <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            <Lock className="w-3.5 h-3.5" /> This tool needs approval — a manager will confirm before it's released.
+          </div>
+        )}
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Who's taking it? <span className="text-red-500">*</span></label>
+            <Input value={holder} onChange={e => setHolder(e.target.value)} placeholder="Name of the person / crew" autoFocus />
+            {persons.length > 0 && (
+              <select
+                value={personId}
+                onChange={e => { setPersonId(e.target.value); const p = persons.find((x: any) => x.id === e.target.value); if (p) setHolder(p.name) }}
+                className="w-full mt-2 border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="">— or pick from people —</option>
+                {persons.map((p: any) => <option key={p.id} value={p.id}>{p.name}{p.department ? ` — ${p.department}` : ''}</option>)}
+              </select>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Job / site</label>
+              <Input value={job} onChange={e => setJob(e.target.value)} placeholder="e.g. JOB-2047" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Due back</label>
+              <Input type="date" value={due} onChange={e => setDue(e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Notes</label>
+            <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional" />
+          </div>
+          {error && <p className="text-xs text-red-600">{error}</p>}
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit} disabled={saving} className="gap-2">
+            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            {asset.requires_checkout_approval ? 'Request checkout' : 'Check out'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Check-in Dialog ───────────────────────────────────────────────────────────
+function CheckinDialog({ asset, onClose, onDone }: { asset: any; onClose: () => void; onDone: (msg: string) => void }) {
+  const { data: locData } = useApi<{ data: any[] }>('/api/locations?all=true')
+  const locations = locData?.data ?? []
+  const [locId, setLocId] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const submit = async () => {
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/assets/${asset.id}/checkin`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ returned_to_location_id: locId || null }),
+      })
+      if (res.ok) onDone(`${asset.name} checked in.`)
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+            <LogIn className="w-4 h-4 text-green-600" /> Check in — {asset.name}
+          </h2>
+          <Button variant="ghost" size="icon" onClick={onClose}><X className="w-4 h-4" /></Button>
+        </div>
+        <p className="text-sm text-slate-500">Currently with <strong className="text-slate-700">{asset.checked_out_to ?? 'requester'}</strong>. Where's it coming back to?</p>
+        <select value={locId} onChange={e => setLocId(e.target.value)}
+          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">— Leave location unchanged —</option>
+          {locations.map((l: any) => <option key={l.id} value={l.id}>{'  '.repeat(l.level ?? 0)}{l.name}{l.code ? ` (${l.code})` : ''}</option>)}
+        </select>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit} disabled={saving} className="gap-2 bg-green-600 hover:bg-green-700">
+            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Check in
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Checkouts panel (pending approvals + out / overdue) ───────────────────────
+function ToolCheckoutsPanel({ canApprove, onChange }: { canApprove: boolean; onChange: () => void }) {
+  const { data: pendingData, refetch: refetchPending } = useApi<{ data: any[] }>('/api/assets/checkouts?status=pending')
+  const { data: outData,     refetch: refetchOut }     = useApi<{ data: any[] }>('/api/assets/checkouts?status=out')
+  const pending = pendingData?.data ?? []
+  const out     = outData?.data ?? []
+  const overdue = out.filter((c: any) => c.due_at && new Date(c.due_at).getTime() < Date.now())
+
+  const act = async (coId: string, action: 'approve' | 'reject') => {
+    let reason: string | undefined
+    if (action === 'reject') { const r = window.prompt('Reason (optional):'); if (r === null) return; reason = r || undefined }
+    await fetch(`/api/assets/checkouts/${coId}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, reason }),
+    })
+    refetchPending(); refetchOut(); onChange()
+  }
+
+  if (pending.length === 0 && overdue.length === 0) return null
+
+  return (
+    <div className="space-y-3">
+      {canApprove && pending.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-800 mb-2 flex items-center gap-2">
+            <Lock className="w-4 h-4" /> {pending.length} checkout{pending.length !== 1 ? 's' : ''} awaiting approval
+          </p>
+          <div className="space-y-2">
+            {pending.map((c: any) => (
+              <div key={c.id} className="flex items-center gap-3 bg-white rounded-lg border border-amber-100 px-3 py-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-slate-800 truncate">{c.asset?.name} <span className="text-slate-400 font-mono text-xs">{c.asset?.asset_tag}</span></p>
+                  <p className="text-xs text-slate-500">{c.holder_name}{c.job_code ? ` · ${c.job_code}` : ''} · requested by {c.requester?.full_name ?? '—'}</p>
+                </div>
+                <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => act(c.id, 'reject')}>Reject</Button>
+                <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => act(c.id, 'approve')}>Approve</Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {overdue.length > 0 && (
+        <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm">
+          <Clock className="w-4 h-4 text-red-600 flex-shrink-0" />
+          <p className="text-red-800">
+            <strong>{overdue.length} tool{overdue.length !== 1 ? 's' : ''} overdue:</strong>{' '}
+            {overdue.map((c: any) => `${c.asset?.name} (${c.holder_name})`).join(', ')}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function AssetsPage() {
   const [search,         setSearch]         = useState('')
@@ -1096,10 +1319,14 @@ export default function AssetsPage() {
   const [showPersons,    setShowPersons]    = useState(false)
   const [printAssets,    setPrintAssets]    = useState<LabelAsset[] | null>(null)
   const [disposeTarget,  setDisposeTarget]  = useState<{ asset: any; mode: 'retire' | 'sell' } | null>(null)
+  const [checkoutTarget, setCheckoutTarget] = useState<any>(null)
+  const [checkinTarget,  setCheckinTarget]  = useState<any>(null)
+  const [toast,          setToast]          = useState('')
 
   const { data: profileData } = useApi<any>('/api/user/profile')
   const role = profileData?.role ?? 'viewer'
   const canManagePersons = role === 'owner' || role === 'admin' || role === 'operations' || role === 'manager'
+  const canApprove = canManagePersons || role === 'procurement'
 
   const { data, loading, error, refetch } = useApi<{ data: any[] }>('/api/assets')
   const assets = data?.data ?? []
@@ -1124,6 +1351,15 @@ export default function AssetsPage() {
     <div>
       <Topbar title="Fixed Assets" />
       <div className="p-6 space-y-4">
+
+        {toast && (
+          <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-sm text-green-800">
+            <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> {toast}
+          </div>
+        )}
+
+        {/* Tool checkouts: pending approvals + overdue */}
+        <ToolCheckoutsPanel canApprove={canApprove} onChange={refetch} />
 
         {/* Warranty expiry banner */}
         {expiringWarranties.length > 0 && (
@@ -1268,6 +1504,29 @@ export default function AssetsPage() {
                       )}
                     </div>
 
+                    {/* Custody status + check-out/in */}
+                    {!['disposed', 'retired', 'sold'].includes(asset.status) && (() => {
+                      const c = custodyOf(asset)
+                      const isOut = asset.current_checkout_id
+                      return (
+                        <div className="flex items-center justify-between gap-2 border-t border-slate-50 pt-3 mb-1">
+                          <span className={cn('text-xs font-medium flex items-center gap-1.5 min-w-0', CUSTODY_TONE[c.tone])}>
+                            {c.tone === 'available' ? <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" /> : <LogOut className="w-3.5 h-3.5 flex-shrink-0" />}
+                            <span className="truncate">{c.label}</span>
+                          </span>
+                          {isOut ? (
+                            <Button size="sm" variant="outline" className="gap-1 flex-shrink-0" onClick={() => setCheckinTarget(asset)}>
+                              <LogIn className="w-3.5 h-3.5" /> Check in
+                            </Button>
+                          ) : (
+                            <Button size="sm" variant="outline" className="gap-1 flex-shrink-0" onClick={() => setCheckoutTarget(asset)}>
+                              <LogOut className="w-3.5 h-3.5" /> Check out
+                            </Button>
+                          )}
+                        </div>
+                      )
+                    })()}
+
                     <div className="flex items-center justify-between border-t border-slate-50 pt-3">
                       <div>
                         <p className="text-xs text-slate-400">Purchase Cost</p>
@@ -1316,6 +1575,22 @@ export default function AssetsPage() {
           mode={disposeTarget.mode}
           onClose={() => setDisposeTarget(null)}
           onSaved={() => { setDisposeTarget(null); refetch() }}
+        />
+      )}
+
+      {checkoutTarget && (
+        <CheckoutDialog
+          asset={checkoutTarget}
+          onClose={() => setCheckoutTarget(null)}
+          onDone={(msg) => { setCheckoutTarget(null); setToast(msg); refetch(); setTimeout(() => setToast(''), 4000) }}
+        />
+      )}
+
+      {checkinTarget && (
+        <CheckinDialog
+          asset={checkinTarget}
+          onClose={() => setCheckinTarget(null)}
+          onDone={(msg) => { setCheckinTarget(null); setToast(msg); refetch(); setTimeout(() => setToast(''), 4000) }}
         />
       )}
     </div>

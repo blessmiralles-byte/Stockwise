@@ -660,6 +660,10 @@ function OrgSettingsSection({ isAdmin }: { isAdmin: boolean }) {
   const serverName = data?.data?.name ?? ''
   const displayName = orgName !== '' ? orgName : serverName
 
+  // Tool-checkout approval default (per-tool overrides this)
+  const [approvalOverride, setApprovalOverride] = useState<boolean | null>(null)
+  const requireApproval = approvalOverride ?? !!data?.data?.require_checkout_approval
+
   const saveOrg = async () => {
     const name = displayName.trim()
     if (!name || name.length < 2) { setOrgError('Name must be at least 2 characters'); return }
@@ -667,7 +671,7 @@ function OrgSettingsSection({ isAdmin }: { isAdmin: boolean }) {
     const res  = await fetch('/api/org', {
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ name }),
+      body:    JSON.stringify({ name, require_checkout_approval: requireApproval }),
     })
     const json = await res.json()
     setSaving(false)
@@ -692,6 +696,25 @@ function OrgSettingsSection({ isAdmin }: { isAdmin: boolean }) {
               placeholder="Your company name"
             />
             {orgError && <p className="text-xs text-red-600 mt-1">{orgError}</p>}
+          </div>
+        )}
+
+        {data?.data && (
+          <div className="flex items-start justify-between gap-4 rounded-lg border border-slate-200 p-3">
+            <div>
+              <p className="text-sm font-medium text-slate-700">Require approval to check out tools</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Default for new tools. You can override this per tool or per category.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={!isAdmin}
+              onClick={() => setApprovalOverride(!requireApproval)}
+              className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${requireApproval ? 'bg-indigo-600' : 'bg-slate-300'} ${!isAdmin ? 'opacity-50' : ''}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${requireApproval ? 'translate-x-5' : ''}`} />
+            </button>
           </div>
         )}
 
