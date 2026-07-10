@@ -19,7 +19,7 @@ export async function PATCH(
   }
 
   const FIELD_ALLOWED    = ['status', 'notes']                      // any authenticated user
-  const MANAGER_FIELDS   = ['location_id', 'accountable_person_id'] // operations / owner
+  const MANAGER_FIELDS   = ['location_id', 'accountable_person_id', 'requires_checkout_approval'] // operations / owner
   const FINANCIAL_FIELDS = ['current_value']                        // finance / owner
 
   const MANAGER_ROLES  = new Set(['owner', 'admin', 'operations', 'manager', 'procurement'])

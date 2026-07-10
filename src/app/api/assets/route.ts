@@ -8,6 +8,7 @@ const ASSET_SELECT = `
   depreciation_method, useful_life_years, salvage_value,
   warranty_provider, warranty_number, warranty_expires, warranty_contact, warranty_notes,
   notes,
+  requires_checkout_approval, current_checkout_id, checked_out_to, checked_out_job, checkout_due_at,
   category:categories(id, name),
   location:locations(id, name, code),
   accountable_person:accountable_persons(id, name, department)
@@ -58,6 +59,8 @@ export async function POST(req: NextRequest) {
     // warranty
     warranty_provider, warranty_number, warranty_expires,
     warranty_contact, warranty_notes,
+    // tool tracking
+    requires_checkout_approval,
   } = body
 
   if (!name?.trim()) {
@@ -78,11 +81,33 @@ export async function POST(req: NextRequest) {
     tag = `AST-${datePart}-${String(seqVal).padStart(4, '0')}`
   }
 
+  // Resolve the checkout-approval requirement: explicit value wins, else inherit
+  // the category default (if set), else the org-wide default.
+  let approvalRequired: boolean
+  if (typeof requires_checkout_approval === 'boolean') {
+    approvalRequired = requires_checkout_approval
+  } else {
+    let catDefault: boolean | null = null
+    if (category_id) {
+      const { data: cat } = await supabase
+        .from('categories').select('require_checkout_approval').eq('id', category_id).single()
+      catDefault = cat?.require_checkout_approval ?? null
+    }
+    if (catDefault !== null) {
+      approvalRequired = catDefault
+    } else {
+      const { data: org } = await supabase
+        .from('organizations').select('require_checkout_approval').eq('id', auth.orgId).single()
+      approvalRequired = !!org?.require_checkout_approval
+    }
+  }
+
   const insert: Record<string, any> = {
     org_id:             auth.orgId,
     name:               name.trim(),
     asset_tag:          tag,
     status:             status ?? 'active',
+    requires_checkout_approval: approvalRequired,
     created_by:         auth.userId,
   }
 
