@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useApi } from '@/lib/use-api'
-import { Cpu, MapPin, User, AlertCircle, CheckCircle2, Loader2, ChevronLeft, X, Search, WrenchIcon } from 'lucide-react'
+import { Cpu, MapPin, User, AlertCircle, CheckCircle2, Loader2, ChevronLeft, X, Search, WrenchIcon, LogOut, LogIn, Lock } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 
@@ -135,14 +135,22 @@ function AssetCard({
   asset,
   onReport,
   onMarkActive,
+  onCheckout,
+  onCheckin,
   busy,
 }: {
   asset: any
   onReport: (a: any) => void
   onMarkActive: (id: string) => void
+  onCheckout: (a: any) => void
+  onCheckin: (a: any) => void
   busy: boolean
 }) {
   const cfg = STATUS_CFG[asset.status] ?? STATUS_CFG.inactive
+  const isOut     = !!asset.current_checkout_id
+  const isPending = isOut && !asset.checked_out_to
+  const overdue   = asset.checkout_due_at && new Date(asset.checkout_due_at).getTime() < Date.now()
+  const canCustody = !['disposed', 'retired', 'sold'].includes(asset.status)
 
   return (
     <div className={cn('bg-white rounded-2xl border p-4 shadow-sm', cfg.border)}>
@@ -177,11 +185,38 @@ function AssetCard({
               <span className="text-gray-300">{asset.category.name}</span>
             )}
           </div>
+
+          {/* Custody */}
+          {canCustody && isOut && (
+            <p className={cn('text-xs font-medium mt-2 flex items-center gap-1', overdue ? 'text-red-600' : isPending ? 'text-amber-600' : 'text-indigo-600')}>
+              <LogOut className="w-3 h-3" />
+              {isPending
+                ? 'Pending approval'
+                : `Out — ${asset.checked_out_to}${asset.checkout_due_at ? ` · due ${new Date(asset.checkout_due_at).toLocaleDateString()}` : ''}`}
+            </p>
+          )}
         </div>
       </div>
 
       {/* Actions */}
       <div className="flex gap-2 mt-4">
+        {canCustody && (
+          isOut ? (
+            <button
+              onClick={() => onCheckin(asset)}
+              disabled={busy}
+              className="flex-1 h-11 bg-green-600 text-white rounded-xl font-semibold text-sm active:bg-green-700 disabled:opacity-60 transition-colors flex items-center justify-center gap-2">
+              <LogIn className="w-4 h-4" /> Check in
+            </button>
+          ) : (
+            <button
+              onClick={() => onCheckout(asset)}
+              disabled={busy}
+              className="flex-1 h-11 bg-indigo-600 text-white rounded-xl font-semibold text-sm active:bg-indigo-700 disabled:opacity-60 transition-colors flex items-center justify-center gap-2">
+              <LogOut className="w-4 h-4" /> Check out
+            </button>
+          )
+        )}
         {asset.status === 'maintenance' ? (
           <button
             onClick={() => onMarkActive(asset.id)}
@@ -207,6 +242,68 @@ function AssetCard({
   )
 }
 
+// ── Check-out bottom sheet (mobile) ───────────────────────────────────────────
+function CheckoutSheet({ asset, onClose, onDone }: { asset: any; onClose: () => void; onDone: (msg: string) => void }) {
+  const [holder, setHolder] = useState('')
+  const [job, setJob]       = useState('')
+  const [due, setDue]       = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError]   = useState('')
+
+  const submit = async () => {
+    if (!holder.trim()) { setError('Enter who is taking it'); return }
+    setSaving(true); setError('')
+    try {
+      const res = await fetch(`/api/assets/${asset.id}/checkout`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          holder_name: holder.trim(),
+          job_code: job.trim() || null,
+          due_at: due ? new Date(due).toISOString() : null,
+        }),
+      })
+      const j = await res.json()
+      if (!res.ok) { setError(j.error ?? 'Failed to check out'); return }
+      onDone(j.pending ? 'Sent for approval ✓' : `Checked out to ${holder.trim()} ✓`)
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-white rounded-t-3xl z-50 px-5 pt-5 pb-8 shadow-2xl">
+        <div className="flex items-center justify-between mb-3">
+          <p className="font-semibold text-gray-900 flex items-center gap-2"><LogOut className="w-4 h-4 text-indigo-600" /> Check out</p>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400"><X className="w-5 h-5" /></button>
+        </div>
+        <p className="text-sm text-gray-500 mb-3">{asset.name} <span className="font-mono text-xs text-gray-400">{asset.asset_tag}</span></p>
+        {asset.requires_checkout_approval && (
+          <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mb-3">
+            <Lock className="w-3.5 h-3.5" /> Needs a manager's approval before release.
+          </div>
+        )}
+        <div className="space-y-3">
+          <input value={holder} onChange={e => setHolder(e.target.value)} placeholder="Who's taking it?" autoFocus
+            className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <input value={job} onChange={e => setJob(e.target.value)} placeholder="Job / site (optional)"
+            className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Due back (optional)</label>
+            <input type="date" value={due} onChange={e => setDue(e.target.value)}
+              className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+        </div>
+        <button onClick={submit} disabled={saving}
+          className="mt-4 w-full h-13 py-3.5 bg-indigo-600 text-white rounded-2xl font-bold text-base active:bg-indigo-700 disabled:opacity-60 flex items-center justify-center gap-2">
+          {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogOut className="w-5 h-5" />}
+          {asset.requires_checkout_approval ? 'Request checkout' : 'Check out'}
+        </button>
+      </div>
+    </>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function FieldEquipmentPage() {
   const { data, loading, error, refetch } = useApi<{ data: any[] }>('/api/assets')
@@ -215,8 +312,17 @@ export default function FieldEquipmentPage() {
   const [search, setSearch]     = useState('')
   const [filter, setFilter]     = useState<'all' | 'active' | 'maintenance'>('all')
   const [reporting, setReporting] = useState<any | null>(null)
+  const [checkoutTarget, setCheckoutTarget] = useState<any | null>(null)
   const [updating, setUpdating]  = useState<string | null>(null)
   const [toast, setToast]        = useState('')
+
+  const checkin = useCallback(async (asset: any) => {
+    setUpdating(asset.id)
+    try {
+      const res = await fetch(`/api/assets/${asset.id}/checkin`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      if (res.ok) { await refetch?.(); setToast(`${asset.name} checked in ✓`); setTimeout(() => setToast(''), 2500) }
+    } finally { setUpdating(null) }
+  }, [refetch])
 
   const filtered = assets.filter(a => {
     const matchSearch = search === '' ||
@@ -323,6 +429,8 @@ export default function FieldEquipmentPage() {
               asset={asset}
               onReport={setReporting}
               onMarkActive={markActive}
+              onCheckout={setCheckoutTarget}
+              onCheckin={checkin}
               busy={updating === asset.id}
             />
           ))
@@ -342,6 +450,15 @@ export default function FieldEquipmentPage() {
           asset={reporting}
           onClose={() => setReporting(null)}
           onDone={handleReported}
+        />
+      )}
+
+      {/* Check-out bottom sheet */}
+      {checkoutTarget && (
+        <CheckoutSheet
+          asset={checkoutTarget}
+          onClose={() => setCheckoutTarget(null)}
+          onDone={async (msg) => { setCheckoutTarget(null); await refetch?.(); setToast(msg); setTimeout(() => setToast(''), 2800) }}
         />
       )}
     </div>
