@@ -52,10 +52,11 @@ export async function POST(req: NextRequest) {
   }
 
   // Fetch the owner's email for the Stripe customer record
+  // (user_profiles PK is `id`, which equals the auth user id — not `user_id`)
   const { data: profile } = await supabase
     .from('user_profiles')
     .select('email, full_name')
-    .eq('user_id', auth.userId)
+    .eq('id', auth.userId)
     .single()
 
   // Reuse or create Stripe customer
