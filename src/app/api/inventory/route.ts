@@ -104,25 +104,29 @@ export async function POST(req: NextRequest) {
 
   // ── Draft: save record only, no balance update ────────────────────────────
   if (draft === true) {
+    const draftRow: Record<string, any> = {
+      org_id: auth.orgId,
+      status: 'draft',
+      transaction_type,
+      product_id,
+      from_location_id: from_location_id ?? null,
+      to_location_id:   to_location_id   ?? null,
+      quantity:     qty,
+      unit_cost:    unit_cost ?? 0,
+      // total_cost is a generated column (quantity * unit_cost) — never set it
+      reference_no: reference_no ?? null,
+      customer_id:  customer_id  ?? null,
+      notes:        notes        ?? null,
+      created_by:   auth.userId,
+      job_order_id: job_order_id ?? null,
+    }
+    // Only reference related_po_id when a PO is actually linked — a blind
+    // receipt never has one, so it shouldn't depend on that column existing.
+    if (related_po_id) draftRow.related_po_id = related_po_id
+
     const { data: tx, error: txError } = await supabase
       .from('inventory_transactions')
-      .insert({
-        org_id: auth.orgId,
-        status: 'draft',
-        transaction_type,
-        product_id,
-        from_location_id: from_location_id ?? null,
-        to_location_id:   to_location_id   ?? null,
-        quantity:     qty,
-        unit_cost:    unit_cost ?? 0,
-        // total_cost is a generated column (quantity * unit_cost) — never set it
-        reference_no: reference_no ?? null,
-        customer_id:  customer_id  ?? null,
-        notes:        notes        ?? null,
-        created_by:   auth.userId,
-        job_order_id: job_order_id ?? null,
-        related_po_id: related_po_id ?? null,
-      })
+      .insert(draftRow)
       .select()
       .single()
 
