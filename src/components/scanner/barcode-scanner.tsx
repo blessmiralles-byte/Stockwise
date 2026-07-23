@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode'
+import { Html5Qrcode, Html5QrcodeScannerState, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 import { Camera, CameraOff, Flashlight, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -13,13 +13,34 @@ interface BarcodeScannerProps {
   id?: string
 }
 
+// Restrict decoding to the formats a contractor actually scans. Fewer formats
+// = faster, more reliable reads (the decoder isn't guessing across everything).
+const BARCODE_FORMATS = [
+  Html5QrcodeSupportedFormats.QR_CODE,
+  Html5QrcodeSupportedFormats.EAN_13,
+  Html5QrcodeSupportedFormats.EAN_8,
+  Html5QrcodeSupportedFormats.UPC_A,
+  Html5QrcodeSupportedFormats.UPC_E,
+  Html5QrcodeSupportedFormats.UPC_EAN_EXTENSION,
+  Html5QrcodeSupportedFormats.CODE_128,
+  Html5QrcodeSupportedFormats.CODE_39,
+  Html5QrcodeSupportedFormats.CODE_93,
+  Html5QrcodeSupportedFormats.ITF,
+  Html5QrcodeSupportedFormats.CODABAR,
+  Html5QrcodeSupportedFormats.DATA_MATRIX,
+]
+
 export function BarcodeScanner({ onScan, onError, className, id = 'qr-reader' }: BarcodeScannerProps) {
   const [scanning, setScanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [cameras, setCameras] = useState<{ id: string; label: string }[]>([])
-  const [activeCameraIdx, setActiveCameraIdx] = useState(0)
+  // The camera the user explicitly picked via the switch button. When null we
+  // always target the rear camera by facingMode (so re-scans never drift to the
+  // front camera just because it happens to be first in the device list).
+  const [preferredCamId, setPreferredCamId] = useState<string | null>(null)
+  const [torchOn, setTorchOn] = useState(false)
+  const [torchAvailable, setTorchAvailable] = useState(false)
   const scannerRef = useRef<Html5Qrcode | null>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
   const scannedRef = useRef(false)
 
   // Don't enumerate cameras on mount — on mobile that prompts for permission
@@ -43,10 +64,18 @@ export function BarcodeScanner({ onScan, onError, className, id = 'qr-reader' }:
       scannerRef.current = null
     }
     setScanning(false)
+    setTorchOn(false)
+    setTorchAvailable(false)
     scannedRef.current = false
   }
 
-  const startScanner = async () => {
+  // Wide, short scan window suits 1D barcodes (which are much wider than tall).
+  const qrbox = (vw: number, vh: number) => {
+    const edge = Math.floor(Math.min(vw, vh) * 0.85)
+    return { width: edge, height: Math.floor(edge * 0.5) }
+  }
+
+  const startScanner = async (overrideCamId?: string) => {
     if (!window.isSecureContext) {
       setError('Camera scanning needs a secure (https) connection.')
       return
@@ -55,58 +84,97 @@ export function BarcodeScanner({ onScan, onError, className, id = 'qr-reader' }:
     setError(null)
     scannedRef.current = false
 
-    const scanner = new Html5Qrcode(id)
+    const scanner = new Html5Qrcode(id, {
+      formatsToSupport: BARCODE_FORMATS,
+      // Use the browser's native, hardware-accelerated barcode detector where
+      // available (Android Chrome) — far faster and more reliable than the
+      // bundled decoder. Falls back automatically when unsupported (iOS Safari).
+      useBarCodeDetectorIfSupported: true,
+      verbose: false,
+    })
     scannerRef.current = scanner
 
-    // Prefer a known camera id (after we've enumerated), else ask the browser
-    // for the rear camera directly — this triggers the permission prompt on
-    // mobile and works without a prior getCameras() call.
-    const camConfig = cameras[activeCameraIdx]?.id ?? { facingMode: 'environment' as const }
-
-    // Size the scan box to the viewfinder so small phone screens don't throw
-    // "qrbox dimensions greater than the video".
-    const qrbox = (vw: number, vh: number) => {
-      const edge = Math.floor(Math.min(vw, vh) * 0.8)
-      return { width: edge, height: Math.floor(edge * 0.55) }
-    }
-
-    try {
-      await scanner.start(
-        camConfig,
-        { fps: 10, qrbox },
-        (decodedText) => {
-          if (!scannedRef.current) {
-            scannedRef.current = true
-            onScan(decodedText)
-            stopScanner()
-          }
-        },
-        () => {}
-      )
-      setScanning(true)
-
-      // Permission is now granted — enumerate cameras so the switch button can
-      // appear if there's more than one.
-      if (!cameras.length) {
-        Html5Qrcode.getCameras().then(d => { if (d.length) setCameras(d) }).catch(() => {})
+    const onSuccess = (decodedText: string) => {
+      if (!scannedRef.current) {
+        scannedRef.current = true
+        try { navigator.vibrate?.(60) } catch {}
+        onScan(decodedText)
+        stopScanner()
       }
-    } catch (err: any) {
-      const raw = String(err?.name || err?.message || '')
-      const msg = /NotAllowed|Permission|denied/i.test(raw)
-        ? 'Camera permission denied. Enable camera access for this site in your browser settings, then try again.'
-        : /NotFound|no camera|OverconstrainedError/i.test(raw)
-        ? 'No camera available on this device. You can type the barcode instead.'
-        : (err?.message || 'Could not start the camera. You can type the barcode instead.')
-      setError(msg)
-      onError?.(msg)
-      scannerRef.current = null
     }
+
+    // Best-effort continuous autofocus — sharper frames mean fewer retries.
+    const focus = { advanced: [{ focusMode: 'continuous' }] } as unknown as MediaTrackConstraints
+
+    // If the user explicitly picked a camera, honour it. Otherwise force the
+    // rear camera, then soft-prefer it for devices (laptops) with no rear cam.
+    const camId = overrideCamId ?? preferredCamId ?? undefined
+    const chain: MediaTrackConstraints[] = camId
+      ? [{ deviceId: { exact: camId } }]
+      : [{ facingMode: { exact: 'environment' } }, { facingMode: 'environment' }]
+
+    let lastErr: any = null
+    for (const base of chain) {
+      const videoConstraints: MediaTrackConstraints = { ...base, ...focus }
+      try {
+        await scanner.start(
+          { facingMode: 'environment' }, // ignored — videoConstraints below wins
+          { fps: 15, qrbox, videoConstraints },
+          onSuccess,
+          () => {},
+        )
+        setScanning(true)
+
+        // Surface a torch toggle when the running camera supports it.
+        try {
+          const caps = scanner.getRunningTrackCapabilities() as any
+          setTorchAvailable(!!caps?.torch)
+        } catch { setTorchAvailable(false) }
+
+        // Permission is granted now — enumerate so the switch button can appear.
+        if (!cameras.length) {
+          Html5Qrcode.getCameras().then(d => { if (d.length) setCameras(d) }).catch(() => {})
+        }
+        return
+      } catch (err) {
+        lastErr = err
+        try { await scanner.stop() } catch {}
+      }
+    }
+
+    // Every attempt failed — surface a helpful message.
+    const raw = String(lastErr?.name || lastErr?.message || '')
+    const msg = /NotAllowed|Permission|denied/i.test(raw)
+      ? 'Camera permission denied. Enable camera access for this site in your browser settings, then try again.'
+      : /NotFound|no camera|OverconstrainedError/i.test(raw)
+      ? 'No camera available on this device. You can type the barcode instead.'
+      : (lastErr?.message || 'Could not start the camera. You can type the barcode instead.')
+    setError(msg)
+    onError?.(msg)
+    scannerRef.current = null
+    setScanning(false)
   }
 
   const switchCamera = async () => {
+    if (cameras.length < 2) return
+    const curIdx = preferredCamId ? cameras.findIndex(c => c.id === preferredCamId) : -1
+    const next   = cameras[(curIdx + 1) % cameras.length]
+    setPreferredCamId(next.id)
     await stopScanner()
-    setActiveCameraIdx(prev => (prev + 1) % cameras.length)
-    setTimeout(startScanner, 300)
+    startScanner(next.id)
+  }
+
+  const toggleTorch = async () => {
+    if (!scannerRef.current) return
+    const next = !torchOn
+    try {
+      await scannerRef.current.applyVideoConstraints({
+        advanced: [{ torch: next }],
+      } as unknown as MediaTrackConstraints)
+      setTorchOn(next)
+    } catch {
+      setTorchAvailable(false)
+    }
   }
 
   return (
@@ -150,7 +218,7 @@ export function BarcodeScanner({ onScan, onError, className, id = 'qr-reader' }:
 
       <div className="flex gap-2">
         {!scanning ? (
-          <Button onClick={startScanner} className="gap-2">
+          <Button onClick={() => startScanner()} className="gap-2">
             <Camera className="w-4 h-4" />
             Start Scanner
           </Button>
@@ -160,8 +228,18 @@ export function BarcodeScanner({ onScan, onError, className, id = 'qr-reader' }:
               <CameraOff className="w-4 h-4" />
               Stop
             </Button>
+            {torchAvailable && (
+              <Button
+                onClick={toggleTorch}
+                variant={torchOn ? 'default' : 'outline'}
+                size="icon"
+                aria-label={torchOn ? 'Turn torch off' : 'Turn torch on'}
+              >
+                <Flashlight className="w-4 h-4" />
+              </Button>
+            )}
             {cameras.length > 1 && (
-              <Button onClick={switchCamera} variant="outline" size="icon">
+              <Button onClick={switchCamera} variant="outline" size="icon" aria-label="Switch camera">
                 <RefreshCw className="w-4 h-4" />
               </Button>
             )}
@@ -170,7 +248,7 @@ export function BarcodeScanner({ onScan, onError, className, id = 'qr-reader' }:
       </div>
 
       <p className="text-xs text-slate-400 text-center">
-        Point camera at a barcode or QR code
+        Point the rear camera at a barcode — hold steady about 15–20&nbsp;cm away
       </p>
     </div>
   )
