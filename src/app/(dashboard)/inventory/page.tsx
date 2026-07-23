@@ -12,9 +12,10 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import {
   Search, Plus, ScanBarcode, MoreVertical, AlertTriangle,
   Package, ArrowDownToLine, ArrowUpFromLine, Scale,
-  ChevronDown, CalendarClock, Layers,
+  ChevronDown, CalendarClock, Layers, ClipboardCheck,
 } from 'lucide-react'
 import Link from 'next/link'
+import { ReviewItemDialog, type ReviewProduct } from '@/components/inventory/review-item-dialog'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const typeConfig: Record<string, { label: string; variant: any }> = {
@@ -45,14 +46,19 @@ function StockTab() {
 
   const { data, loading, error, refetch } = useApi<{ data: any[] }>('/api/inventory')
   const balances = data?.data ?? []
-  const reviewCount = balances.filter((b: any) => b.product?.needs_review).length
 
-  async function markReviewed(productId: string) {
-    await fetch(`/api/products/${productId}`, {
-      method:  'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ needs_review: false }),
-    })
+  // Products needing review — sourced from the catalog so items with no stock
+  // yet (e.g. added via the field "Add Item" flow) still show up here.
+  const { data: prodData, loading: prodLoading, refetch: refetchProducts } =
+    useApi<{ data: any[] }>('/api/products?limit=500')
+  const reviewProducts = (prodData?.data ?? []).filter((p: any) => p.needs_review)
+  const reviewCount = reviewProducts.length
+
+  const [reviewItem, setReviewItem] = useState<ReviewProduct | null>(null)
+
+  const onReviewDone = () => {
+    setReviewItem(null)
+    refetchProducts()
     refetch()
   }
 
@@ -118,6 +124,49 @@ function StockTab() {
         </div>
       </div>
 
+      {filter === 'review' ? (
+        <Card>
+          <CardContent className="p-0">
+            {prodLoading ? (
+              <TableSkeleton rows={4} cols={3} />
+            ) : reviewProducts.length === 0 ? (
+              <div className="text-center py-12 text-slate-400">
+                <ClipboardCheck className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <p>Nothing to review — you&apos;re all caught up.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-50">
+                {reviewProducts
+                  .filter((p: any) => {
+                    const q = search.toLowerCase()
+                    return !q || (p.name ?? '').toLowerCase().includes(q) ||
+                      (p.sku ?? '').toLowerCase().includes(q) || (p.barcode ?? '').includes(search)
+                  })
+                  .map((p: any) => (
+                    <div key={p.id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50/50">
+                      <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0">
+                        <AlertTriangle className="w-4 h-4 text-amber-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-slate-900 truncate">{p.name}</p>
+                        <p className="text-xs text-slate-400 font-mono">
+                          {p.sku}{p.barcode ? ` · ${p.barcode}` : ''}{p.category?.name ? ` · ${p.category.name}` : ''}
+                        </p>
+                      </div>
+                      <Button size="sm" className="gap-1.5 flex-shrink-0" onClick={() => setReviewItem({
+                        id: p.id, name: p.name, sku: p.sku, barcode: p.barcode,
+                        unit_of_measure: p.unit_of_measure, cost_method: p.cost_method,
+                        reorder_point: p.reorder_point, category: p.category,
+                      })}>
+                        <ClipboardCheck className="w-3.5 h-3.5" /> Review &amp; Approve
+                      </Button>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
       <Card>
         <CardContent className="p-0">
           {loading ? (
@@ -152,8 +201,13 @@ function StockTab() {
                               <p className="font-medium text-slate-900">{b.product?.name}</p>
                               {b.product?.needs_review && (
                                 <button
-                                  onClick={() => markReviewed(b.product.id)}
-                                  title="Auto-created during receiving — click to mark reviewed"
+                                  onClick={() => setReviewItem({
+                                    id: b.product.id, name: b.product.name, sku: b.product.sku,
+                                    barcode: b.product.barcode, unit_of_measure: b.product.unit_of_measure,
+                                    cost_method: b.product.cost_method, reorder_point: b.product.reorder_point,
+                                    category: b.product.category,
+                                  })}
+                                  title="Needs review — click to review & approve"
                                   className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors">
                                   <AlertTriangle className="w-2.5 h-2.5" /> Review
                                 </button>
@@ -208,6 +262,15 @@ function StockTab() {
           )}
         </CardContent>
       </Card>
+      )}
+
+      {reviewItem && (
+        <ReviewItemDialog
+          product={reviewItem}
+          onClose={() => setReviewItem(null)}
+          onDone={onReviewDone}
+        />
+      )}
     </>
   )
 }
