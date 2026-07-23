@@ -74,8 +74,9 @@ export default function TermsPage() {
             <h2 className="text-lg font-semibold text-slate-800 mb-3">4. Subscriptions and billing</h2>
             <div className="space-y-3 text-slate-600">
               <p>
-                Paid subscriptions are billed in advance on a monthly basis via Stripe. By
-                subscribing you authorize us to charge your payment method on a recurring basis.
+                Paid subscriptions are billed in advance on a monthly basis through Lemon Squeezy,
+                our authorized reseller and Merchant of Record. By subscribing you authorize
+                recurring charges to your payment method.
               </p>
               <p>
                 <strong>Free trial.</strong> New accounts receive a 14-day free trial with full
@@ -85,7 +86,7 @@ export default function TermsPage() {
               </p>
               <p>
                 <strong>Cancellations.</strong> You may cancel your subscription at any time via
-                the Billing settings page or the Stripe customer portal. Cancellation takes effect
+                the Billing settings page or the Lemon Squeezy customer portal. Cancellation takes effect
                 at the end of the current billing period; no refunds are issued for partial months.
               </p>
               <p>

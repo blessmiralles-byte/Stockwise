@@ -10,7 +10,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import {
   Package, AlertTriangle, TrendingUp, Building2,
   Wrench, ArrowUpRight, ScanBarcode, ArrowLeftRight,
-  ClipboardList, ShoppingCart, ShieldAlert, CheckCircle2, Circle, X,
+  ClipboardList, ShoppingCart, ShieldAlert, CheckCircle2, Circle, X, ArrowRight,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -124,6 +124,13 @@ export default function DashboardPage() {
                   </span>
                 </Link>
               ))}
+            </div>
+            <div className="px-5 py-2.5 border-t border-indigo-50 bg-white">
+              <Link href="/setup?tab=start"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-700">
+                Open the step-by-step setup guide
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
           </div>
         )}

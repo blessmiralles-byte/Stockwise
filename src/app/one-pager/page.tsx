@@ -6,7 +6,7 @@ import {
   FileText, Bell, ArrowUpDown, Layers, ScanLine, Building2,
   Printer, Smartphone
 } from 'lucide-react'
-import { PLAN_CONFIG } from '@/lib/stripe-config'
+import { PLAN_CONFIG } from '@/lib/plan-config'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Data

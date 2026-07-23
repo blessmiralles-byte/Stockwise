@@ -1,6 +1,6 @@
 /**
- * Stripe plan configuration — safe to import in client components.
- * Contains no secrets and does not import the Stripe SDK.
+ * Plan configuration — safe to import in client components.
+ * Contains no secrets and does not import any payment SDK.
  */
 export const PLAN_CONFIG = {
   trial: {

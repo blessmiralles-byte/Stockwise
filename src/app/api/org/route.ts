@@ -17,7 +17,7 @@ export async function GET() {
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('organizations')
-    .select('id, name, slug, plan, plan_status, trial_ends_at, max_users, require_checkout_approval, created_at')
+    .select('id, name, slug, plan, plan_status, trial_ends_at, max_users, require_checkout_approval, ls_subscription_id, created_at')
     .eq('id', auth.orgId)
     .single()
 
@@ -92,7 +92,7 @@ export async function PATCH(req: NextRequest) {
     .from('organizations')
     .update(updates)
     .eq('id', auth.orgId)
-    .select('id, name, slug, plan, plan_status, trial_ends_at, max_users, require_checkout_approval, created_at')
+    .select('id, name, slug, plan, plan_status, trial_ends_at, max_users, require_checkout_approval, ls_subscription_id, created_at')
     .single()
 
   if (error) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireRole } from '@/lib/api-auth'
+import { createNotification } from '@/lib/notify'
 
 /**
  * GET /api/inventory
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
     unit_cost, reference_no, customer_id, notes,
     expiration_date, batch_no, job_order_id,
     cost_center_id, job_code,
-    draft, related_po_id,
+    draft, related_po_id, price_review,
   } = body
 
   // ── Input validation (M-2) ─────────────────────────────────────────────────
@@ -97,6 +98,10 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServiceClient()
 
+  // Blind receipt: goods received with no PO to validate cost against. Flag the
+  // org's value approvers to verify the unit price/value after the fact.
+  const flagValue = transaction_type === 'purchase' && price_review === true
+
   // ── Draft: save record only, no balance update ────────────────────────────
   if (draft === true) {
     const { data: tx, error: txError } = await supabase
@@ -126,6 +131,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: txError.message ?? 'Failed to save draft' }, { status: 500 })
     }
 
+    if (flagValue) {
+      await notifyBlindReceiptValue(supabase, auth.orgId, auth.userId, {
+        productId: product_id, qty, unitCost: Number(unit_cost ?? 0), draft: true,
+      })
+    }
+
     return NextResponse.json({ success: true, draft: true, transaction: tx }, { status: 201 })
   }
 
@@ -151,6 +162,11 @@ export async function POST(req: NextRequest) {
 
   // If RPC exists and succeeded, return immediately
   if (!rpcError) {
+    if (flagValue) {
+      await notifyBlindReceiptValue(supabase, auth.orgId, auth.userId, {
+        productId: product_id, qty, unitCost: Number(unit_cost ?? 0), draft: false,
+      })
+    }
     return NextResponse.json({ success: true, ...(rpcData as object) }, { status: 201 })
   }
 
@@ -228,7 +244,56 @@ export async function POST(req: NextRequest) {
     })
   }
 
+  if (flagValue) {
+    await notifyBlindReceiptValue(supabase, auth.orgId, auth.userId, {
+      productId: product_id, qty, unitCost: Number(unit_cost ?? 0), draft: false,
+    })
+  }
+
   return NextResponse.json({ success: true, transaction: tx }, { status: 201 })
+}
+
+/**
+ * Flag the org's value approvers (owner / procurement / finance) to verify the
+ * unit price/value of a receipt logged without a purchase order.
+ */
+async function notifyBlindReceiptValue(
+  supabase: ReturnType<typeof createServiceClient>,
+  orgId: string,
+  actorId: string,
+  info: { productId: string; qty: number; unitCost: number; draft: boolean },
+) {
+  const { data: product } = await supabase
+    .from('products')
+    .select('name')
+    .eq('id', info.productId)
+    .eq('org_id', orgId)
+    .single()
+
+  const { data: approvers } = await supabase
+    .from('user_profiles')
+    .select('id')
+    .eq('org_id', orgId)
+    .in('role', ['owner', 'procurement', 'finance'])
+
+  const recipients = (approvers ?? []).map(a => a.id).filter(id => id !== actorId)
+  if (recipients.length === 0) return
+
+  const total = info.qty * info.unitCost
+  const name  = product?.name ?? 'an item'
+  const valueLabel = info.unitCost > 0
+    ? `${info.qty} × ${info.unitCost.toFixed(2)} = ${total.toFixed(2)}`
+    : `${info.qty} unit(s) — no price entered`
+
+  await createNotification({
+    userId:    recipients,
+    orgId,
+    type:      'receipt_value_review',
+    title:     'Approve value: receipt logged without a PO',
+    body:      `${name} was logged for receipt without a purchase order (${valueLabel}). Approve the value to post it to stock.`,
+    data:      { product_id: info.productId, quantity: info.qty, unit_cost: info.unitCost, draft: info.draft },
+    actionUrl: '/transactions',
+  })
 }
 
 async function upsertBalance(

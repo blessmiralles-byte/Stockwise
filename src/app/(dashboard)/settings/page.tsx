@@ -11,7 +11,7 @@ import { useApi } from '@/lib/use-api'
 import { Settings, Bell, Shield, Key, Send, CheckCircle2, AlertCircle, Loader2,
   ToggleLeft, ToggleRight, Briefcase, CalendarRange, Plus, X, Lock, Unlock,
   UserPlus, Building2, CreditCard, Zap, ExternalLink, Star } from 'lucide-react'
-import { PLAN_CONFIG, type PlanKey } from '@/lib/stripe-config'
+import { PLAN_CONFIG, type PlanKey } from '@/lib/plan-config'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Role = 'owner' | 'procurement' | 'operations' | 'receiver' | 'finance' | 'viewer'
@@ -560,7 +560,7 @@ function BillingSection() {
                   {org?.max_users} user seats
                 </p>
               </div>
-              {org?.stripe_customer_id && (
+              {org?.ls_subscription_id && (
                 <button onClick={openPortal} disabled={portalLoading}
                   className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 font-medium transition-colors">
                   {portalLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}

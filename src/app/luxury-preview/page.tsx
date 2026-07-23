@@ -19,7 +19,7 @@ import {
   HardHat, Gauge, Hammer, HeartPulse, UtensilsCrossed,
   Building2, MapPin,
 } from 'lucide-react'
-import { PLAN_CONFIG } from '@/lib/stripe-config'
+import { PLAN_CONFIG } from '@/lib/plan-config'
 
 const serif = Playfair_Display({
   subsets: ['latin'],

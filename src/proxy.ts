@@ -3,7 +3,7 @@ import { createServerClient } from '@supabase/ssr'
 
 const PUBLIC_PATHS = [
   '/', '/login', '/register', '/auth/callback', '/auth/confirm', '/forgot-password', '/reset-password',
-  '/onboarding', '/privacy', '/terms', '/one-pager',
+  '/onboarding', '/privacy', '/terms', '/one-pager', '/getting-started',
   // Public SEO / social-share assets — must be reachable by unauthenticated
   // crawlers (Slackbot, LinkedIn, Twitterbot, Googlebot), not redirected to login.
   '/opengraph-image', '/twitter-image', '/robots.txt', '/sitemap.xml',

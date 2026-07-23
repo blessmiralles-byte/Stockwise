@@ -118,6 +118,7 @@ export default function FieldLogPage() {
   const [inputMode, setInputMode] = useState<InputMode>('scan')
   const [product, setProduct]     = useState<any>(null)
   const [qty, setQty]             = useState(1)
+  const [unitPrice, setUnitPrice] = useState('')
   const [fromLocation, setFromLocation] = useState('')
   const [toLocation, setToLocation]     = useState('')
   const [jobRef, setJobRef]       = useState('')
@@ -143,6 +144,10 @@ export default function FieldLogPage() {
 
   const logType    = LOG_TYPES[typeIdx]
   const isPurchase = logType.value === 'purchase'
+  // A "blind receipt" is goods received with no linked PO — there's no PO price
+  // to validate cost against, so it must be approved by a manager before it
+  // touches stock or the ledger.
+  const isBlindReceipt = isPurchase && !selectedPO
 
   // Load purchase-specific data when type = purchase
   useEffect(() => {
@@ -206,6 +211,10 @@ export default function FieldLogPage() {
     if (isPurchase && !receivedBy.trim()) { setErrorMsg('Please select who is receiving the goods'); return }
     if (isPurchase && !supplierId)        { setErrorMsg('Please select the supplier'); return }
 
+    // Blind receipts can never post directly — force them to a draft that a
+    // manager must approve before stock/ledger update.
+    if (isBlindReceipt) mode = 'draft'
+
     setSaveMode(mode)
     setSubmitting(true)
     setErrorMsg('')
@@ -254,11 +263,12 @@ export default function FieldLogPage() {
       transaction_type: logType.value,
       product_id:       product.id,
       quantity:         qty,
-      unit_cost:        product.avg_cost ?? 0,
+      unit_cost:        isBlindReceipt ? (Number(unitPrice) || 0) : (product.avg_cost ?? 0),
       reference_no:     refNo.trim() || undefined,
       notes:            notes.trim() || undefined,
       draft:            mode === 'draft',
     }
+    if (isBlindReceipt) body.price_review = true
     if (supplierId)   body.supplier_id     = supplierId
     if (selectedPO)   body.related_po_id   = selectedPO.id
     if (logType.needsFrom)            body.from_location_id = fromLocation || undefined
@@ -282,7 +292,7 @@ export default function FieldLogPage() {
   }
 
   const reset = () => {
-    setStep('type'); setProduct(null); setQty(1)
+    setStep('type'); setProduct(null); setQty(1); setUnitPrice('')
     setFromLocation(''); setToLocation(''); setJobRef('')
     setRefNo(''); setNotes(''); setErrorMsg(''); setScanError('')
     setSelectedPO(null); setSelectedLine(null); setSupplierId('')
@@ -299,7 +309,7 @@ export default function FieldLogPage() {
         </div>
         <div>
           <h2 className="text-2xl font-bold text-gray-900">
-            {saveMode === 'draft' ? 'Draft Saved!' : 'Logged!'}
+            {isBlindReceipt ? 'Submitted for Approval!' : saveMode === 'draft' ? 'Draft Saved!' : 'Logged!'}
           </h2>
           <p className="text-gray-500 mt-1">
             {qty}× {product?.name}
@@ -309,7 +319,11 @@ export default function FieldLogPage() {
             <p className="mt-2 text-sm font-medium text-green-600">{doneStatus}</p>
           )}
           {saveMode === 'draft' && (
-            <p className="mt-1 text-xs text-gray-400">Review and post it from the Transactions list.</p>
+            <p className="mt-1 text-xs text-gray-400">
+              {isBlindReceipt
+                ? 'A manager will review the value before stock and costs are updated.'
+                : 'Review and post it from the Transactions list.'}
+            </p>
           )}
         </div>
         <button
@@ -537,6 +551,35 @@ export default function FieldLogPage() {
                   )}
                 </div>
 
+                {/* Unit price — blind receipts only (no PO to validate cost) */}
+                {!selectedPO && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+                      Unit Price / Value
+                    </p>
+                    <div className="relative flex items-center">
+                      <span className="absolute left-4 text-gray-400 text-base">$</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.01"
+                        value={unitPrice}
+                        onChange={e => setUnitPrice(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full h-14 pl-9 pr-4 rounded-2xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                      />
+                    </div>
+                    <div className="mt-2 flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2.5 text-xs text-amber-700">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                      <span>
+                        No purchase order linked — a manager will be asked to verify this value.
+                        You can leave it blank if you don&apos;t know the price.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Condition */}
                 <div>
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Item Condition</p>
@@ -635,6 +678,24 @@ export default function FieldLogPage() {
 
             {/* Submit buttons */}
             {isPurchase ? (
+              isBlindReceipt ? (
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => handleSubmit('draft')}
+                    disabled={submitting}
+                    className="w-full h-16 rounded-2xl bg-green-600 text-white font-bold text-lg active:bg-green-700 disabled:opacity-60 transition-colors flex items-center justify-center gap-3 shadow-md shadow-green-200"
+                  >
+                    {submitting
+                      ? <><Loader2 className="w-5 h-5 animate-spin" /> Submitting…</>
+                      : <><FileCheck className="w-5 h-5" /> Submit for Approval</>
+                    }
+                  </button>
+                  <p className="text-xs text-center text-gray-400">
+                    No PO linked — a manager must approve the value before stock and costs are updated.
+                  </p>
+                </div>
+              ) : (
               <div className="space-y-3">
                 <button
                   type="button"
@@ -662,6 +723,7 @@ export default function FieldLogPage() {
                   Confirm Receipt updates stock immediately. Save as Draft lets a manager review first.
                 </p>
               </div>
+              )
             ) : (
               <button
                 type="button"

@@ -9,7 +9,7 @@ import {
   ChevronRight, Smartphone, TrendingDown, CalendarClock, History,
   Hammer, HardHat, HeartPulse, UtensilsCrossed, Building2, MapPin,
 } from 'lucide-react'
-import { PLAN_CONFIG } from '@/lib/stripe-config'
+import { PLAN_CONFIG } from '@/lib/plan-config'
 
 // ── Nav ───────────────────────────────────────────────────────────────────────
 function Nav() {

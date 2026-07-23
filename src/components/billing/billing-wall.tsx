@@ -2,14 +2,14 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { PLAN_CONFIG } from '@/lib/stripe-config'
+import { PLAN_CONFIG } from '@/lib/plan-config'
 import { Lock, CheckCircle2, Loader2 } from 'lucide-react'
 import type { BillingReason } from '@/lib/billing'
 
 /**
  * Full-screen paywall shown by the dashboard layout when an org's trial has
- * ended or its subscription was cancelled. Owners can upgrade inline (Stripe
- * Checkout); everyone else is told to ask the owner.
+ * ended or its subscription was cancelled. Owners can upgrade inline (Lemon
+ * Squeezy checkout); everyone else is told to ask the owner.
  */
 export function BillingWall({
   reason,

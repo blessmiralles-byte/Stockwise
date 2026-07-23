@@ -1,17 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
-import { stripe } from '@/lib/stripe'
+import { getSubscription } from '@/lib/lemonsqueezy'
 
 /**
  * POST /api/billing/portal
- * Creates a Stripe Customer Portal session so the user can manage their
+ * Returns the Lemon Squeezy customer portal URL so the user can manage their
  * subscription, update payment method, view invoices, or cancel.
+ *
+ * The portal URL is a short-lived signed link, so we fetch the subscription
+ * fresh on each request rather than storing it.
  *
  * Returns: { url: string }
  * Restricted to: owner
  */
-export async function POST(req: NextRequest) {
+export async function POST() {
   const auth = await requireAnyRole('owner')
   if (auth.error) return auth.error
 
@@ -23,23 +26,26 @@ export async function POST(req: NextRequest) {
 
   const { data: org } = await supabase
     .from('organizations')
-    .select('stripe_customer_id')
+    .select('ls_subscription_id')
     .eq('id', auth.orgId)
     .single()
 
-  if (!org?.stripe_customer_id) {
+  if (!org?.ls_subscription_id) {
     return NextResponse.json(
       { error: 'No billing account found. Please subscribe to a plan first.' },
       { status: 404 }
     )
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? ''
-
-  const portalSession = await stripe.billingPortal.sessions.create({
-    customer:   org.stripe_customer_id,
-    return_url: `${siteUrl}/settings?tab=billing`,
-  })
-
-  return NextResponse.json({ url: portalSession.url })
+  try {
+    const sub = await getSubscription(org.ls_subscription_id)
+    const url = sub?.data?.attributes?.urls?.customer_portal
+    if (!url) {
+      return NextResponse.json({ error: 'Billing portal is unavailable right now.' }, { status: 502 })
+    }
+    return NextResponse.json({ url })
+  } catch (err: any) {
+    console.error('[portal] lemonsqueezy error:', err.message)
+    return NextResponse.json({ error: 'Could not open billing portal.' }, { status: 502 })
+  }
 }

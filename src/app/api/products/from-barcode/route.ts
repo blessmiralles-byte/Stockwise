@@ -55,6 +55,11 @@ export async function POST(req: NextRequest) {
   const rand = Math.random().toString(36).slice(2, 6).toUpperCase()
   const sku = `ITM-${datePart}-${rand}`
 
+  // Optional details supplied by the field "Add Item" form (fall back to
+  // sensible defaults for the pure scan-at-the-dock case).
+  const unitOfMeasure = String(body.unit_of_measure ?? '').trim() || 'pc'
+  const reorderPoint  = Number.isFinite(Number(body.reorder_point)) ? Number(body.reorder_point) : 0
+
   const { data: created, error } = await supabase
     .from('products')
     .insert({
@@ -62,9 +67,9 @@ export async function POST(req: NextRequest) {
       sku,
       barcode,
       name,
-      unit_of_measure: 'pc',
+      unit_of_measure: unitOfMeasure,
       cost_method:     'average',
-      reorder_point:   0,
+      reorder_point:   reorderPoint,
       attributes:      external?.brand ? { Brand: external.brand } : {},
       needs_review:    true,
       is_active:       true,

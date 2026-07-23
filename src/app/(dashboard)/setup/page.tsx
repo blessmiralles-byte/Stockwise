@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useApi } from '@/lib/use-api'
 import { cn } from '@/lib/utils'
+import { GettingStartedGuide } from '@/components/onboarding/getting-started-guide'
 import {
   MapPin, Tag, Briefcase, Hash,
   Plus, Pencil, Trash2, Loader2, AlertCircle, CheckCircle2,
@@ -1121,6 +1122,7 @@ function AssetsTab() {
 // Page
 // ─────────────────────────────────────────────────────────────────────────────
 const TABS = [
+  { id: 'start',        label: 'Start here',   icon: Sparkles   },
   { id: 'locations',    label: 'Locations',    icon: MapPin     },
   { id: 'categories',   label: 'Categories',   icon: Tag        },
   { id: 'vendors',      label: 'Vendors',      icon: Truck      },
@@ -1133,7 +1135,7 @@ const TABS = [
 function SetupInner() {
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab') ?? ''
-  const [active, setActive] = useState(TABS.some(t => t.id === tabParam) ? tabParam : 'locations')
+  const [active, setActive] = useState(TABS.some(t => t.id === tabParam) ? tabParam : 'start')
   const [bannerDismissed, setBannerDismissed] = useState(false)
 
   const { data: orgData } = useApi<{ data: any }>('/api/organization')
@@ -1147,7 +1149,7 @@ function SetupInner() {
       <div className="p-6 max-w-3xl">
 
         {/* 30-day onboarding banner */}
-        {inSetupWindow && !bannerDismissed && (
+        {inSetupWindow && !bannerDismissed && active !== 'start' && (
           <div className="mb-6 flex items-start gap-3 p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
             <Sparkles className="w-5 h-5 text-indigo-500 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
@@ -1181,6 +1183,7 @@ function SetupInner() {
           ))}
         </div>
 
+        {active === 'start'        && <GettingStartedGuide />}
         {active === 'locations'    && <LocationsTab />}
         {active === 'categories'   && <CategoriesTab />}
         {active === 'vendors'      && <VendorsTab />}

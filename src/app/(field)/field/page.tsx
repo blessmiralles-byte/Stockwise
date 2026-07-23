@@ -6,7 +6,7 @@ import { formatDate } from '@/lib/utils'
 import {
   ScanBarcode, Cpu, Wrench, AlertCircle,
   ArrowLeftRight, CheckCircle2, Clock, ChevronRight,
-  Package,
+  Package, PackagePlus,
 } from 'lucide-react'
 
 const ROLE_LABELS: Record<string, string> = {
@@ -24,6 +24,14 @@ const actions = [
     description: 'Scan or search — issue, receive, or transfer',
     color: 'bg-indigo-50 text-indigo-600 border-indigo-100',
     iconBg: 'bg-indigo-600',
+  },
+  {
+    href: '/field/add-item',
+    icon: PackagePlus,
+    label: 'Add Item',
+    description: 'Scan a barcode to add a new product',
+    color: 'bg-green-50 text-green-600 border-green-100',
+    iconBg: 'bg-green-600',
   },
   {
     href: '/field/equipment',

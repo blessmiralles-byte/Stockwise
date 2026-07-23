@@ -22,7 +22,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     if (profile?.org_id) {
       const { data: org } = await service
         .from('organizations')
-        .select('plan, plan_status, trial_ends_at, stripe_customer_id')
+        .select('plan, plan_status, trial_ends_at, ls_subscription_id')
         .eq('id', profile.org_id)
         .single()
 
@@ -34,7 +34,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <BillingWall
               reason={state.reason}
               canManage={canManage}
-              hasSubscription={!!(org as any).stripe_customer_id}
+              hasSubscription={!!(org as any).ls_subscription_id}
             />
           )
         }

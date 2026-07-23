@@ -21,10 +21,10 @@ const navItems = [
   { href: '/purchase-orders', icon: ShoppingCart,    label: 'Purchase Orders' },
   { href: '/requisitions',    icon: ClipboardList,   label: 'Requisitions'    },
   { href: '/stock-counts',    icon: Truck,           label: 'Stock Counts'    },
-  { href: '/setup',           icon: Sliders,         label: 'Setup & Import'  },
   { href: '/assets',          icon: Cpu,             label: 'Fixed Assets'    },
   { href: '/maintenance',     icon: Wrench,          label: 'Maintenance'     },
   { href: '/reports',         icon: BarChart3,       label: 'Reports'         },
+  { href: '/setup',           icon: Sliders,         label: 'Setup & Import'  },
   { href: '/audit-log',       icon: Shield,          label: 'Audit Log'       },
   { href: '/settings',        icon: Settings,        label: 'Settings'        },
 ]

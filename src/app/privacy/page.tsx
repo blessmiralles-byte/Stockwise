@@ -54,9 +54,9 @@ export default function PrivacyPage() {
               <p><strong>Usage data.</strong> We automatically collect information about how you
               interact with the service, including IP addresses, browser type, pages visited, and
               actions taken within the app. This data helps us improve the product.</p>
-              <p><strong>Payment information.</strong> We use Stripe to process payments. We do not
-              store your full credit card number — Stripe handles payment data under their own
-              privacy policy and PCI-DSS compliance.</p>
+              <p><strong>Payment information.</strong> We use Lemon Squeezy as our Merchant of
+              Record to process payments. We do not store your full credit card number — Lemon
+              Squeezy handles payment data under their own privacy policy and PCI-DSS compliance.</p>
               <p><strong>Communications.</strong> If you contact us by email, we retain that
               correspondence to assist you and improve support.</p>
             </div>
@@ -101,8 +101,8 @@ export default function PrivacyPage() {
                     <td className="px-3 py-2">US (AWS)</td>
                   </tr>
                   <tr>
-                    <td className="px-3 py-2">Stripe</td>
-                    <td className="px-3 py-2">Payment processing</td>
+                    <td className="px-3 py-2">Lemon Squeezy</td>
+                    <td className="px-3 py-2">Payment processing &amp; Merchant of Record</td>
                     <td className="px-3 py-2">US</td>
                   </tr>
                   <tr>
