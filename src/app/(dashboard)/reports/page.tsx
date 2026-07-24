@@ -2,7 +2,7 @@
 
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent } from '@/components/ui/card'
-import { BarChart2, TrendingUp, Package, ChevronRight, Briefcase, TrendingDown, ScrollText, BookOpen } from 'lucide-react'
+import { BarChart2, TrendingUp, Package, ChevronRight, Briefcase, TrendingDown, ScrollText, BookOpen, Wrench, HardHat } from 'lucide-react'
 import Link from 'next/link'
 
 const reports = [
@@ -26,6 +26,20 @@ const reports = [
     color: 'bg-rose-50 text-rose-600',
     title: 'Depreciation Run',
     desc: 'Calculate and post periodic depreciation for all active fixed assets.',
+  },
+  {
+    href: '/reports/tools-out',
+    icon: Wrench,
+    color: 'bg-amber-50 text-amber-600',
+    title: 'Tools Checked Out',
+    desc: 'Every fixed asset / tool currently checked out — who holds it, the job, and whether it is overdue.',
+  },
+  {
+    href: '/reports/tools-by-crew',
+    icon: HardHat,
+    color: 'bg-cyan-50 text-cyan-600',
+    title: 'Tools by Crew Member',
+    desc: 'Type a crew member’s name to see every tool currently assigned to them.',
   },
   {
     href: '/reports/assets-roll-forward',
