@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
       id, status, holder_name, job_code, job_reference, due_at, notes,
       checked_out_at, approved_at,
       asset:fixed_assets(id, asset_tag, name),
+      holder:accountable_persons!holder_person_id(id, name, employee_no),
       requester:user_profiles!checked_out_by(id, full_name)
     `)
     .eq('org_id', auth.orgId)

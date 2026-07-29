@@ -15,6 +15,7 @@ interface Checkout {
   due_at?:         string | null
   checked_out_at?: string
   asset?:          { id: string; asset_tag?: string; name?: string }
+  holder?:         { id: string; name?: string; employee_no?: string } | null
 }
 
 const isOverdue = (c: Checkout) => !!c.due_at && new Date(c.due_at).getTime() < Date.now()
@@ -24,29 +25,38 @@ export default function ToolsByCrewReport() {
   const [name, setName] = useState('')
   const all = data?.data ?? []
 
-  // Roster of crew who currently hold tools, with a count each.
+  // Roster of crew who currently hold tools, with a count + employee no each.
   const crew = useMemo(() => {
-    const m = new Map<string, number>()
+    const m = new Map<string, { count: number; employee_no?: string }>()
     for (const c of all) {
       const h = (c.holder_name ?? '').trim()
-      if (h) m.set(h, (m.get(h) ?? 0) + 1)
+      if (!h) continue
+      const cur = m.get(h) ?? { count: 0 }
+      cur.count++
+      if (!cur.employee_no && c.holder?.employee_no) cur.employee_no = c.holder.employee_no
+      m.set(h, cur)
     }
     return [...m.entries()]
-      .map(([n, count]) => ({ name: n, count }))
+      .map(([n, v]) => ({ name: n, count: v.count, employee_no: v.employee_no }))
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [all])
 
   const s = name.trim().toLowerCase()
   const matched = useMemo(
-    () => (s ? all.filter(c => (c.holder_name ?? '').toLowerCase().includes(s)) : []),
+    () => (s
+      ? all.filter(c =>
+          (c.holder_name ?? '').toLowerCase().includes(s) ||
+          (c.holder?.employee_no ?? '').toLowerCase().includes(s))
+      : []),
     [all, s],
   )
   const overdueCount = matched.filter(isOverdue).length
 
   const exportCsv = () => {
-    const header = ['Assigned To', 'Tool', 'Asset Tag', 'Job', 'Checked Out', 'Due', 'Status']
+    const header = ['Assigned To', 'Employee No', 'Tool', 'Asset Tag', 'Job', 'Checked Out', 'Due', 'Status']
     const body = matched.map(c => [
       c.holder_name ?? '',
+      c.holder?.employee_no ?? '',
       c.asset?.name ?? '',
       c.asset?.asset_tag ?? '',
       c.job_code || c.job_reference || '',
@@ -79,7 +89,7 @@ export default function ToolsByCrewReport() {
           <input
             value={name}
             onChange={e => setName(e.target.value)}
-            placeholder="Crew member's name…"
+            placeholder="Crew member's name or employee no…"
             className="w-full pl-9 pr-3 h-11 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
@@ -105,6 +115,7 @@ export default function ToolsByCrewReport() {
                   >
                     <User className="w-3.5 h-3.5 text-slate-400" />
                     {c.name}
+                    {c.employee_no && <span className="text-xs font-mono text-slate-400">{c.employee_no}</span>}
                     <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 rounded-full px-1.5">{c.count}</span>
                   </button>
                 ))}
@@ -120,6 +131,11 @@ export default function ToolsByCrewReport() {
               <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg px-3 py-1.5">
                 <User className="w-4 h-4 text-slate-500" />
                 {matched.length} tool{matched.length !== 1 ? 's' : ''} assigned to &ldquo;{name.trim()}&rdquo;
+                {matched.find(c => c.holder?.employee_no)?.holder?.employee_no && (
+                  <span className="text-xs font-mono text-indigo-600">
+                    {matched.find(c => c.holder?.employee_no)!.holder!.employee_no}
+                  </span>
+                )}
               </div>
               {overdueCount > 0 && (
                 <div className="inline-flex items-center gap-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">

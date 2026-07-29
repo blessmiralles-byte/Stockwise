@@ -20,7 +20,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const allowed = ['name', 'department', 'email', 'phone']
+  const allowed = ['name', 'employee_no', 'department', 'email', 'phone']
   const updates: Record<string, any> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]?.trim() || null
@@ -40,10 +40,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .update(updates)
     .eq('id', id)
     .eq('org_id', auth.orgId)  // org isolation
-    .select('id, name, department, email, phone')
+    .select('id, name, employee_no, department, email, phone')
     .single()
 
   if (error) {
+    if (error.code === '23505') {
+      return NextResponse.json({ error: 'That employee number is already used by another person.' }, { status: 409 })
+    }
     console.error('[PATCH /api/accountable-persons/[id]]', error)
     return NextResponse.json({ error: 'Failed to update person' }, { status: 500 })
   }

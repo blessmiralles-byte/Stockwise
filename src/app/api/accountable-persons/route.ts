@@ -18,7 +18,7 @@ export async function GET() {
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('accountable_persons')
-    .select('id, name, department, email, phone')
+    .select('id, name, employee_no, department, email, phone')
     .eq('org_id', auth.orgId)
     .order('name')
 
@@ -48,16 +48,20 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase
     .from('accountable_persons')
     .insert({
-      org_id:     auth.orgId,
+      org_id:      auth.orgId,
       name,
-      department: body.department?.trim() || null,
-      email:      body.email?.trim()      || null,
-      phone:      body.phone?.trim()      || null,
+      employee_no: body.employee_no?.trim() || null,
+      department:  body.department?.trim()   || null,
+      email:       body.email?.trim()        || null,
+      phone:       body.phone?.trim()        || null,
     })
-    .select('id, name, department, email, phone')
+    .select('id, name, employee_no, department, email, phone')
     .single()
 
   if (error) {
+    if (error.code === '23505') {
+      return NextResponse.json({ error: 'That employee number is already used by another person.' }, { status: 409 })
+    }
     console.error('[POST /api/accountable-persons]', error)
     return NextResponse.json({ error: 'Failed to create person' }, { status: 500 })
   }

@@ -15,6 +15,7 @@ interface Checkout {
   due_at?:         string | null
   checked_out_at?: string
   asset?:          { id: string; asset_tag?: string; name?: string }
+  holder?:         { id: string; name?: string; employee_no?: string } | null
 }
 
 const isOverdue = (c: Checkout) => !!c.due_at && new Date(c.due_at).getTime() < Date.now()
@@ -31,6 +32,7 @@ export default function ToolsOutReport() {
       (c.asset?.name ?? '').toLowerCase().includes(s) ||
       (c.asset?.asset_tag ?? '').toLowerCase().includes(s) ||
       (c.holder_name ?? '').toLowerCase().includes(s) ||
+      (c.holder?.employee_no ?? '').toLowerCase().includes(s) ||
       (c.job_code ?? '').toLowerCase().includes(s) ||
       (c.job_reference ?? '').toLowerCase().includes(s)
     )
@@ -39,11 +41,12 @@ export default function ToolsOutReport() {
   const overdueCount = all.filter(isOverdue).length
 
   const exportCsv = () => {
-    const header = ['Tool', 'Asset Tag', 'Assigned To', 'Job', 'Checked Out', 'Due', 'Status']
+    const header = ['Tool', 'Asset Tag', 'Assigned To', 'Employee No', 'Job', 'Checked Out', 'Due', 'Status']
     const body = rows.map(c => [
       c.asset?.name ?? '',
       c.asset?.asset_tag ?? '',
       c.holder_name ?? '',
+      c.holder?.employee_no ?? '',
       c.job_code || c.job_reference || '',
       c.checked_out_at ? formatDate(c.checked_out_at) : '',
       c.due_at ? formatDate(c.due_at) : '',
@@ -125,7 +128,12 @@ export default function ToolsOutReport() {
                             <p className="font-medium text-slate-900">{c.asset?.name ?? 'Unknown tool'}</p>
                             {c.asset?.asset_tag && <p className="text-xs text-slate-400 font-mono">{c.asset.asset_tag}</p>}
                           </td>
-                          <td className="px-4 py-3 text-slate-700">{c.holder_name || <span className="text-slate-400">—</span>}</td>
+                          <td className="px-4 py-3 text-slate-700">
+                            {c.holder_name || <span className="text-slate-400">—</span>}
+                            {c.holder?.employee_no && (
+                              <span className="ml-2 text-xs font-mono text-indigo-600">{c.holder.employee_no}</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3 hidden md:table-cell text-slate-600">{c.job_code || c.job_reference || <span className="text-slate-300">—</span>}</td>
                           <td className="px-4 py-3 hidden sm:table-cell text-slate-500">{c.checked_out_at ? formatDate(c.checked_out_at) : '—'}</td>
                           <td className="px-4 py-3">

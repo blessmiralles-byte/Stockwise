@@ -73,6 +73,7 @@ function ManagePersonsPanel({ onClose }: { onClose: () => void }) {
   const persons = data?.data ?? []
 
   const [name,       setName]       = useState('')
+  const [employeeNo, setEmployeeNo] = useState('')
   const [department, setDepartment] = useState('')
   const [email,      setEmail]      = useState('')
   const [phone,      setPhone]      = useState('')
@@ -83,10 +84,10 @@ function ManagePersonsPanel({ onClose }: { onClose: () => void }) {
   const [deleting,   setDeleting]   = useState<string | null>(null)
   const [deleteError,setDeleteError]= useState<Record<string, string>>({})
 
-  const resetForm = () => { setName(''); setDepartment(''); setEmail(''); setPhone(''); setEditId(null); setFormError('') }
+  const resetForm = () => { setName(''); setEmployeeNo(''); setDepartment(''); setEmail(''); setPhone(''); setEditId(null); setFormError('') }
 
   const startEdit = (p: any) => {
-    setEditId(p.id); setName(p.name); setDepartment(p.department ?? ''); setEmail(p.email ?? ''); setPhone(p.phone ?? ''); setFormError('')
+    setEditId(p.id); setName(p.name); setEmployeeNo(p.employee_no ?? ''); setDepartment(p.department ?? ''); setEmail(p.email ?? ''); setPhone(p.phone ?? ''); setFormError('')
   }
 
   const save = async () => {
@@ -97,7 +98,7 @@ function ManagePersonsPanel({ onClose }: { onClose: () => void }) {
     const res    = await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.trim(), department: department.trim() || undefined, email: email.trim() || undefined, phone: phone.trim() || undefined }),
+      body: JSON.stringify({ name: name.trim(), employee_no: employeeNo.trim() || undefined, department: department.trim() || undefined, email: email.trim() || undefined, phone: phone.trim() || undefined }),
     })
     const json = await res.json()
     setSaving(false)
@@ -138,6 +139,10 @@ function ManagePersonsPanel({ onClose }: { onClose: () => void }) {
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-slate-600 mb-1">Full Name <span className="text-red-500">*</span></label>
                 <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Juan dela Cruz" autoFocus />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Employee No.</label>
+                <Input value={employeeNo} onChange={e => setEmployeeNo(e.target.value)} placeholder="e.g. EMP-1024" className="font-mono" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Department</label>
@@ -193,7 +198,10 @@ function ManagePersonsPanel({ onClose }: { onClose: () => void }) {
                       {p.name.slice(0, 2).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">{p.name}</p>
+                      <p className="text-sm font-medium text-slate-900 truncate">
+                        {p.name}
+                        {p.employee_no && <span className="ml-2 text-xs font-mono font-normal text-indigo-600 bg-indigo-50 rounded px-1.5 py-0.5">{p.employee_no}</span>}
+                      </p>
                       <p className="text-xs text-slate-400 truncate">
                         {[p.department, p.email, p.phone].filter(Boolean).join(' · ') || 'No details'}
                       </p>
@@ -1181,7 +1189,7 @@ function CheckoutDialog({ asset, onClose, onDone }: { asset: any; onClose: () =>
                 onChange={e => { setPersonId(e.target.value); const p = persons.find((x: any) => x.id === e.target.value); if (p) setHolder(p.name) }}
                 className="w-full mt-2 border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 <option value="">— or pick from people —</option>
-                {persons.map((p: any) => <option key={p.id} value={p.id}>{p.name}{p.department ? ` — ${p.department}` : ''}</option>)}
+                {persons.map((p: any) => <option key={p.id} value={p.id}>{p.name}{p.employee_no ? ` (${p.employee_no})` : ''}{p.department ? ` — ${p.department}` : ''}</option>)}
               </select>
             )}
           </div>
