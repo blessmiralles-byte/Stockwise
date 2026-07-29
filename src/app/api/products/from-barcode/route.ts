@@ -60,6 +60,18 @@ export async function POST(req: NextRequest) {
   const unitOfMeasure = String(body.unit_of_measure ?? '').trim() || 'pc'
   const reorderPoint  = Number.isFinite(Number(body.reorder_point)) ? Number(body.reorder_point) : 0
 
+  // Custom attributes (Color, Size, …). Keep only non-empty string pairs, merged
+  // over any brand we prefilled from the global catalog.
+  const suppliedAttrs: Record<string, string> = {}
+  if (body.attributes && typeof body.attributes === 'object') {
+    for (const [k, v] of Object.entries(body.attributes)) {
+      const key = String(k).trim()
+      const val = String(v ?? '').trim()
+      if (key && val) suppliedAttrs[key] = val
+    }
+  }
+  const attributes = { ...(external?.brand ? { Brand: external.brand } : {}), ...suppliedAttrs }
+
   const { data: created, error } = await supabase
     .from('products')
     .insert({
@@ -70,7 +82,7 @@ export async function POST(req: NextRequest) {
       unit_of_measure: unitOfMeasure,
       cost_method:     'average',
       reorder_point:   reorderPoint,
-      attributes:      external?.brand ? { Brand: external.brand } : {},
+      attributes,
       needs_review:    true,
       is_active:       true,
     })

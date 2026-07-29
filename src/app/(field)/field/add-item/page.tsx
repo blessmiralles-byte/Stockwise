@@ -4,19 +4,22 @@ import { useState } from 'react'
 import { BarcodeScanner } from '@/components/scanner/barcode-scanner'
 import {
   ScanBarcode, Keyboard, Loader2, CheckCircle2, AlertCircle,
-  ChevronLeft, PackagePlus,
+  ChevronLeft, PackagePlus, Tag, Plus, X,
 } from 'lucide-react'
 import Link from 'next/link'
 
 const UNITS = ['pcs', 'kg', 'g', 'lbs', 'oz', 'liters', 'ml', 'meters', 'ft', 'box', 'pack', 'roll', 'set', 'pair']
+const QUICK_ATTRS = ['Color', 'Size', 'Brand', 'Material', 'Weight', 'Grade']
 
 type BarcodeMode = 'scan' | 'manual'
+interface AttrRow { key: string; value: string }
 
 export default function FieldAddItemPage() {
   const [barcode, setBarcode]   = useState('')
   const [name, setName]         = useState('')
   const [unit, setUnit]         = useState('pcs')
   const [reorder, setReorder]   = useState('')
+  const [attrs, setAttrs]       = useState<AttrRow[]>([])
   const [mode, setMode]         = useState<BarcodeMode>('scan')
   const [checking, setChecking] = useState(false)
   const [dupWarn, setDupWarn]   = useState('')
@@ -44,10 +47,21 @@ export default function FieldAddItemPage() {
     finally { setChecking(false) }
   }
 
+  const addAttr    = (key = '') => setAttrs(a => [...a, { key, value: '' }])
+  const removeAttr = (i: number) => setAttrs(a => a.filter((_, idx) => idx !== i))
+  const updateAttr = (i: number, field: 'key' | 'value', val: string) =>
+    setAttrs(a => a.map((row, idx) => idx === i ? { ...row, [field]: val } : row))
+
   const save = async () => {
     if (!barcode.trim()) { setError('Scan or enter a barcode first'); return }
     if (!name.trim())    { setError('Enter an item name'); return }
     setSaving(true); setError('')
+
+    const attributes: Record<string, string> = {}
+    for (const { key, value } of attrs) {
+      if (key.trim() && value.trim()) attributes[key.trim()] = value.trim()
+    }
+
     try {
       const res = await fetch('/api/products/from-barcode', {
         method:  'POST',
@@ -57,6 +71,7 @@ export default function FieldAddItemPage() {
           name:            name.trim(),
           unit_of_measure: unit,
           reorder_point:   reorder ? Number(reorder) : 0,
+          attributes,
         }),
       })
       const j = await res.json()
@@ -69,7 +84,7 @@ export default function FieldAddItemPage() {
   }
 
   const reset = () => {
-    setBarcode(''); setName(''); setUnit('pcs'); setReorder('')
+    setBarcode(''); setName(''); setUnit('pcs'); setReorder(''); setAttrs([])
     setMode('scan'); setChecking(false); setDupWarn(''); setError(''); setDone(null); setSaving(false)
   }
 
@@ -212,6 +227,65 @@ export default function FieldAddItemPage() {
               className="w-full h-14 px-4 rounded-2xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
             />
           </div>
+        </div>
+
+        {/* Attributes (color, size, …) */}
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+            Details <span className="text-gray-300 font-normal normal-case">(optional)</span>
+          </p>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {QUICK_ATTRS.map(a => {
+              const used = attrs.some(r => r.key.toLowerCase() === a.toLowerCase())
+              return (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => addAttr(a)}
+                  className={`flex items-center gap-1 text-sm px-3 py-1.5 rounded-full border transition-colors ${
+                    used ? 'border-indigo-300 bg-indigo-50 text-indigo-600'
+                         : 'border-gray-200 bg-white text-gray-600 active:bg-gray-50'}`}
+                >
+                  <Tag className="w-3.5 h-3.5" /> {a}
+                </button>
+              )
+            })}
+            <button
+              type="button"
+              onClick={() => addAttr('')}
+              className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-full border border-dashed border-gray-300 text-gray-400 active:bg-gray-50"
+            >
+              <Plus className="w-3.5 h-3.5" /> Custom
+            </button>
+          </div>
+
+          {attrs.length > 0 && (
+            <div className="space-y-2">
+              {attrs.map((row, i) => (
+                <div key={i} className="flex gap-2 items-center">
+                  <input
+                    value={row.key}
+                    onChange={e => updateAttr(i, 'key', e.target.value)}
+                    placeholder="e.g. Color"
+                    className="flex-1 h-12 px-3 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <input
+                    value={row.value}
+                    onChange={e => updateAttr(i, 'value', e.target.value)}
+                    placeholder="e.g. Red"
+                    className="flex-1 h-12 px-3 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeAttr(i)}
+                    className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400 active:bg-gray-200 flex-shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {error && (
