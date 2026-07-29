@@ -157,6 +157,67 @@ union all select 'signup trigger is org-aware',
 Anything `false` → run the matching script(s), then finish with
 `notify pgrst, 'reload schema';`
 
+## Full `org_id` drift sweep (every tenant table)
+
+`migrate-multitenancy.sql` was applied unevenly — `inventory_transactions`
+and `accountable_persons` both turned up missing pieces mid-feature. This
+checks the `org_id` column on **all 26 tenant tables** at once, so you can clear
+the drift in a single pass instead of hitting it one feature at a time.
+
+```sql
+with expected(tbl) as (values
+  ('accountable_persons'),('accounting_periods'),('asset_checkouts'),
+  ('asset_depreciation_log'),('asset_movements'),('audit_log'),
+  ('categories'),('cost_centers'),('fixed_assets'),('inventory_balances'),
+  ('inventory_batches'),('inventory_transactions'),('job_codes'),
+  ('locations'),('maintenance_schedules'),('notifications'),('products'),
+  ('purchase_order_lines'),('purchase_orders'),('requisition_items'),
+  ('requisitions'),('stock_count_attendees'),('stock_count_lines'),
+  ('stock_counts'),('suppliers'),('user_profiles')
+)
+select
+  e.tbl                                   as table_name,
+  to_regclass('public.' || e.tbl) is not null as table_exists,
+  exists (
+    select 1 from information_schema.columns c
+    where c.table_schema = 'public'
+      and c.table_name   = e.tbl
+      and c.column_name  = 'org_id'
+  )                                       as has_org_id
+from expected e
+order by has_org_id, table_exists, e.tbl;   -- problems float to the top
+```
+
+- `has_org_id = false` (but `table_exists = true`) → the table is missing
+  `org_id`. That's the drift.
+- `table_exists = false` → an entire table's migration never ran.
+
+### Fixing it
+
+**Cleanest:** re-run `migrate-multitenancy.sql` — it's idempotent, adds `org_id`
+to every tenant table (`ADD COLUMN IF NOT EXISTS`), and back-fills it from the
+linked product where possible. Then re-run `fix-signup-trigger.sql` **last**
+(multitenancy resets the signup trigger, and fix-signup-trigger restores the
+org-aware version).
+
+**Or patch a single table** — add the column, then back-fill and reload:
+
+```sql
+alter table public.<table>
+  add column if not exists org_id uuid references public.organizations(id) on delete cascade;
+
+-- back-fill from the linked product when the table has product_id
+-- (skip this line for tables without one, e.g. audit_log / notifications):
+update public.<table> t set org_id = p.org_id
+  from public.products p
+ where t.product_id = p.id and t.org_id is null;
+
+notify pgrst, 'reload schema';
+```
+
+> Rows left with a `NULL org_id` won't appear in the app (every query filters by
+> org), so back-filling matters for any table that already holds data.
+
 ## Targeted patch for the column that bit us
 
 If only `inventory_transactions` is behind, this is the minimal safe fix:
