@@ -6,7 +6,7 @@ import { LocationSelect } from '@/components/ui/location-select'
 import {
   ScanBarcode, Search, X, Loader2, CheckCircle2,
   AlertCircle, Minus, Plus, Keyboard, ChevronLeft,
-  Save, FileCheck,
+  Save, FileCheck, Tag, PackagePlus,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -19,6 +19,10 @@ const LOG_TYPES = [
 ]
 
 type Condition = 'good' | 'damaged' | 'missing'
+
+const UNITS = ['pcs', 'kg', 'g', 'lbs', 'oz', 'liters', 'ml', 'meters', 'ft', 'box', 'pack', 'roll', 'set', 'pair']
+const QUICK_ATTRS = ['Color', 'Size', 'Brand', 'Material', 'Weight', 'Grade']
+interface AttrRow { key: string; value: string }
 
 // ── Product search inline ─────────────────────────────────────────────────────
 function ItemSearch({ onSelect }: { onSelect: (p: any) => void }) {
@@ -108,7 +112,7 @@ function QtyStepper({ value, onChange, max }: { value: number; onChange: (n: num
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
-type Step      = 'type' | 'item' | 'details' | 'done'
+type Step      = 'type' | 'item' | 'newitem' | 'details' | 'done'
 type InputMode = 'scan' | 'search'
 type SaveMode  = 'draft' | 'post'
 
@@ -129,6 +133,15 @@ export default function FieldLogPage() {
   const [errorMsg, setErrorMsg]   = useState('')
   const [scanError, setScanError] = useState('')
   const [scanLookup, setScanLookup] = useState(false)
+
+  // New-item form (shown when a scanned barcode isn't in the catalog yet)
+  const [newBarcode, setNewBarcode] = useState('')
+  const [newName, setNewName]       = useState('')
+  const [newUnit, setNewUnit]       = useState('pcs')
+  const [newReorder, setNewReorder] = useState('')
+  const [newAttrs, setNewAttrs]     = useState<AttrRow[]>([])
+  const [creatingItem, setCreatingItem] = useState(false)
+  const [newItemError, setNewItemError] = useState('')
 
   // Purchase-specific
   const [pendingPOs, setPendingPOs]     = useState<any[]>([])
@@ -169,24 +182,15 @@ export default function FieldLogPage() {
         return
       }
 
-      // Not in the catalog. When receiving, auto-create the item (prefilled from
-      // the global barcode catalog when known) so the dock isn't blocked — it's
-      // flagged for a manager to review afterwards. Other log types still error.
+      // Not in the catalog. When receiving, don't silently create a placeholder —
+      // ask the worker (who's holding the item) to enter its details first, then
+      // create it and continue the receipt. Other log types still error.
       if (isPurchase) {
-        const created = await fetch('/api/products/from-barcode', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ barcode }),
-        })
-        const cj = await created.json()
-        if (created.ok && cj.data) {
-          setProduct(cj.data)
-          setScanError(cj.created
-            ? `New item added from barcode${cj.source === 'global' ? ' (matched online)' : ''} — flagged for review.`
-            : '')
-          setStep('details')
-          return
-        }
+        setNewBarcode(barcode)
+        setNewName(''); setNewUnit('pcs'); setNewReorder(''); setNewAttrs([])
+        setNewItemError('')
+        setStep('newitem')
+        return
       }
 
       setScanError(`Barcode "${barcode}" not found.`)
@@ -196,6 +200,47 @@ export default function FieldLogPage() {
       setScanLookup(false)
     }
   }, [isPurchase])
+
+  // ── New-item form helpers ─────────────────────────────────────────────────
+  const addNewAttr    = (key = '') => setNewAttrs(a => [...a, { key, value: '' }])
+  const removeNewAttr = (i: number) => setNewAttrs(a => a.filter((_, idx) => idx !== i))
+  const updateNewAttr = (i: number, field: 'key' | 'value', val: string) =>
+    setNewAttrs(a => a.map((row, idx) => idx === i ? { ...row, [field]: val } : row))
+
+  // Create the scanned-but-unknown item from the details entered, then continue
+  // to the receipt step with it selected.
+  const createNewItem = async () => {
+    if (!newName.trim()) { setNewItemError('Enter an item name'); return }
+    setCreatingItem(true); setNewItemError('')
+
+    const attributes: Record<string, string> = {}
+    for (const { key, value } of newAttrs) {
+      if (key.trim() && value.trim()) attributes[key.trim()] = value.trim()
+    }
+
+    try {
+      const res = await fetch('/api/products/from-barcode', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          barcode:         newBarcode,
+          name:            newName.trim(),
+          unit_of_measure: newUnit,
+          reorder_point:   newReorder ? Number(newReorder) : 0,
+          attributes,
+        }),
+      })
+      const j = await res.json()
+      if (!res.ok) { setNewItemError(j.error ?? 'Failed to add item'); setCreatingItem(false); return }
+      setProduct(j.data)
+      setScanError('New item added — flagged for a manager to review.')
+      setStep('details')
+    } catch {
+      setNewItemError('Network error — please try again.')
+    } finally {
+      setCreatingItem(false)
+    }
+  }
 
   function selectPOLine(po: any, line: any) {
     setSelectedPO(po)
@@ -298,6 +343,7 @@ export default function FieldLogPage() {
     setSelectedPO(null); setSelectedLine(null); setSupplierId('')
     setReceivedBy(''); setCondition('good'); setConditionNotes('')
     setDoneStatus('')
+    setNewBarcode(''); setNewName(''); setNewUnit('pcs'); setNewReorder(''); setNewAttrs([]); setNewItemError('')
   }
 
   // ── Success screen ────────────────────────────────────────────────────────
@@ -412,7 +458,7 @@ export default function FieldLogPage() {
         )}
 
         {/* ── Step 2: Item selection (non-purchase or no PO selected) ── */}
-        {step !== 'type' && (!isPurchase || !selectedLine) && (
+        {step !== 'type' && step !== 'newitem' && (!isPurchase || !selectedLine) && (
           <div>
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
@@ -472,6 +518,138 @@ export default function FieldLogPage() {
             ) : (
               <ItemSearch onSelect={p => { setProduct(p); setStep('details') }} />
             )}
+          </div>
+        )}
+
+        {/* ── New item step: scanned barcode not in the catalog yet ── */}
+        {step === 'newitem' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>This barcode isn&apos;t in your inventory yet — add its details to receive it.</span>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Barcode</p>
+              <div className="h-12 px-4 flex items-center rounded-2xl border border-gray-200 bg-gray-50 text-base font-mono text-gray-600">
+                {newBarcode}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                Item Name <span className="text-red-400">*</span>
+              </p>
+              <input
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+                placeholder="e.g. WD-40 Spray 350ml"
+                autoFocus
+                className="w-full h-14 px-4 rounded-2xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Unit</p>
+                <select
+                  value={newUnit}
+                  onChange={e => setNewUnit(e.target.value)}
+                  className="w-full h-14 px-4 rounded-2xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                >
+                  {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                  Reorder at <span className="text-gray-300 font-normal normal-case">(opt.)</span>
+                </p>
+                <input
+                  type="number" inputMode="numeric" min="0"
+                  value={newReorder}
+                  onChange={e => setNewReorder(e.target.value)}
+                  placeholder="0"
+                  className="w-full h-14 px-4 rounded-2xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                />
+              </div>
+            </div>
+
+            {/* Attributes */}
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                Details <span className="text-gray-300 font-normal normal-case">(optional)</span>
+              </p>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {QUICK_ATTRS.map(a => {
+                  const used = newAttrs.some(r => r.key.toLowerCase() === a.toLowerCase())
+                  return (
+                    <button
+                      key={a} type="button" onClick={() => addNewAttr(a)}
+                      className={`flex items-center gap-1 text-sm px-3 py-1.5 rounded-full border transition-colors ${
+                        used ? 'border-indigo-300 bg-indigo-50 text-indigo-600'
+                             : 'border-gray-200 bg-white text-gray-600 active:bg-gray-50'}`}
+                    >
+                      <Tag className="w-3.5 h-3.5" /> {a}
+                    </button>
+                  )
+                })}
+                <button
+                  type="button" onClick={() => addNewAttr('')}
+                  className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-full border border-dashed border-gray-300 text-gray-400 active:bg-gray-50"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Custom
+                </button>
+              </div>
+              {newAttrs.length > 0 && (
+                <div className="space-y-2">
+                  {newAttrs.map((row, i) => (
+                    <div key={i} className="flex gap-2 items-center">
+                      <input
+                        value={row.key} onChange={e => updateNewAttr(i, 'key', e.target.value)}
+                        placeholder="e.g. Color"
+                        className="flex-1 h-12 px-3 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                      <input
+                        value={row.value} onChange={e => updateNewAttr(i, 'value', e.target.value)}
+                        placeholder="e.g. Red"
+                        className="flex-1 h-12 px-3 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                      <button
+                        type="button" onClick={() => removeNewAttr(i)}
+                        className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400 active:bg-gray-200 flex-shrink-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {newItemError && (
+              <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" /> {newItemError}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={createNewItem}
+              disabled={creatingItem}
+              className="w-full h-16 rounded-2xl bg-green-600 text-white font-bold text-lg active:bg-green-700 disabled:opacity-60 transition-colors flex items-center justify-center gap-3 shadow-md shadow-green-200"
+            >
+              {creatingItem
+                ? <><Loader2 className="w-5 h-5 animate-spin" /> Adding…</>
+                : <><PackagePlus className="w-5 h-5" /> Add item & continue</>
+              }
+            </button>
+            <button
+              type="button"
+              onClick={() => { setStep('item'); setNewBarcode(''); setNewItemError('') }}
+              className="w-full text-sm text-gray-400 active:text-gray-600"
+            >
+              ← Scan a different item
+            </button>
           </div>
         )}
 
