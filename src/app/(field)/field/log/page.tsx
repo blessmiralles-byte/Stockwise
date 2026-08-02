@@ -25,7 +25,7 @@ const QUICK_ATTRS = ['Color', 'Size', 'Brand', 'Material', 'Weight', 'Grade']
 interface AttrRow { key: string; value: string }
 
 // ── Product search inline ─────────────────────────────────────────────────────
-function ItemSearch({ onSelect }: { onSelect: (p: any) => void }) {
+function ItemSearch({ onSelect, onAddNew }: { onSelect: (p: any) => void; onAddNew?: (name: string) => void }) {
   const [q, setQ]             = useState('')
   const [results, setResults] = useState<any[]>([])
   const [busy, setBusy]       = useState(false)
@@ -72,8 +72,17 @@ function ItemSearch({ onSelect }: { onSelect: (p: any) => void }) {
         </div>
       )}
       {open && results.length === 0 && !busy && (
-        <div className="absolute z-20 left-0 right-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-xl px-4 py-4 text-sm text-gray-400">
-          No items found for "{q}"
+        <div className="absolute z-20 left-0 right-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden">
+          <p className="px-4 py-3 text-sm text-gray-400">No items found for &ldquo;{q}&rdquo;</p>
+          {onAddNew && (
+            <button
+              type="button"
+              onClick={() => { onAddNew(q); setQ(''); setOpen(false) }}
+              className="w-full flex items-center gap-2 px-4 py-3.5 border-t border-gray-100 text-left text-indigo-600 font-medium hover:bg-indigo-50 active:bg-indigo-100"
+            >
+              <Plus className="w-4 h-4 flex-shrink-0" /> Add &ldquo;{q}&rdquo; as a new item
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -516,7 +525,13 @@ export default function FieldLogPage() {
                 )}
               </div>
             ) : (
-              <ItemSearch onSelect={p => { setProduct(p); setStep('details') }} />
+              <ItemSearch
+                onSelect={p => { setProduct(p); setStep('details') }}
+                onAddNew={isPurchase ? (name => {
+                  setNewBarcode(''); setNewName(name); setNewUnit('pcs'); setNewReorder('')
+                  setNewAttrs([]); setNewItemError(''); setStep('newitem')
+                }) : undefined}
+              />
             )}
           </div>
         )}
@@ -530,10 +545,15 @@ export default function FieldLogPage() {
             </div>
 
             <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Barcode</p>
-              <div className="h-12 px-4 flex items-center rounded-2xl border border-gray-200 bg-gray-50 text-base font-mono text-gray-600">
-                {newBarcode}
-              </div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                Barcode <span className="text-gray-300 font-normal normal-case">(optional)</span>
+              </p>
+              <input
+                value={newBarcode}
+                onChange={e => setNewBarcode(e.target.value)}
+                placeholder="Scan or type a barcode"
+                className="w-full h-14 px-4 rounded-2xl border border-gray-200 bg-white text-base font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+              />
             </div>
 
             <div>
@@ -648,7 +668,7 @@ export default function FieldLogPage() {
               onClick={() => { setStep('item'); setNewBarcode(''); setNewItemError('') }}
               className="w-full text-sm text-gray-400 active:text-gray-600"
             >
-              ← Scan a different item
+              ← Back to search / scan
             </button>
           </div>
         )}

@@ -25,29 +25,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const barcode = String(body.barcode ?? '').trim()
-  if (!barcode) {
-    return NextResponse.json({ error: 'barcode is required' }, { status: 400 })
+  // Barcode is optional: the field "Add Item" / receive-by-search flows can
+  // create an item by name alone. Require at least one of barcode or name.
+  const barcode      = String(body.barcode ?? '').trim()
+  const suppliedName = String(body.name ?? '').trim()
+  if (!barcode && !suppliedName) {
+    return NextResponse.json({ error: 'A barcode or an item name is required' }, { status: 400 })
   }
 
   const supabase = createServiceClient()
 
-  // 1. Already in the catalog?
-  const { data: existing } = await supabase
-    .from('products')
-    .select('id, sku, barcode, name, unit_of_measure, cost_method, reorder_point, needs_review, category:categories(name)')
-    .eq('org_id', auth.orgId)
-    .eq('barcode', barcode)
-    .eq('is_active', true)
-    .maybeSingle()
+  // 1. Already in the catalog? (only meaningful when we have a barcode to match)
+  if (barcode) {
+    const { data: existing } = await supabase
+      .from('products')
+      .select('id, sku, barcode, name, unit_of_measure, cost_method, reorder_point, needs_review, category:categories(name)')
+      .eq('org_id', auth.orgId)
+      .eq('barcode', barcode)
+      .eq('is_active', true)
+      .maybeSingle()
 
-  if (existing) {
-    return NextResponse.json({ data: existing, created: false, source: 'existing' })
+    if (existing) {
+      return NextResponse.json({ data: existing, created: false, source: 'existing' })
+    }
   }
 
-  // 2. Prefill from the global barcode catalog (name; category is text-only here)
-  const external = await lookupBarcode(barcode)
-  const suppliedName = String(body.name ?? '').trim()
+  // 2. Prefill from the global barcode catalog (only when we have a barcode)
+  const external = barcode ? await lookupBarcode(barcode) : null
   const name = suppliedName || external?.name || `Unknown item ${barcode}`
   const source = external?.found ? 'global' : 'manual'
 
@@ -77,7 +81,7 @@ export async function POST(req: NextRequest) {
     .insert({
       org_id:          auth.orgId,
       sku,
-      barcode,
+      barcode:         barcode || null,
       name,
       unit_of_measure: unitOfMeasure,
       cost_method:     'average',
