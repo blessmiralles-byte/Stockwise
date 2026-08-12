@@ -19,6 +19,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [needsConfirmation, setNeedsConfirmation] = useState(false)
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
 
   // Capture plan intent from the landing pricing CTAs (/register?plan=pro).
   // We can't act on it during a no-card trial signup, so we stash it for the
@@ -38,6 +39,11 @@ export default function RegisterPage() {
 
     if (password.length < 8) {
       setError('Password must be at least 8 characters.')
+      return
+    }
+
+    if (!agreedToTerms) {
+      setError('Please agree to the Terms of Service and Privacy Policy to continue.')
       return
     }
 
@@ -62,6 +68,9 @@ export default function RegisterPage() {
       options: {
         data: {
           full_name: fullName.trim().slice(0, 100),
+          // Record acceptance of the legal terms for an auditable consent trail
+          terms_accepted_at: new Date().toISOString(),
+          terms_version:     'v1',
           // First-touch channel data — stamped onto the organization at onboarding
           ...(attribution ? { attribution } : {}),
         },
@@ -168,7 +177,23 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <Button type="submit" className="w-full gap-2" disabled={loading}>
+          <label className="flex items-start gap-2.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={agreedToTerms}
+              onChange={e => setAgreedToTerms(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 flex-shrink-0"
+            />
+            <span className="text-xs text-slate-500 leading-relaxed">
+              I agree to the{' '}
+              <Link href="/terms" target="_blank" className="text-indigo-600 font-medium hover:underline">Terms of Service</Link>
+              {' '}and{' '}
+              <Link href="/privacy" target="_blank" className="text-indigo-600 font-medium hover:underline">Privacy Policy</Link>,
+              and I consent to the processing of my data as described.
+            </span>
+          </label>
+
+          <Button type="submit" className="w-full gap-2" disabled={loading || !agreedToTerms}>
             <UserPlus className="w-4 h-4" />
             {loading ? 'Creating account…' : 'Create account'}
           </Button>
@@ -178,13 +203,6 @@ export default function RegisterPage() {
             <Link href="/login" className="text-indigo-600 font-medium hover:underline">
               Sign in
             </Link>
-          </p>
-
-          <p className="text-center text-xs text-slate-400">
-            By creating an account you agree to our{' '}
-            <Link href="/terms"   className="hover:underline text-slate-500">Terms of Service</Link>
-            {' '}and{' '}
-            <Link href="/privacy" className="hover:underline text-slate-500">Privacy Policy</Link>
           </p>
         </form>
       </CardContent>
