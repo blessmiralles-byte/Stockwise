@@ -10,8 +10,9 @@ import { Badge } from '@/components/ui/badge'
 import { useApi } from '@/lib/use-api'
 import { Settings, Bell, Shield, Key, Send, CheckCircle2, AlertCircle, Loader2,
   ToggleLeft, ToggleRight, Briefcase, CalendarRange, Plus, X, Lock, Unlock,
-  UserPlus, Building2, CreditCard, Zap, ExternalLink, Star } from 'lucide-react'
+  UserPlus, Building2, CreditCard, Zap, ExternalLink, Star, Trash2 } from 'lucide-react'
 import { PLAN_CONFIG, type PlanKey } from '@/lib/plan-config'
+import { createClient } from '@/lib/supabase/client'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Role = 'owner' | 'procurement' | 'operations' | 'receiver' | 'finance' | 'viewer'
@@ -1122,9 +1123,82 @@ function SettingsInner() {
           )}
         </Section>
 
+        {/* Danger zone — delete account */}
+        <DeleteAccountSection role={profile?.role} />
+
         </div>}  {/* end general tab */}
 
       </div>
+    </div>
+  )
+}
+
+// ── Danger zone: delete account (Google Play data-deletion requirement) ────────
+function DeleteAccountSection({ role }: { role?: string }) {
+  const isOwner = role === 'owner' || role === 'admin'
+  const [open, setOpen] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState('')
+
+  const canDelete = isOwner ? confirmText.trim().toUpperCase() === 'DELETE' : true
+
+  const doDelete = async () => {
+    setDeleting(true); setError('')
+    try {
+      const res = await fetch('/api/account', { method: 'DELETE' })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        setError(j.error ?? 'Failed to delete account'); setDeleting(false); return
+      }
+      await createClient().auth.signOut().catch(() => {})
+      window.location.href = '/'
+    } catch {
+      setError('Network error — please try again.'); setDeleting(false)
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-red-200 bg-red-50/40 p-5">
+      <div className="flex items-center gap-2 mb-1">
+        <Trash2 className="w-5 h-5 text-red-500" />
+        <h3 className="text-base font-semibold text-red-700">Delete account</h3>
+      </div>
+      <p className="text-sm text-slate-600 mb-4">
+        {isOwner
+          ? 'Permanently delete your organization and all its data — inventory, assets, suppliers, purchase orders, reports, and every team member’s access. This cannot be undone.'
+          : 'Permanently delete your own login. Your organization’s data is not affected. This cannot be undone.'}
+      </p>
+
+      {!open ? (
+        <Button
+          variant="outline" size="sm" onClick={() => setOpen(true)}
+          className="border-red-300 text-red-600 hover:bg-red-100"
+        >
+          <Trash2 className="w-4 h-4 mr-1.5" /> Delete account
+        </Button>
+      ) : (
+        <div className="space-y-3">
+          {isOwner && (
+            <div>
+              <label className="text-xs font-medium text-slate-600 block mb-1">
+                Type <span className="font-mono font-bold">DELETE</span> to confirm
+              </label>
+              <Input value={confirmText} onChange={e => setConfirmText(e.target.value)} placeholder="DELETE" className="max-w-xs" />
+            </div>
+          )}
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex gap-2">
+            <Button
+              size="sm" onClick={doDelete} disabled={!canDelete || deleting}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {deleting ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" />Deleting…</> : 'Permanently delete'}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => { setOpen(false); setConfirmText(''); setError('') }}>Cancel</Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
