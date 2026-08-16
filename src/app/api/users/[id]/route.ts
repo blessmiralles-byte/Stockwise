@@ -21,10 +21,32 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'You cannot deactivate your own account' }, { status: 400 })
   }
 
-  const allowed = ['role', 'is_active', 'full_name']
+  const allowed = ['role', 'is_active', 'full_name', 'reports_to', 'requisition_approval_limit', 'po_approval_limit']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]
+  }
+
+  // A member can't report to themselves; blank clears the reporting line.
+  if ('reports_to' in updates) {
+    if (!updates.reports_to) updates.reports_to = null
+    else if (updates.reports_to === id) {
+      return NextResponse.json({ error: 'A member cannot report to themselves' }, { status: 400 })
+    }
+  }
+  // Approval limits: non-negative number, or null to clear (no authority).
+  for (const key of ['requisition_approval_limit', 'po_approval_limit'] as const) {
+    if (key in updates) {
+      if (updates[key] === null || updates[key] === '' || updates[key] === undefined) {
+        updates[key] = null
+      } else {
+        const n = Number(updates[key])
+        if (!Number.isFinite(n) || n < 0) {
+          return NextResponse.json({ error: 'Approval limits must be a non-negative amount' }, { status: 400 })
+        }
+        updates[key] = n
+      }
+    }
   }
 
   if ('role' in updates) {

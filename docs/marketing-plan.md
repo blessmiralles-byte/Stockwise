@@ -1,6 +1,7 @@
 # Stocked — Solo-Operator Marketing Plan to 100 Customers
 
 *Written July 2026. One operator (founder), ~15–20 hrs/week on go-to-market alongside product work.*
+*Part 2 (August 2026, below) extends this plan to the real goal: $20,000 MRR.*
 
 ---
 
@@ -150,3 +151,96 @@ Keep outreach running at half intensity; add assets that generate trials while y
 - **Paid ads before month 7** — you can't out-spend incumbents; you can out-help them.
 - **Lifetime deals (AppSumo etc.)** — fast users, terrible revenue, support burden that kills a solo operator. Revisit only if you want testers, not customers.
 - **A second ICP before customer 50** — the temptation will be constant (clinics! restaurants! warehouses!). The suite vision (CrewSync, JobLedger) makes construction/field-service the strategic beachhead: Stocked's job-costing feed is the moat there.
+
+---
+---
+
+# PART 2 — From 100 Customers to $20,000 MRR
+
+*Written August 2026. Same operator, same constraint: one person, low budget. Part 1 (above) is unchanged and remains the playbook for months 1–12. This part is the honest math and the extra machinery needed to go from ~$6.4k MRR to $20k.*
+
+## 9. Step zero — you cannot earn $1 yet
+
+Before any marketing: **Lemon Squeezy is still in test mode.** The blocking checklist (from the go-live notes):
+
+1. Activate the LS store for live payouts (KYC).
+2. Fix product config: Pro shows $99.99 (should be $99), and LS variants carry their own 14-day trial on top of the app's 14-day trial — strip it.
+3. Recreate products in LIVE mode; swap the 5 Vercel env vars to live values + live webhook secret; redeploy.
+4. One real, refundable checkout end-to-end.
+
+This is days of admin work, not weeks. Do it before spending a single hour on outreach — every trial started before billing works is a trial you may never collect on.
+
+## 10. The math (why $20k ≠ "the 100-customer plan but louder")
+
+| Blended ARPU | Customers needed for $20k MRR | Net adds/mo needed in year 2 |
+|---|---|---|
+| $64 (current 70/30 Starter/Pro mix) | **313** | ~18 |
+| $85 (better mix + Business tier + annual) | **235** | ~11 |
+| $95 (above + modest price increase for new signups) | **211** | ~9 |
+
+At 3% monthly churn, a 313-customer base loses ~9 customers/month — you'd need ~27 gross adds/month *forever* just to stand still, which at 35% trial conversion means ~77 trials/month. **That is not a solo-operator number.** At ~$90 ARPU the same goal needs ~40–45 trials/month, which is achievable once SEO + reviews + referrals compound.
+
+**Conclusion: ARPU is the plan. Every dollar of ARPU is worth ~3.3 customers you don't have to find, close, onboard, and retain.**
+
+**Honest timeline:** ~$6–7k MRR at month 12 (Part 1), **$20k around month 20–26**. Any solo plan promising $20k in year 1 with no ad budget is fiction.
+
+## 11. Lever 1 — Pricing & packaging (do in month 1; costs nothing)
+
+1. **Add a "Business" tier — $199/mo, 50 users.** Right now a 30-person contractor pays the same $99 as an 8-person shop. This tier already exists in your market (Sortly Premium is $164+). Even a 10% Business mix lifts blended ARPU ~$12. Keep "every plan has every feature; pay by team size" — the tier is pure seat count.
+2. **Annual billing, 2 months free** ($490/$990/$1,990). Lemon Squeezy supports annual variants natively. Annual buyers churn dramatically less and the upfront cash funds the month-9+ ad budget. Push annual at the end of a successful trial, not before.
+3. **Price-test new signups at 25 paying customers:** $59/$119/$229, grandfathering everyone existing (announce the grandfathering loudly — it's a loyalty story *and* an urgency lever: "lock in current pricing"). If trial→paid doesn't drop more than ~15% relative, keep the new prices; the math above says a ~20% price lift beats a 15% conversion dip.
+4. **Never discount monthly. Discount only annual prepay.** A solo operator's time is too expensive to haggle for $10.
+
+## 12. Lever 2 — Churn (the silent half of $20k)
+
+At 235 customers, the difference between 3% and 2% monthly churn is ~28 customers a year — roughly three months of sales effort.
+
+- **Activation is the churn fix:** a customer who runs a real stock count or receives a real PO in week 1 almost never cancels in month 2. Watch the activation metric weekly (already defined in §6); when it dips, fix onboarding before adding traffic.
+- **Call every cancellation** (LTV ≈ $2,100 — a 15-minute call is the best-paid work you'll do all week). Offer a downgrade or 2 months at 50% *only* if the reason is budget, not fit.
+- **Annual plans** (see above) mechanically cap churn.
+- **The JobLedger/CrewSync suite is a retention moat:** once material costs feed job costing, ripping Stocked out means losing job P&L. Mention the suite in onboarding even before the integrations are polished.
+
+## 13. Lever 3 — A funnel that runs without you
+
+Part 1's white-glove onboarding is correct for the first 100 — and physically impossible at 40+ trials/month. The transition (build during months 6–12, while volume is still low):
+
+1. **Automated 14-day trial email sequence** (Resend is already wired): day 0 welcome + 3-min video; day 1 "import your products" (CSV); day 3 "run your first count"; day 7 case study; day 11 "trial ends soon" + annual offer; day 14 convert-or-extend. This replicates ~70% of what the hand-holding does.
+2. **Guided setup** (already built — the 8-step `/setup?tab=start` guide) is the in-app half of the same machine. Instrument it: which step do trials abandon?
+3. **Segment the hand-holding:** personally onboard every Pro/Business trial (high ARPU, worth founder hours); let Starter trials ride the automated sequence, with a "book a 15-min setup call" link for those who raise a hand.
+4. **Public demo video library** (the YouTube channel from §5 *is* this) so prospects self-qualify before ever emailing you.
+
+## 14. Year-2 channel plan (months 12–24)
+
+Rule from §6 still governs: the tracking sheet decides, not vibes. Expected shape:
+
+| Channel | Year-2 role | Trials/mo by ~M18 | Cost |
+|---|---|---|---|
+| SEO (comparison + template pages, 40–60 published by M12) | Primary — compounds from year 1 | 12–18 | time only |
+| Directories + reviews (25+ Capterra/G2 reviews) | Steady inbound, high intent | 5–8 | free (Capterra PPC optional) |
+| Referral program (in-app, month free both sides) | Grows with the base — 200 customers who know other contractors | 4–8 | revenue share only |
+| Paid: Google Ads on high-intent terms + Capterra PPC | Throttle to hit the monthly trial target | 8–15 | $500–1,000/mo, capped at $300 CAC |
+| Bookkeeper/accountant partners (20% first-year rev share) | 2–3 productive partners = steady drip | 3–5 | revenue share only |
+| Founder outreach | **Retire as a volume channel**; keep only for Business-tier ($199+) prospects and suite (JobLedger/CrewSync) deals | 2–4 | time |
+
+Total: ~35–55 trials/mo by month 18 → at 30–35% conversion, ~12–17 gross adds/mo → net +9–11/mo against churn. That is the $20k trajectory.
+
+**Budget stays solo-sized:** infra ~$150/mo + tools ~$50 + ads $500–1,000 (only while CAC < $300 and payback < 4 months, funded by annual-prepay cash). Worst case total ~$1,200/mo against $10k+ MRR — never a cash risk.
+
+## 15. Milestones (kill/adjust checkpoints, not vanity dates)
+
+| When | State | If you're behind, the fix is… |
+|---|---|---|
+| M3 | 10 customers, ~$650 MRR, 2 case studies | message/ICP — keep iterating outreach script, don't add channels |
+| M6 | 35 customers, ~$2.4k MRR, ≥30% of trials inbound | double down on whichever inbound channel shows life |
+| M9 | ~60 customers, Business tier live, annual live, email sequence live | ARPU levers — this is when packaging must ship |
+| M12 | ~100 customers, ~$7k MRR (helped by ARPU lift) | churn/activation before traffic |
+| M15 | ~140 customers, ~$10.5k MRR, ads on and CAC-positive | if CAC > $300, pause ads, fix landing/onboarding |
+| M18 | ~185 customers, ~$14k MRR | referral program yield; raise prices again if conversion is strong |
+| M21–24 | **~230–250 customers, $20k MRR** at ~$85–90 ARPU | — |
+
+## 16. What Part 2 still refuses to do
+
+Everything in §8, plus:
+- **No hiring before ~$12k MRR.** First hire at that point is a part-time VA for onboarding/support (~$800–1,200/mo), which buys back the founder hours that sell Business tier.
+- **No second product push (CrewSync/JobLedger) as separate GTM motions** — they enter *this* funnel as expansion revenue for existing Stocked customers, not as new top-of-funnel.
+- **No enterprise sales motion.** Hand-negotiate inbound 50+ user deals when they appear; never prospect for them solo.

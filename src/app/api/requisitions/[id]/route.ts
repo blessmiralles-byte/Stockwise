@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
 import { logAudit } from '@/lib/audit'
 import { createNotification } from '@/lib/notify'
+import { sumLineValue, checkApprovalLimit } from '@/lib/approvals'
 
 const REQ_SELECT = `
   id, req_number, type, status, job_reference, job_code, notes, reject_reason, required_by,
@@ -92,6 +93,17 @@ export async function PATCH(
       }
       if (r.status !== 'pending') {
         return NextResponse.json({ error: 'Only pending requisitions can be approved' }, { status: 400 })
+      }
+
+      // Approval-limit enforcement: the approver's requisition limit must cover
+      // the requisition's value, or it must be escalated up the reporting line.
+      const reqTotal = sumLineValue(r.items as any[])
+      const limitError = await checkApprovalLimit(supabase, {
+        orgId: auth.orgId, approverId: auth.userId, approverRole: auth.role,
+        kind: 'requisition', amount: reqTotal,
+      })
+      if (limitError) {
+        return NextResponse.json({ error: limitError }, { status: 403 })
       }
 
       // checkout → checked_out immediately (no separate approval step needed)

@@ -28,7 +28,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { email, role = 'viewer', full_name } = body
+  const { email, role = 'viewer', full_name, reports_to, requisition_approval_limit, po_approval_limit } = body
+
+  // Normalize the delegation-of-authority fields (applied after the invite
+  // creates the profile row).
+  const reqLimit = requisition_approval_limit == null || requisition_approval_limit === ''
+    ? null : Number(requisition_approval_limit)
+  const poLimit  = po_approval_limit == null || po_approval_limit === ''
+    ? null : Number(po_approval_limit)
+  if ((reqLimit != null && (!Number.isFinite(reqLimit) || reqLimit < 0)) ||
+      (poLimit  != null && (!Number.isFinite(poLimit)  || poLimit  < 0))) {
+    return NextResponse.json({ error: 'Approval limits must be a non-negative amount' }, { status: 400 })
+  }
 
   if (!email?.trim()) {
     return NextResponse.json({ error: 'email is required' }, { status: 400 })
@@ -155,6 +166,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: inviteErr.message }, { status: 500 })
     }
     userId = inviteData.user?.id ?? null
+  }
+
+  // The invite already created the auth user (and the trigger created its
+  // profile), so we can stamp the reporting line + approval limits now.
+  if (userId && (reports_to || reqLimit != null || poLimit != null)) {
+    await supabase
+      .from('user_profiles')
+      .update({
+        reports_to:                 reports_to || null,
+        requisition_approval_limit: reqLimit,
+        po_approval_limit:          poLimit,
+      })
+      .eq('id', userId)
+      .eq('org_id', auth.orgId)
   }
 
   return NextResponse.json({

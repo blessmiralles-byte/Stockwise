@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireRole } from '@/lib/api-auth'
+import { sumLineValue, checkApprovalLimit } from '@/lib/approvals'
 
 // GET /api/purchase-orders/:id
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -54,6 +55,32 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const supabase = createServiceClient()
+
+  // Approval gate: issuing a PO (moving to 'approved' or 'sent') requires the
+  // actor's PO approval limit to cover its value — otherwise it must be
+  // escalated up the reporting line. A PO already 'approved' can be sent freely.
+  if (updates.status === 'approved' || updates.status === 'sent') {
+    const { data: po } = await supabase
+      .from('purchase_orders')
+      .select('status, lines:purchase_order_lines(quantity_ordered, unit_cost)')
+      .eq('id', id)
+      .eq('org_id', auth.orgId)
+      .single()
+
+    if (po && po.status !== 'approved') {
+      const total = sumLineValue(po.lines as any[], 'quantity_ordered', 'unit_cost')
+      const limitError = await checkApprovalLimit(supabase, {
+        orgId: auth.orgId, approverId: auth.userId, approverRole: auth.role,
+        kind: 'po', amount: total,
+      })
+      if (limitError) {
+        return NextResponse.json({ error: limitError }, { status: 403 })
+      }
+      updates.approved_by = auth.userId
+      updates.approved_at = new Date().toISOString()
+    }
+  }
+
   const { data, error } = await supabase
     .from('purchase_orders')
     .update(updates)

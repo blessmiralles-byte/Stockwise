@@ -10,7 +10,7 @@ export async function GET() {
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('user_profiles')
-    .select('id, full_name, email, role, is_active, created_at')
+    .select('id, full_name, email, role, is_active, reports_to, requisition_approval_limit, po_approval_limit, created_at')
     .eq('org_id', auth.orgId)
     .order('created_at', { ascending: true })
 

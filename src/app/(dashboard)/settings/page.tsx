@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense, Fragment } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -21,6 +21,15 @@ type Role = 'owner' | 'procurement' | 'operations' | 'receiver' | 'finance' | 'v
 type UserProfile = {
   id: string; full_name: string; email: string; role: Role
   is_active: boolean; created_at: string
+  reports_to?: string | null
+  requisition_approval_limit?: number | null
+  po_approval_limit?: number | null
+}
+
+// Compact money label for approval limits (e.g. 5000 → "$5,000", null → "—")
+function limitLabel(n?: number | null): string {
+  if (n == null) return '—'
+  return '$' + Number(n).toLocaleString()
 }
 
 // SOD role definitions — shown in the legend and role selector
@@ -66,13 +75,16 @@ const ROLE_CFG: Record<string, { label: string; variant: any; description: strin
 const SOD_ROLES: Role[] = ['owner', 'procurement', 'operations', 'receiver', 'finance', 'viewer']
 
 // ── Invite User form ──────────────────────────────────────────────────────────
-function InviteUserForm({ onSuccess }: { onSuccess: () => void }) {
-  const [open,     setOpen]     = useState(false)
-  const [email,    setEmail]    = useState('')
-  const [name,     setName]     = useState('')
-  const [role,     setRole]     = useState<Role>('viewer')
-  const [loading,  setLoading]  = useState(false)
-  const [result,   setResult]   = useState<{ ok: boolean; msg: string } | null>(null)
+function InviteUserForm({ onSuccess, members }: { onSuccess: () => void; members: UserProfile[] }) {
+  const [open,      setOpen]      = useState(false)
+  const [email,     setEmail]     = useState('')
+  const [name,      setName]      = useState('')
+  const [role,      setRole]      = useState<Role>('viewer')
+  const [reportsTo, setReportsTo] = useState('')
+  const [reqLimit,  setReqLimit]  = useState('')
+  const [poLimit,   setPoLimit]   = useState('')
+  const [loading,   setLoading]   = useState(false)
+  const [result,    setResult]    = useState<{ ok: boolean; msg: string } | null>(null)
 
   const send = async () => {
     if (!email.trim()) return
@@ -80,13 +92,18 @@ function InviteUserForm({ onSuccess }: { onSuccess: () => void }) {
     const res  = await fetch('/api/users/invite', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ email: email.trim(), role, full_name: name.trim() || undefined }),
+      body:    JSON.stringify({
+        email: email.trim(), role, full_name: name.trim() || undefined,
+        reports_to: reportsTo || undefined,
+        requisition_approval_limit: reqLimit === '' ? undefined : Number(reqLimit),
+        po_approval_limit:          poLimit  === '' ? undefined : Number(poLimit),
+      }),
     })
     const json = await res.json()
     setLoading(false)
     if (res.ok) {
       setResult({ ok: true, msg: json.message ?? `Invitation sent to ${email}` })
-      setEmail(''); setName(''); setRole('viewer')
+      setEmail(''); setName(''); setRole('viewer'); setReportsTo(''); setReqLimit(''); setPoLimit('')
       onSuccess()
     } else {
       setResult({ ok: false, msg: json.error ?? 'Failed to send invite' })
@@ -144,7 +161,33 @@ function InviteUserForm({ onSuccess }: { onSuccess: () => void }) {
             ))}
           </select>
         </div>
+        <div className="col-span-2">
+          <label className="text-xs font-medium text-slate-600 block mb-1">Reports to</label>
+          <select value={reportsTo} onChange={e => setReportsTo(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="">— No manager —</option>
+            {members.filter(m => m.is_active !== false).map(m => (
+              <option key={m.id} value={m.id}>{m.full_name || m.email}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-slate-600 block mb-1">Requisition limit ($)</label>
+          <input type="number" min="0" value={reqLimit} onChange={e => setReqLimit(e.target.value)}
+            placeholder="e.g. 5000"
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-slate-600 block mb-1">PO limit ($)</label>
+          <input type="number" min="0" value={poLimit} onChange={e => setPoLimit(e.target.value)}
+            placeholder="e.g. 10000"
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
       </div>
+      <p className="text-xs text-slate-400">
+        Approval limits are the maximum value this person can approve. Leave blank for no approval
+        authority (the owner always has unlimited authority).
+      </p>
 
       {result && (
         <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg border ${
@@ -171,11 +214,75 @@ function InviteUserForm({ onSuccess }: { onSuccess: () => void }) {
   )
 }
 
+// ── Per-member approvals editor (reporting line + limits) ──────────────────────
+function ApprovalsEditorRow({ user, members, onSaved, onCancel }: {
+  user: UserProfile
+  members: UserProfile[]
+  onSaved: () => void
+  onCancel: () => void
+}) {
+  const [reportsTo, setReportsTo] = useState(user.reports_to ?? '')
+  const [reqLimit,  setReqLimit]  = useState(user.requisition_approval_limit != null ? String(user.requisition_approval_limit) : '')
+  const [poLimit,   setPoLimit]   = useState(user.po_approval_limit != null ? String(user.po_approval_limit) : '')
+  const [saving,    setSaving]    = useState(false)
+
+  const save = async () => {
+    setSaving(true)
+    await fetch(`/api/users/${user.id}`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reports_to:                 reportsTo || null,
+        requisition_approval_limit: reqLimit === '' ? null : Number(reqLimit),
+        po_approval_limit:          poLimit  === '' ? null : Number(poLimit),
+      }),
+    })
+    setSaving(false)
+    onSaved()
+  }
+
+  return (
+    <tr className="bg-indigo-50/40 border-b border-slate-100">
+      <td colSpan={5} className="px-4 py-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl">
+          <div>
+            <label className="text-xs font-medium text-slate-600 block mb-1">Reports to</label>
+            <select value={reportsTo} onChange={e => setReportsTo(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="">— No manager —</option>
+              {members.map(m => <option key={m.id} value={m.id}>{m.full_name || m.email}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-600 block mb-1">Requisition limit ($)</label>
+            <input type="number" min="0" value={reqLimit} onChange={e => setReqLimit(e.target.value)} placeholder="No authority"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-600 block mb-1">PO limit ($)</label>
+            <input type="number" min="0" value={poLimit} onChange={e => setPoLimit(e.target.value)} placeholder="No authority"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+        <div className="flex gap-2 mt-3">
+          <Button size="sm" onClick={save} disabled={saving} className="gap-1.5">
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+            Save
+          </Button>
+          <Button size="sm" variant="outline" onClick={onCancel}>Cancel</Button>
+        </div>
+      </td>
+    </tr>
+  )
+}
+
 // ── User Management section ────────────────────────────────────────────────────
 function UserManagementSection({ currentUserId }: { currentUserId: string }) {
   const { data, loading, error, refetch } = useApi<{ data: UserProfile[] }>('/api/users')
   const users = data?.data ?? []
   const [saving, setSaving] = useState<string | null>(null)
+  const [editId, setEditId] = useState<string | null>(null)
+  const byId = Object.fromEntries(users.map(u => [u.id, u])) as Record<string, UserProfile>
 
   async function changeRole(userId: string, role: Role) {
     setSaving(userId)
@@ -202,7 +309,7 @@ function UserManagementSection({ currentUserId }: { currentUserId: string }) {
       {error && <p className="text-red-500 text-sm">{error}</p>}
 
       {/* Invite */}
-      <InviteUserForm onSuccess={refetch} />
+      <InviteUserForm onSuccess={refetch} members={users} />
 
       {/* SOD notice */}
       <div className="bg-amber-50 border border-amber-100 rounded-lg px-4 py-3 text-xs text-amber-800 space-y-1">
@@ -221,6 +328,7 @@ function UserManagementSection({ currentUserId }: { currentUserId: string }) {
                   <tr>
                     <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase">User</th>
                     <th className="text-center px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Role</th>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Approvals</th>
                     <th className="text-center px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Status</th>
                     <th className="w-8"></th>
                   </tr>
@@ -231,7 +339,8 @@ function UserManagementSection({ currentUserId }: { currentUserId: string }) {
                     const isBusy = saving === u.id
                     const rb = ROLE_CFG[u.role] ?? ROLE_CFG.viewer
                     return (
-                      <tr key={u.id} className={`border-b border-slate-50 ${!u.is_active ? 'opacity-50' : ''}`}>
+                      <Fragment key={u.id}>
+                      <tr className={`border-b border-slate-50 ${!u.is_active ? 'opacity-50' : ''}`}>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-semibold text-xs flex-shrink-0">
@@ -262,6 +371,22 @@ function UserManagementSection({ currentUserId }: { currentUserId: string }) {
                             </select>
                           )}
                         </td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => setEditId(editId === u.id ? null : u.id)}
+                            className="text-left group"
+                          >
+                            <p className="text-xs text-slate-600">
+                              Req {limitLabel(u.requisition_approval_limit)} · PO {limitLabel(u.po_approval_limit)}
+                            </p>
+                            <p className="text-[11px] text-slate-400">
+                              {u.reports_to && byId[u.reports_to]
+                                ? `Reports to ${byId[u.reports_to].full_name || byId[u.reports_to].email}`
+                                : 'No manager'}
+                              <span className="ml-1.5 text-indigo-500 group-hover:underline">{editId === u.id ? 'close' : 'edit'}</span>
+                            </p>
+                          </button>
+                        </td>
                         <td className="px-4 py-3 text-center">
                           <button
                             onClick={() => !isSelf && toggleActive(u)}
@@ -281,6 +406,15 @@ function UserManagementSection({ currentUserId }: { currentUserId: string }) {
                           {isBusy && <div className="w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin inline-block" />}
                         </td>
                       </tr>
+                      {editId === u.id && (
+                        <ApprovalsEditorRow
+                          user={u}
+                          members={users.filter(m => m.id !== u.id && m.is_active !== false)}
+                          onSaved={() => { setEditId(null); refetch() }}
+                          onCancel={() => setEditId(null)}
+                        />
+                      )}
+                      </Fragment>
                     )
                   })}
                 </tbody>
