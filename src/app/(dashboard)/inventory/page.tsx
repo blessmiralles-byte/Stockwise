@@ -10,12 +10,13 @@ import { TableSkeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/lib/use-api'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import {
-  Search, Plus, ScanBarcode, MoreVertical, AlertTriangle,
+  Search, Plus, ScanBarcode, ArrowLeftRight, AlertTriangle,
   Package, ArrowDownToLine, ArrowUpFromLine, Scale,
   ChevronDown, CalendarClock, Layers, ClipboardCheck,
 } from 'lucide-react'
 import Link from 'next/link'
 import { ReviewItemDialog, type ReviewProduct } from '@/components/inventory/review-item-dialog'
+import { MoveStockDialog } from '@/components/inventory/move-stock-dialog'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const typeConfig: Record<string, { label: string; variant: any }> = {
@@ -55,6 +56,7 @@ function StockTab() {
   const reviewCount = reviewProducts.length
 
   const [reviewItem, setReviewItem] = useState<ReviewProduct | null>(null)
+  const [moveBalance, setMoveBalance] = useState<any | null>(null)
 
   const onReviewDone = () => {
     setReviewItem(null)
@@ -242,10 +244,16 @@ function StockTab() {
                             {status === 'ok' ? 'OK' : status === 'low' ? 'Low' : 'Out'}
                           </Badge>
                         </td>
-                        <td className="px-4 py-3">
-                          <Button variant="ghost" size="icon" className="w-8 h-8">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
+                        <td className="px-4 py-3 text-right">
+                          {b.quantity > 0 && (
+                            <Button
+                              variant="ghost" size="sm"
+                              onClick={() => setMoveBalance(b)}
+                              className="gap-1.5 text-slate-500 hover:text-indigo-600"
+                            >
+                              <ArrowLeftRight className="w-3.5 h-3.5" /> Move
+                            </Button>
+                          )}
                         </td>
                       </tr>
                     )
@@ -269,6 +277,14 @@ function StockTab() {
           product={reviewItem}
           onClose={() => setReviewItem(null)}
           onDone={onReviewDone}
+        />
+      )}
+
+      {moveBalance && (
+        <MoveStockDialog
+          balance={moveBalance}
+          onClose={() => setMoveBalance(null)}
+          onDone={() => { setMoveBalance(null); refetch() }}
         />
       )}
     </>

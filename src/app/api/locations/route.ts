@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
   if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 })
   if (!code) return NextResponse.json({ error: 'code is required' }, { status: 400 })
 
-  const VALID_TYPES = ['warehouse', 'office', 'store', 'room', 'shelf', 'other']
+  const VALID_TYPES = ['building', 'floor', 'warehouse', 'office', 'store', 'room', 'shelf', 'vehicle', 'other']
   const type = body.type ?? 'other'
   if (!VALID_TYPES.includes(type)) {
     return NextResponse.json({ error: `type must be one of: ${VALID_TYPES.join(', ')}` }, { status: 400 })

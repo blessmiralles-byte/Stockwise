@@ -20,7 +20,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const VALID_TYPES = ['warehouse', 'office', 'store', 'room', 'shelf', 'other']
+  const VALID_TYPES = ['building', 'floor', 'warehouse', 'office', 'store', 'room', 'shelf', 'vehicle', 'other']
   const updates: Record<string, any> = {}
 
   if ('name'    in body) updates.name    = body.name?.trim()

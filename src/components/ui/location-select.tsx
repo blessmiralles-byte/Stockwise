@@ -42,8 +42,8 @@ function getPath(id: string, byId: Record<string, LocationNode>): string {
   return parts.join(' › ')
 }
 
-const levelLabels = ['Location', 'Room / Area', 'Shelf / Bin', 'Position']
-const levelPlaceholders = ['Select location…', 'Select room…', 'Select shelf / bin…', 'Select position…']
+const levelLabels = ['Building / Site', 'Floor / Area', 'Room / Zone', 'Shelf / Bin']
+const levelPlaceholders = ['Select building / site…', 'Select floor / area…', 'Select room / zone…', 'Select shelf / bin…']
 
 export function LocationSelect({ value, onChange, className, placeholder, disabled }: LocationSelectProps) {
   const [locations, setLocations] = useState<LocationNode[]>([])

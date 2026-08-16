@@ -188,12 +188,14 @@ function ImportPanel({ config, onImported }: { config: ImportConfig; onImported:
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. LOCATIONS TAB
 // ─────────────────────────────────────────────────────────────────────────────
-const LOC_TYPES = ['warehouse', 'office', 'store', 'room', 'shelf', 'other'] as const
-const locIcon: Record<string, any> = { warehouse: Archive, office: BookOpen, store: Package, room: Layers, shelf: Layers, other: MapPin }
+const LOC_TYPES = ['building', 'floor', 'warehouse', 'office', 'store', 'room', 'shelf', 'vehicle', 'other'] as const
+const locIcon: Record<string, any> = { building: Building2, floor: Layers, warehouse: Archive, office: BookOpen, store: Package, room: Layers, shelf: Layers, vehicle: Truck, other: MapPin }
 const locColor: Record<string, string> = {
+  building: 'bg-indigo-50 text-indigo-600', floor: 'bg-cyan-50 text-cyan-600',
   warehouse: 'bg-blue-50 text-blue-600', office: 'bg-purple-50 text-purple-600',
   store: 'bg-green-50 text-green-600',   room: 'bg-orange-50 text-orange-600',
-  shelf: 'bg-slate-100 text-slate-500',  other: 'bg-slate-100 text-slate-500',
+  shelf: 'bg-slate-100 text-slate-500',  vehicle: 'bg-amber-50 text-amber-600',
+  other: 'bg-slate-100 text-slate-500',
 }
 
 interface Loc { id: string; name: string; code: string; type: string; level: number; parent_id: string | null; address?: string }
