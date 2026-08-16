@@ -17,7 +17,9 @@ import {
 import Link from 'next/link'
 
 const STATUS_CONFIG: Record<string, { label: string; variant: any; icon: React.ReactNode }> = {
-  draft:     { label: 'Draft',     variant: 'secondary',    icon: <FileText className="w-3 h-3" /> },
+  draft:            { label: 'Draft',            variant: 'secondary',   icon: <FileText className="w-3 h-3" /> },
+  pending_approval: { label: 'Pending Approval', variant: 'warning',     icon: <Clock className="w-3 h-3" /> },
+  approved:         { label: 'Approved',         variant: 'default',     icon: <CheckCircle2 className="w-3 h-3" /> },
   sent:      { label: 'Sent',      variant: 'warning',      icon: <Truck className="w-3 h-3" /> },
   partial:   { label: 'Partial',   variant: 'warning',      icon: <Clock className="w-3 h-3" /> },
   received:  { label: 'Received',  variant: 'success',      icon: <CheckCircle2 className="w-3 h-3" /> },
@@ -400,7 +402,7 @@ export default function PurchaseOrdersPage() {
               <Input placeholder="Search PO or supplier…" className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
             </div>
             <div className="flex flex-wrap gap-1">
-              {['all', 'draft', 'sent', 'partial', 'received', 'cancelled'].map(s => (
+              {['all', 'draft', 'pending_approval', 'approved', 'sent', 'partial', 'received', 'cancelled'].map(s => (
                 <Button key={s} size="sm" variant={statusFilter === s ? 'default' : 'outline'} onClick={() => setStatusFilter(s)} className="text-xs capitalize">
                   {s === 'all' ? 'All' : STATUS_CONFIG[s]?.label ?? s}
                 </Button>

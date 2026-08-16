@@ -165,7 +165,7 @@ export interface Supplier {
 }
 
 // ── Purchase Orders ───────────────────────────────────────────────────────────
-export type PurchaseOrderStatus = 'draft' | 'sent' | 'partial' | 'received' | 'cancelled'
+export type PurchaseOrderStatus = 'draft' | 'pending_approval' | 'approved' | 'sent' | 'partial' | 'received' | 'cancelled'
 
 export interface PurchaseOrder {
   id: string

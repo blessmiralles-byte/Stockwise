@@ -13,11 +13,13 @@ import { ArrowLeft, Truck, CheckCircle2, Send, X, FileText, AlertTriangle, Scale
 import Link from 'next/link'
 
 const STATUS_CFG: Record<string, { label: string; variant: any }> = {
-  draft:     { label: 'Draft',     variant: 'secondary'   },
-  sent:      { label: 'Sent',      variant: 'warning'     },
-  partial:   { label: 'Partial',   variant: 'warning'     },
-  received:  { label: 'Received',  variant: 'success'     },
-  cancelled: { label: 'Cancelled', variant: 'destructive' },
+  draft:             { label: 'Draft',              variant: 'secondary'   },
+  pending_approval:  { label: 'Pending Approval',   variant: 'warning'     },
+  approved:          { label: 'Approved',           variant: 'default'     },
+  sent:              { label: 'Sent',               variant: 'warning'     },
+  partial:           { label: 'Partial',            variant: 'warning'     },
+  received:          { label: 'Received',           variant: 'success'     },
+  cancelled:         { label: 'Cancelled',          variant: 'destructive' },
 }
 
 // ── GRN Dialog ────────────────────────────────────────────────────────────────
@@ -756,13 +758,26 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
   const suppliers  = supplierData?.data ?? []
   const categories = catData?.data ?? []
 
+  const [statusError, setStatusError] = useState('')
+  const [statusBusy,  setStatusBusy]  = useState(false)
+
   async function markStatus(status: string) {
-    await fetch(`/api/purchase-orders/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    })
-    refetch()
+    setStatusError(''); setStatusBusy(true)
+    try {
+      const res = await fetch(`/api/purchase-orders/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        setStatusError(j.error ?? 'Could not update the purchase order')
+        return
+      }
+      refetch()
+    } finally {
+      setStatusBusy(false)
+    }
   }
 
   if (loading) return (
@@ -924,7 +939,6 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
   const cfg = STATUS_CFG[po.status]
   const total = (po.lines ?? []).reduce((s, l) => s + l.quantity_ordered * l.unit_cost, 0)
   const canReceive = po.status === 'sent' || po.status === 'partial'
-  const canSend    = po.status === 'draft'
   const canCancel  = po.status !== 'received' && po.status !== 'cancelled'
 
   return (
@@ -960,9 +974,24 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
                     <Download className="w-3.5 h-3.5" /> Download PDF
                   </Button>
                 </a>
-                {canSend && (
-                  <Button variant="outline" size="sm" onClick={() => markStatus('sent')} className="gap-1">
-                    <Send className="w-3.5 h-3.5" /> Mark Sent
+                {po.status === 'draft' && (
+                  <Button size="sm" onClick={() => markStatus('pending_approval')} disabled={statusBusy} className="gap-1">
+                    <Send className="w-3.5 h-3.5" /> Submit for Approval
+                  </Button>
+                )}
+                {po.status === 'pending_approval' && (
+                  <>
+                    <Button size="sm" onClick={() => markStatus('approved')} disabled={statusBusy} className="gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Approve
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => markStatus('draft')} disabled={statusBusy} className="gap-1 text-red-600 hover:text-red-700">
+                      <X className="w-3.5 h-3.5" /> Reject
+                    </Button>
+                  </>
+                )}
+                {po.status === 'approved' && (
+                  <Button size="sm" onClick={() => markStatus('sent')} disabled={statusBusy} className="gap-1">
+                    <Send className="w-3.5 h-3.5" /> Send to Supplier
                   </Button>
                 )}
                 {canReceive && (
@@ -971,12 +1000,24 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
                   </Button>
                 )}
                 {canCancel && (
-                  <Button variant="outline" size="sm" onClick={() => markStatus('cancelled')} className="gap-1 text-red-600 hover:text-red-700">
+                  <Button variant="outline" size="sm" onClick={() => markStatus('cancelled')} disabled={statusBusy} className="gap-1 text-red-600 hover:text-red-700">
                     <X className="w-3.5 h-3.5" /> Cancel
                   </Button>
                 )}
               </div>
             </div>
+
+            {statusError && (
+              <div className="mt-4 flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" /> {statusError}
+              </div>
+            )}
+            {po.status === 'pending_approval' && !statusError && (
+              <div className="mt-4 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-700">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                Awaiting approval — total {formatCurrency(total)}. An approver whose PO limit covers this amount must approve it before it can be sent.
+              </div>
+            )}
           </CardContent>
         </Card>
 
