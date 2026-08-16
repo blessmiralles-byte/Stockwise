@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
       .select('id, name, code, type, level, parent_id, is_active')
       .eq('org_id', auth.orgId)
       .eq('is_active', true)
+      .eq('is_transit', false)   // hide the system In-Transit holding location
       .order('level')
       .order('name')
 
@@ -33,6 +34,7 @@ export async function GET(req: NextRequest) {
     .select('id, name, code, address, type, level')
     .eq('org_id', auth.orgId)
     .eq('is_active', true)
+    .eq('is_transit', false)   // hide the system In-Transit holding location
     .is('parent_id', null)
     .order('name')
 

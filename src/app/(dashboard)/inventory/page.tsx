@@ -17,6 +17,7 @@ import {
 import Link from 'next/link'
 import { ReviewItemDialog, type ReviewProduct } from '@/components/inventory/review-item-dialog'
 import { MoveStockDialog } from '@/components/inventory/move-stock-dialog'
+import { ReceiveDeliveryDialog } from '@/components/inventory/receive-delivery-dialog'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const typeConfig: Record<string, { label: string; variant: any }> = {
@@ -43,7 +44,7 @@ function AttrChips({ attrs }: { attrs?: Record<string, string> }) {
 // ─── Stock tab ────────────────────────────────────────────────────────────────
 function StockTab() {
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<'all' | 'low' | 'out' | 'review'>('all')
+  const [filter, setFilter] = useState<'all' | 'low' | 'out' | 'review' | 'transit'>('all')
 
   const { data, loading, error, refetch } = useApi<{ data: any[] }>('/api/inventory')
   const balances = data?.data ?? []
@@ -55,8 +56,15 @@ function StockTab() {
   const reviewProducts = (prodData?.data ?? []).filter((p: any) => p.needs_review)
   const reviewCount = reviewProducts.length
 
+  // In-transit deliveries (shipped, awaiting receipt at destination)
+  const { data: transitData, loading: transitLoading, refetch: refetchTransit } =
+    useApi<{ data: any[] }>('/api/transfers?status=in_transit')
+  const deliveries = transitData?.data ?? []
+  const transitCount = deliveries.length
+
   const [reviewItem, setReviewItem] = useState<ReviewProduct | null>(null)
   const [moveBalance, setMoveBalance] = useState<any | null>(null)
+  const [receiveTransfer, setReceiveTransfer] = useState<any | null>(null)
 
   const onReviewDone = () => {
     setReviewItem(null)
@@ -114,6 +122,16 @@ function StockTab() {
                 Needs Review ({reviewCount})
               </Button>
             )}
+            {transitCount > 0 && (
+              <Button
+                size="sm"
+                variant={filter === 'transit' ? 'default' : 'outline'}
+                onClick={() => setFilter('transit')}
+                className={filter === 'transit' ? '' : 'border-cyan-300 text-cyan-700 hover:bg-cyan-50'}
+              >
+                In Transit ({transitCount})
+              </Button>
+            )}
           </div>
         </div>
         <div className="flex gap-2">
@@ -126,7 +144,44 @@ function StockTab() {
         </div>
       </div>
 
-      {filter === 'review' ? (
+      {filter === 'transit' ? (
+        <Card>
+          <CardContent className="p-0">
+            {transitLoading ? (
+              <TableSkeleton rows={4} cols={3} />
+            ) : deliveries.length === 0 ? (
+              <div className="text-center py-12 text-slate-400">
+                <Package className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <p>Nothing in transit right now.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-50">
+                {deliveries.map((t: any) => {
+                  const outstanding = Number(t.quantity) - Number(t.quantity_received)
+                  return (
+                    <div key={t.id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50/50">
+                      <div className="w-8 h-8 rounded-lg bg-cyan-50 flex items-center justify-center flex-shrink-0">
+                        <ArrowLeftRight className="w-4 h-4 text-cyan-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-slate-900 truncate">{t.product?.name}</p>
+                        <p className="text-xs text-slate-400">
+                          {t.from_location?.name} → <span className="text-slate-600 font-medium">{t.to_location?.name}</span>
+                          {' · '}{outstanding} {t.product?.unit_of_measure} in transit
+                          {t.shipped_by?.full_name ? ` · shipped by ${t.shipped_by.full_name}` : ''}
+                        </p>
+                      </div>
+                      <Button size="sm" className="gap-1.5 flex-shrink-0" onClick={() => setReceiveTransfer(t)}>
+                        <ArrowDownToLine className="w-3.5 h-3.5" /> Receive
+                      </Button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : filter === 'review' ? (
         <Card>
           <CardContent className="p-0">
             {prodLoading ? (
@@ -284,7 +339,15 @@ function StockTab() {
         <MoveStockDialog
           balance={moveBalance}
           onClose={() => setMoveBalance(null)}
-          onDone={() => { setMoveBalance(null); refetch() }}
+          onDone={() => { setMoveBalance(null); refetch(); refetchTransit() }}
+        />
+      )}
+
+      {receiveTransfer && (
+        <ReceiveDeliveryDialog
+          transfer={receiveTransfer}
+          onClose={() => setReceiveTransfer(null)}
+          onDone={() => { setReceiveTransfer(null); refetchTransit(); refetch() }}
         />
       )}
     </>

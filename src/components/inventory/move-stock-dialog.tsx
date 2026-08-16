@@ -27,6 +27,7 @@ export function MoveStockDialog({
   const [toLocation, setToLocation] = useState('')
   const [toPath, setToPath]         = useState('')
   const [qty, setQty]               = useState(String(available || 1))
+  const [inTransit, setInTransit]   = useState(false)
   const [saving, setSaving]         = useState(false)
   const [error, setError]           = useState('')
 
@@ -39,17 +40,17 @@ export function MoveStockDialog({
 
     setSaving(true); setError('')
     try {
-      const res = await fetch('/api/inventory', {
+      // In transit → ship to the holding location; the destination confirms on
+      // arrival. Otherwise it's an instant transfer (same building).
+      const url  = inTransit ? '/api/transfers' : '/api/inventory'
+      const body = inTransit
+        ? { product_id: balance.product.id, from_location_id: fromId, to_location_id: toLocation, quantity: q, notes: 'Stock move (in transit)' }
+        : { transaction_type: 'transfer', product_id: balance.product.id, from_location_id: fromId, to_location_id: toLocation, quantity: q, notes: 'Stock move' }
+
+      const res = await fetch(url, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          transaction_type: 'transfer',
-          product_id:       balance.product.id,
-          quantity:         q,
-          from_location_id: fromId,
-          to_location_id:   toLocation,
-          notes:            'Stock move',
-        }),
+        body:    JSON.stringify(body),
       })
       const j = await res.json()
       if (!res.ok) { setError(j.error ?? 'Could not move the stock'); setSaving(false); return }
@@ -92,6 +93,20 @@ export function MoveStockDialog({
             <Input type="number" min="1" max={available} value={qty} onChange={e => setQty(e.target.value)} className="max-w-[8rem]" />
           </div>
 
+          <label className="flex items-start gap-2.5 cursor-pointer select-none rounded-xl border border-slate-200 p-3">
+            <input
+              type="checkbox"
+              checked={inTransit}
+              onChange={e => setInTransit(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 flex-shrink-0"
+            />
+            <span className="text-xs text-slate-600 leading-relaxed">
+              <span className="font-medium text-slate-800">Delivered later (mark in transit)</span><br />
+              Ships to a holding area until it arrives — the destination confirms the delivery. Leave
+              unchecked for an instant move (e.g. same building).
+            </span>
+          </label>
+
           {error && (
             <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-sm text-red-700">
               <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" /> {error}
@@ -103,7 +118,7 @@ export function MoveStockDialog({
           <Button variant="outline" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button size="sm" onClick={move} disabled={saving} className="gap-1.5">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowLeftRight className="w-4 h-4" />}
-            Move
+            {inTransit ? 'Ship' : 'Move'}
           </Button>
         </div>
       </div>
