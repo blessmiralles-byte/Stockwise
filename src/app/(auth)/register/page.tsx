@@ -88,6 +88,15 @@ export default function RegisterPage() {
       return
     }
 
+    // Supabase obscures existing emails to prevent enumeration: signUp for an
+    // already-registered address returns a user with an EMPTY identities array
+    // (and sends no email). Detect that and tell them to sign in instead.
+    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      setError('An account with this email already exists. Please sign in instead, or reset your password.')
+      setLoading(false)
+      return
+    }
+
     // If we got a session back, email confirmation is disabled — go straight in
     if (data.session) {
       router.push('/dashboard')
