@@ -10,9 +10,10 @@ export const PLAN_CONFIG = {
     features: ['14-day free trial', 'Up to 5 users', 'All features included'],
   },
   starter: {
-    label:    'Starter',
-    price:    49,
-    maxUsers: 5,
+    label:       'Starter',
+    price:       49,
+    priceAnnual: 490,   // 2 months free
+    maxUsers:    5,
     features: [
       'Up to 5 users',
       'Inventory & asset management',
@@ -22,9 +23,10 @@ export const PLAN_CONFIG = {
     ],
   },
   pro: {
-    label:    'Pro',
-    price:    99,
-    maxUsers: 20,
+    label:       'Pro',
+    price:       99,
+    priceAnnual: 990,   // 2 months free
+    maxUsers:    20,
     features: [
       'Up to 20 users',
       'Everything in Starter',

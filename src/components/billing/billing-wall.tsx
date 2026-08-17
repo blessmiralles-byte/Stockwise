@@ -22,6 +22,7 @@ export function BillingWall({
 }) {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [interval, setInterval] = useState<'monthly' | 'annual'>('monthly')
 
   const title = reason === 'cancelled' ? 'Your subscription was cancelled' : 'Your free trial has ended'
   const sub   = reason === 'cancelled'
@@ -34,7 +35,7 @@ export function BillingWall({
       const res = await fetch('/api/billing/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan, interval }),
       })
       const json = await res.json()
       if (!res.ok || !json.url) { setError(json.error ?? 'Could not start checkout'); return }
@@ -72,6 +73,21 @@ export function BillingWall({
 
         {canManage ? (
           <>
+            {/* Monthly / Annual toggle */}
+            <div className="flex justify-center mb-4">
+              <div className="inline-flex items-center bg-slate-100 rounded-lg p-1 text-sm">
+                <button onClick={() => setInterval('monthly')}
+                  className={`px-4 py-1.5 rounded-md font-medium transition-colors ${interval === 'monthly' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}>
+                  Monthly
+                </button>
+                <button onClick={() => setInterval('annual')}
+                  className={`px-4 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1.5 ${interval === 'annual' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}>
+                  Annual
+                  <span className="text-[10px] font-semibold text-green-600 bg-green-100 rounded-full px-1.5 py-0.5">2 months free</span>
+                </button>
+              </div>
+            </div>
+
             <div className="grid sm:grid-cols-2 gap-4">
               {(['starter', 'pro'] as const).map(plan => {
                 const cfg = PLAN_CONFIG[plan]
@@ -79,9 +95,18 @@ export function BillingWall({
                 return (
                   <div key={plan} className={`rounded-2xl border p-5 ${highlight ? 'border-indigo-300 bg-white shadow-md' : 'border-slate-200 bg-white'}`}>
                     <p className="font-bold text-slate-900">{cfg.label}</p>
-                    <p className="text-3xl font-extrabold text-slate-900 mt-1">
-                      ${cfg.price}<span className="text-sm font-normal text-slate-500">/mo</span>
-                    </p>
+                    {interval === 'annual' ? (
+                      <>
+                        <p className="text-3xl font-extrabold text-slate-900 mt-1">
+                          ${cfg.priceAnnual}<span className="text-sm font-normal text-slate-500">/yr</span>
+                        </p>
+                        <p className="text-xs text-green-600">≈ ${Math.round(cfg.priceAnnual / 12)}/mo · 2 months free</p>
+                      </>
+                    ) : (
+                      <p className="text-3xl font-extrabold text-slate-900 mt-1">
+                        ${cfg.price}<span className="text-sm font-normal text-slate-500">/mo</span>
+                      </p>
+                    )}
                     <ul className="mt-3 space-y-1.5 mb-4">
                       {cfg.features.slice(0, 4).map(f => (
                         <li key={f} className="flex items-start gap-2 text-xs text-slate-600">

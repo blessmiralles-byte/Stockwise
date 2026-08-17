@@ -30,20 +30,31 @@ function authHeaders() {
   }
 }
 
-/** plan key → Lemon Squeezy variant id (from env). */
-export const PLAN_VARIANTS: Record<string, string | undefined> = {
-  starter: process.env.LEMONSQUEEZY_VARIANT_STARTER,
-  pro:     process.env.LEMONSQUEEZY_VARIANT_PRO,
+export type BillingInterval = 'monthly' | 'annual'
+
+/**
+ * Resolve the Lemon Squeezy variant id for a plan + billing interval.
+ * Env vars: LEMONSQUEEZY_VARIANT_STARTER[_ANNUAL], LEMONSQUEEZY_VARIANT_PRO[_ANNUAL].
+ */
+export function variantFor(plan: string, interval: BillingInterval): string | undefined {
+  const key = `LEMONSQUEEZY_VARIANT_${plan.toUpperCase()}${interval === 'annual' ? '_ANNUAL' : ''}`
+  return process.env[key]
 }
 
-/** Map a Lemon Squeezy variant id back to our internal plan + seat count. */
+/** Map a Lemon Squeezy variant id back to our internal plan + seat count
+ *  (monthly and annual variants both map to the same plan). */
 export function planFromVariant(variantId: string | number | null | undefined): {
   plan: string
   maxUsers: number
 } {
   const v = String(variantId ?? '')
-  if (v && v === process.env.LEMONSQUEEZY_VARIANT_PRO)     return { plan: 'pro',     maxUsers: 20 }
-  if (v && v === process.env.LEMONSQUEEZY_VARIANT_STARTER) return { plan: 'starter', maxUsers: 5  }
+  if (!v) return { plan: 'enterprise', maxUsers: 999 }
+  if (v === process.env.LEMONSQUEEZY_VARIANT_PRO || v === process.env.LEMONSQUEEZY_VARIANT_PRO_ANNUAL) {
+    return { plan: 'pro', maxUsers: 20 }
+  }
+  if (v === process.env.LEMONSQUEEZY_VARIANT_STARTER || v === process.env.LEMONSQUEEZY_VARIANT_STARTER_ANNUAL) {
+    return { plan: 'starter', maxUsers: 5 }
+  }
   return { plan: 'enterprise', maxUsers: 999 }
 }
 

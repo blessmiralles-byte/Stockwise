@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
-import { createCheckout, PLAN_VARIANTS } from '@/lib/lemonsqueezy'
+import { createCheckout, variantFor, type BillingInterval } from '@/lib/lemonsqueezy'
 
 /**
  * POST /api/billing/checkout
@@ -30,10 +30,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "plan must be 'starter' or 'pro'" }, { status: 400 })
   }
 
-  const variantId = PLAN_VARIANTS[plan]
+  const interval: BillingInterval = body.interval === 'annual' ? 'annual' : 'monthly'
+
+  const variantId = variantFor(plan, interval)
   if (!variantId) {
+    const suffix = interval === 'annual' ? '_ANNUAL' : ''
     return NextResponse.json(
-      { error: `LEMONSQUEEZY_VARIANT_${plan.toUpperCase()} is not configured` },
+      { error: `LEMONSQUEEZY_VARIANT_${plan.toUpperCase()}${suffix} is not configured` },
       { status: 500 }
     )
   }

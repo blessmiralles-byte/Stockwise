@@ -25,9 +25,14 @@ export default function RegisterPage() {
   // We can't act on it during a no-card trial signup, so we stash it for the
   // billing page to pre-highlight once the user decides to upgrade.
   useEffect(() => {
-    const plan = new URLSearchParams(window.location.search).get('plan')
+    const params = new URLSearchParams(window.location.search)
+    const plan = params.get('plan')
     if (plan === 'starter' || plan === 'pro') {
       localStorage.setItem('stocked.intended_plan', plan)
+    }
+    const interval = params.get('interval')
+    if (interval === 'annual' || interval === 'monthly') {
+      localStorage.setItem('stocked.intended_interval', interval)
     }
     // Direct arrivals (ad → /register, shared link) still get first-touch
     // attribution even if they never saw the landing page

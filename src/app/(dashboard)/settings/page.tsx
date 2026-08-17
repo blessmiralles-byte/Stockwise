@@ -620,6 +620,7 @@ function BillingSection() {
   const [upgrading, setUpgrading] = useState<string | null>(null)
   const [portalLoading, setPortalLoading] = useState(false)
   const [billingError, setBillingError] = useState('')
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly')
   const [highlightPlan, setHighlightPlan] = useState<string | null>(null)
   const highlightRef = useRef<HTMLDivElement | null>(null)
 
@@ -631,6 +632,11 @@ function BillingSection() {
     if (intended === 'starter' || intended === 'pro') {
       setHighlightPlan(intended)
       localStorage.removeItem('stocked.intended_plan')
+    }
+    const intendedInterval = localStorage.getItem('stocked.intended_interval')
+    if (intendedInterval === 'annual' || intendedInterval === 'monthly') {
+      setBillingInterval(intendedInterval)
+      localStorage.removeItem('stocked.intended_interval')
     }
   }, [])
 
@@ -646,7 +652,7 @@ function BillingSection() {
     const res  = await fetch('/api/billing/checkout', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ plan }),
+      body:    JSON.stringify({ plan, interval: billingInterval }),
     })
     const json = await res.json()
     setUpgrading(null)
@@ -712,6 +718,26 @@ function BillingSection() {
 
             {/* Upgrade cards — show for trial or starter */}
             {(currentPlan === 'trial' || currentPlan === 'starter') && (
+              <>
+              {/* Monthly / Annual toggle */}
+              <div className="flex justify-center">
+                <div className="inline-flex items-center bg-slate-100 rounded-lg p-1 text-sm">
+                  <button
+                    onClick={() => setBillingInterval('monthly')}
+                    className={`px-4 py-1.5 rounded-md font-medium transition-colors ${billingInterval === 'monthly' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}
+                  >
+                    Monthly
+                  </button>
+                  <button
+                    onClick={() => setBillingInterval('annual')}
+                    className={`px-4 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1.5 ${billingInterval === 'annual' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}
+                  >
+                    Annual
+                    <span className="text-[10px] font-semibold text-green-600 bg-green-100 rounded-full px-1.5 py-0.5">2 months free</span>
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {(['starter', 'pro'] as const).map(plan => {
                   const cfg       = PLAN_CONFIG[plan]
@@ -732,9 +758,18 @@ function BillingSection() {
                       )}
                       <div>
                         <p className="font-semibold text-slate-900">{cfg.label}</p>
-                        <p className="text-2xl font-bold text-slate-900 mt-1">
-                          ${cfg.price}<span className="text-sm font-normal text-slate-500">/mo</span>
-                        </p>
+                        {billingInterval === 'annual' ? (
+                          <>
+                            <p className="text-2xl font-bold text-slate-900 mt-1">
+                              ${cfg.priceAnnual}<span className="text-sm font-normal text-slate-500">/yr</span>
+                            </p>
+                            <p className="text-xs text-green-600">≈ ${Math.round(cfg.priceAnnual / 12)}/mo · 2 months free</p>
+                          </>
+                        ) : (
+                          <p className="text-2xl font-bold text-slate-900 mt-1">
+                            ${cfg.price}<span className="text-sm font-normal text-slate-500">/mo</span>
+                          </p>
+                        )}
                       </div>
                       <ul className="space-y-1.5">
                         {cfg.features.map(f => (
@@ -765,6 +800,7 @@ function BillingSection() {
                   )
                 })}
               </div>
+              </>
             )}
 
             {/* Enterprise CTA */}

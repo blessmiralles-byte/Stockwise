@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { captureAttribution } from '@/lib/attribution'
 import {
@@ -341,6 +341,7 @@ function Industries() {
 
 // ── Pricing ───────────────────────────────────────────────────────────────────
 function Pricing() {
+  const [interval, setInterval] = useState<'monthly' | 'annual'>('monthly')
   const plans = [
     { key: 'starter' as const, highlight: false, cta: 'Start free trial' },
     { key: 'pro'     as const, highlight: true,  cta: 'Start free trial' },
@@ -349,11 +350,26 @@ function Pricing() {
   return (
     <section className="py-24 bg-white" id="pricing">
       <div className="max-w-5xl mx-auto px-6">
-        <div className="text-center mb-14">
+        <div className="text-center mb-8">
           <h2 className="text-3xl font-bold text-slate-900 mb-3">Honest pricing. No surprises.</h2>
           <p className="text-slate-500">
             Try everything free for 14 days. No credit card. Cancel in one click.
           </p>
+        </div>
+
+        {/* Monthly / Annual toggle */}
+        <div className="flex justify-center mb-12">
+          <div className="inline-flex items-center bg-slate-100 rounded-lg p-1 text-sm">
+            <button onClick={() => setInterval('monthly')}
+              className={`px-5 py-2 rounded-md font-medium transition-colors ${interval === 'monthly' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}>
+              Monthly
+            </button>
+            <button onClick={() => setInterval('annual')}
+              className={`px-5 py-2 rounded-md font-medium transition-colors flex items-center gap-2 ${interval === 'annual' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}>
+              Annual
+              <span className="text-[11px] font-semibold text-green-600 bg-green-100 rounded-full px-2 py-0.5">2 months free</span>
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-start">
@@ -375,10 +391,20 @@ function Pricing() {
                 )}
                 <div>
                   <p className={`font-bold text-lg ${highlight ? 'text-white' : 'text-slate-900'}`}>{cfg.label}</p>
-                  <p className={`text-3xl font-extrabold mt-1 ${highlight ? 'text-white' : 'text-slate-900'}`}>
-                    ${cfg.price}
-                    <span className={`text-sm font-normal ${highlight ? 'text-indigo-200' : 'text-slate-500'}`}>/mo</span>
-                  </p>
+                  {interval === 'annual' ? (
+                    <>
+                      <p className={`text-3xl font-extrabold mt-1 ${highlight ? 'text-white' : 'text-slate-900'}`}>
+                        ${cfg.priceAnnual}
+                        <span className={`text-sm font-normal ${highlight ? 'text-indigo-200' : 'text-slate-500'}`}>/yr</span>
+                      </p>
+                      <p className={`text-xs mt-0.5 ${highlight ? 'text-indigo-200' : 'text-green-600'}`}>≈ ${Math.round(cfg.priceAnnual / 12)}/mo · 2 months free</p>
+                    </>
+                  ) : (
+                    <p className={`text-3xl font-extrabold mt-1 ${highlight ? 'text-white' : 'text-slate-900'}`}>
+                      ${cfg.price}
+                      <span className={`text-sm font-normal ${highlight ? 'text-indigo-200' : 'text-slate-500'}`}>/mo</span>
+                    </p>
+                  )}
                 </div>
                 <ul className="space-y-2">
                   {cfg.features.map(f => (
@@ -389,7 +415,7 @@ function Pricing() {
                   ))}
                 </ul>
                 <Link
-                  href={`/register?plan=${key}`}
+                  href={`/register?plan=${key}&interval=${interval}`}
                   className={`block text-center py-2.5 rounded-xl text-sm font-semibold transition-colors ${
                     highlight
                       ? 'bg-white text-indigo-700 hover:bg-indigo-50'
