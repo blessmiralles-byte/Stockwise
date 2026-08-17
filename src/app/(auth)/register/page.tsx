@@ -18,6 +18,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [emailExists, setEmailExists] = useState(false)
   const [needsConfirmation, setNeedsConfirmation] = useState(false)
   const [agreedToTerms, setAgreedToTerms] = useState(false)
 
@@ -64,6 +65,7 @@ export default function RegisterPage() {
 
     setLoading(true)
     setError(null)
+    setEmailExists(false)
 
     const supabase = createClient()
     const attribution = getAttribution()
@@ -92,7 +94,7 @@ export default function RegisterPage() {
     // already-registered address returns a user with an EMPTY identities array
     // (and sends no email). Detect that and tell them to sign in instead.
     if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
-      setError('An account with this email already exists. Please sign in instead, or reset your password.')
+      setEmailExists(true)
       setLoading(false)
       return
     }
@@ -141,11 +143,18 @@ export default function RegisterPage() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleRegister} className="space-y-4">
-          {error && (
+          {emailExists ? (
+            <div className="bg-amber-50 text-amber-800 text-sm px-3 py-2.5 rounded-lg border border-amber-100">
+              An account with this email already exists.{' '}
+              <Link href="/login" className="font-semibold underline hover:text-amber-900">Sign in</Link>
+              {' '}or{' '}
+              <Link href="/forgot-password" className="font-semibold underline hover:text-amber-900">reset your password</Link>.
+            </div>
+          ) : error ? (
             <div className="bg-red-50 text-red-700 text-sm px-3 py-2.5 rounded-lg border border-red-100">
               {error}
             </div>
-          )}
+          ) : null}
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Full name</label>
