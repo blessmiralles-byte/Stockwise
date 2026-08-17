@@ -1,5 +1,6 @@
 import { Sidebar } from '@/components/layout/sidebar'
 import { BillingWall } from '@/components/billing/billing-wall'
+import { SupportChat } from '@/components/support/support-chat'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { billingState } from '@/lib/billing'
@@ -46,6 +47,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="flex h-screen overflow-hidden bg-slate-50">
       <Sidebar />
       <main className="flex-1 overflow-y-auto bg-slate-50">{children}</main>
+      <SupportChat />
     </div>
   )
 }
