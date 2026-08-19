@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { LocationSelect } from '@/components/ui/location-select'
-import { X, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { BarcodeScanner } from '@/components/scanner/barcode-scanner'
+import { X, Loader2, CheckCircle2, AlertCircle, ScanBarcode } from 'lucide-react'
 
 const UNITS = ['pcs', 'kg', 'g', 'lbs', 'oz', 'liters', 'ml', 'meters', 'ft', 'box', 'pack', 'roll', 'set', 'pair']
 
@@ -49,6 +50,7 @@ export function ReviewItemDialog({
   const [categories, setCategories] = useState<any[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
+  const [scanning, setScanning] = useState(false)
 
   useEffect(() => {
     fetch('/api/categories')
@@ -113,6 +115,27 @@ export function ReviewItemDialog({
   }
 
   return (
+    <>
+    {scanning && (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => setScanning(false)}>
+        <div className="w-full max-w-sm rounded-2xl bg-white p-4" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-semibold text-slate-800">Scan barcode</p>
+            <button onClick={() => setScanning(false)} aria-label="Close scanner" className="text-slate-400 hover:text-slate-600">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-900">
+            <BarcodeScanner
+              id="review-barcode-scanner"
+              className="p-3"
+              onScan={code => { setBarcode(code); setScanning(false) }}
+            />
+          </div>
+          <p className="mt-2 text-center text-[11px] text-slate-400">Point the rear camera at the barcode</p>
+        </div>
+      </div>
+    )}
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
         className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto"
@@ -175,7 +198,12 @@ export function ReviewItemDialog({
             </div>
             <div className="col-span-2">
               <label className="text-xs font-medium text-slate-600 block mb-1">Barcode</label>
-              <Input value={barcode} onChange={e => setBarcode(e.target.value)} className="font-mono" placeholder="—" />
+              <div className="flex gap-2">
+                <Input value={barcode} onChange={e => setBarcode(e.target.value)} className="font-mono flex-1" placeholder="Type or scan" />
+                <Button type="button" variant="outline" size="sm" className="gap-1.5 flex-shrink-0" onClick={() => setScanning(true)}>
+                  <ScanBarcode className="w-3.5 h-3.5" /> Scan
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -220,5 +248,6 @@ export function ReviewItemDialog({
         </div>
       </div>
     </div>
+    </>
   )
 }
