@@ -102,7 +102,15 @@ function ImportPanel({ config, onImported }: { config: ImportConfig; onImported:
           <Download className="w-3.5 h-3.5" /> Download template
         </button>
         <p className="text-xs text-slate-400">
-          Required columns: <span className="font-mono text-red-600">{config.required.join(', ')}</span>
+          Required: <span className="font-mono text-red-600">{config.required.join(', ')}</span>
+          {config.columns.filter(c => !config.required.includes(c)).length > 0 && (
+            <>
+              {'  ·  '}Optional:{' '}
+              <span className="font-mono text-slate-500">
+                {config.columns.filter(c => !config.required.includes(c)).join(', ')}
+              </span>
+            </>
+          )}
         </p>
       </div>
 
