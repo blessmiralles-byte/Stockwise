@@ -73,6 +73,49 @@ up for an organization is its Owner.
 - The barcode scanner uses the rear camera and the device's native barcode
   detector, with torch and haptic feedback for faster, more reliable scans.
 
+## Forecasting & reordering
+- The **Forecasting** page projects demand from your actual usage — it looks at
+  consumption and sale transactions to estimate how fast each product moves.
+- For each product it suggests a **reorder point**, **reorder quantity**, and
+  the **reorder value**, so you can see what's running low and how much to buy.
+- The projection window is adjustable (e.g. 30 days); products with little or no
+  usage history won't have a meaningful forecast yet.
+
+## Transactions & inventory ledger
+- The **Transactions** page is the running history of stock movements —
+  receipts, issues/consumption, adjustments, transfers, and sales.
+- Every movement is recorded so on-hand quantities and valuation stay accurate;
+  this history is also what forecasting is built from.
+
+## Stock counts (physical / cycle counts)
+- Use **Stock counts** to do a physical count and reconcile it against the
+  system. Create a count, enter the quantities found, and confirm/approve it to
+  post any adjustments to the ledger.
+
+## Assets: maintenance & depreciation
+- **Maintenance**: schedule maintenance for an asset (with a due date), and mark
+  it done — recording who performed it, the cost, and notes. Overdue items are
+  flagged as urgent.
+- **Depreciation**: assets can be depreciated over time; the depreciation run
+  posts the periodic depreciation, and reports show the asset roll-forward.
+
+## Reports
+Available under **Reports**:
+- **Inventory valuation** — current stock value.
+- **Expenses** — spend over a period.
+- **Tools out** — all tools currently checked out.
+- **Tools by crew** — checked-out tools grouped by crew.
+- **Depreciation** and **Assets roll-forward** — asset value over time.
+- **Accounting export** — export accounting data.
+
+## Import & setup
+- **Setup & Import** lets you bulk-import data (products, suppliers, etc.) from a
+  spreadsheet to get started quickly, and configure initial settings.
+
+## Audit log
+- The **Audit Log** records key changes made in the account (who did what and
+  when) for accountability.
+
 ## Billing & plans
 - Billing runs through **Lemon Squeezy** (the merchant of record, which handles
   sales tax automatically). Prices are in USD.
