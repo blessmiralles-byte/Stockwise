@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { requireAuth } from '@/lib/api-auth'
 import { SUPPORT_KB } from '@/lib/support-kb'
+import { getExtraSupportKB } from '@/lib/support-kb-store'
 
 /**
  * POST /api/support/chat — in-app support assistant.
@@ -21,8 +22,8 @@ const MAX_CHARS = 4000        // per-message guard against oversized payloads
 
 type Turn = { role: 'user' | 'assistant'; content: string }
 
-const SYSTEM = `You are the in-app support assistant for Stocked, an inventory,
-materials, and asset-tracking app for contractors.
+const SYSTEM_INSTRUCTIONS = `You are the in-app support assistant for Stocked, an
+inventory, materials, and asset-tracking app for contractors.
 
 Answer questions using ONLY the knowledge base below. Be concise, friendly, and
 practical — most answers are 1–3 short sentences, and you may point users to the
@@ -37,10 +38,13 @@ Rules:
 - Never ask for or accept passwords, card numbers, or other secrets. If a user
   offers one, tell them not to share it and to contact support@stocked.tech.
 - You cannot take actions inside the app (you can't change settings, issue
-  refunds, or edit their data) — only explain how to do things.
+  refunds, or edit their data) — only explain how to do things.`
 
-KNOWLEDGE BASE:
-${SUPPORT_KB}`
+/** Base knowledge (in code) plus any live additions from the database. */
+function buildSystem(extraKB: string): string {
+  const kb = extraKB ? `${SUPPORT_KB}\n\n${extraKB}` : SUPPORT_KB
+  return `${SYSTEM_INSTRUCTIONS}\n\nKNOWLEDGE BASE:\n${kb}`
+}
 
 export async function POST(req: NextRequest) {
   const auth = await requireAuth()
@@ -77,12 +81,13 @@ export async function POST(req: NextRequest) {
   }
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const extraKB = await getExtraSupportKB()
 
   try {
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: MAX_TOKENS,
-      system: SYSTEM,
+      system: buildSystem(extraKB),
       messages: turns,
     })
 
