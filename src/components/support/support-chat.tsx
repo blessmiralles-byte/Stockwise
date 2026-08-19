@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { MessageCircle, X, Send, Loader2 } from 'lucide-react'
+import { MessageCircle, X, Send, Loader2, RotateCcw } from 'lucide-react'
 
 type Msg = { role: 'user' | 'assistant'; content: string }
 
@@ -63,6 +63,12 @@ export function SupportChat() {
     }
   }
 
+  function reset() {
+    setMessages([GREETING])
+    setInput('')
+    inputRef.current?.focus()
+  }
+
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -92,9 +98,20 @@ export function SupportChat() {
               <MessageCircle className="w-5 h-5" />
               <span className="font-semibold text-sm">Stocked Assistant</span>
             </div>
-            <button onClick={() => setOpen(false)} aria-label="Close support chat" className="text-white/80 hover:text-white">
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={reset}
+                disabled={loading || messages.length <= 1}
+                aria-label="Clear conversation"
+                title="Clear conversation"
+                className="text-white/80 hover:text-white disabled:opacity-40"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+              <button onClick={() => setOpen(false)} aria-label="Close support chat" className="text-white/80 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4 bg-slate-50">
