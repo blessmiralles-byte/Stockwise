@@ -13,8 +13,9 @@ import {
   Plus, Pencil, Trash2, Loader2, AlertCircle, CheckCircle2,
   X, Archive, BookOpen, Package, Layers, Info,
   ToggleLeft, ToggleRight, Upload, Download, FileSpreadsheet,
-  ChevronDown, ChevronRight, Sparkles, Truck, Boxes, Building2,
+  ChevronDown, ChevronRight, Sparkles, Truck, Boxes, Building2, ScanBarcode,
 } from 'lucide-react'
+import { BarcodeScanner } from '@/components/scanner/barcode-scanner'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared helpers
@@ -860,16 +861,17 @@ function ProductsTab() {
   const [form,     setForm]     = useState(blank)
   const [saving,   setSaving]   = useState(false)
   const [error,    setError]    = useState('')
+  const [scanning, setScanning] = useState(false)
 
   const f = (k: keyof typeof blank) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm(v => ({ ...v, [k]: e.target.value }))
 
-  const openAdd  = () => { setEditId(null); setForm(blank); setError(''); setShowForm(true) }
+  const openAdd  = () => { setEditId(null); setForm(blank); setError(''); setScanning(false); setShowForm(true) }
   const openEdit = (p: any) => {
     setEditId(p.id)
     setForm({ name: p.name ?? '', sku: p.sku ?? '', barcode: p.barcode ?? '', unit_of_measure: p.unit_of_measure ?? 'pcs', reorder_point: String(p.reorder_point ?? ''), description: p.description ?? '' })
-    setError(''); setShowForm(true)
+    setError(''); setScanning(false); setShowForm(true)
   }
-  const cancel = () => { setShowForm(false); setEditId(null); setError('') }
+  const cancel = () => { setShowForm(false); setEditId(null); setError(''); setScanning(false) }
 
   const save = async () => {
     if (!form.name.trim()) { setError('Name is required'); return }
@@ -903,6 +905,27 @@ function ProductsTab() {
       {showForm && (
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
           <p className="text-xs font-semibold text-slate-700">{editId ? 'Edit Product' : 'New Product'}</p>
+
+          {scanning && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setScanning(false)}>
+              <div className="w-full max-w-sm rounded-2xl bg-white p-4" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-slate-800">Scan barcode</p>
+                  <button onClick={() => setScanning(false)} aria-label="Close scanner" className="text-slate-400 hover:text-slate-600">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-900">
+                  <BarcodeScanner
+                    id="product-barcode-scanner"
+                    className="p-3"
+                    onScan={code => { setForm(v => ({ ...v, barcode: code })); setScanning(false) }}
+                  />
+                </div>
+                <p className="mt-2 text-center text-[11px] text-slate-400">Point the rear camera at the barcode</p>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className="text-xs font-medium text-slate-600 block mb-1">Product Name *</label>
@@ -914,7 +937,12 @@ function ProductsTab() {
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 block mb-1">Barcode</label>
-              <Input value={form.barcode} onChange={f('barcode')} placeholder="4901234567890" className="font-mono" />
+              <div className="flex gap-2">
+                <Input value={form.barcode} onChange={f('barcode')} placeholder="4901234567890" className="font-mono flex-1" />
+                <Button type="button" variant="outline" size="sm" className="gap-1.5 flex-shrink-0" onClick={() => setScanning(true)}>
+                  <ScanBarcode className="w-3.5 h-3.5" /> Scan
+                </Button>
+              </div>
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 block mb-1">Unit of Measure</label>
