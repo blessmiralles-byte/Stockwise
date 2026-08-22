@@ -32,6 +32,20 @@ up for an organization is its Owner.
   **needs-review** state. A manager reviews them from the **Inventory** tab —
   editing details, setting opening stock, and approving them into the catalog.
 
+## Barcodes
+- Products can carry a barcode, used for scanning during receiving, stock moves,
+  and the field "Add Item" flow.
+- Add or edit a product's barcode three ways:
+  1. **Type or scan it** in the product form — go to **Setup & Import →
+     Products**, add or edit a product, and either type the barcode or tap
+     **Scan** to capture it with the camera.
+  2. **During item review** — open a needs-review item in the **Inventory** tab
+     and type or scan its barcode before approving.
+  3. **In bulk** — include a **barcode** column in the product import
+     spreadsheet (Setup & Import → Products → Download template).
+- Scanning uses the device's rear camera and needs camera permission; it works
+  on the live site and on phones.
+
 ## Receiving goods (field view)
 - Field workers open **Receive Goods** to log incoming stock.
 - Receiving **against a purchase order** matches quantities to the PO.
