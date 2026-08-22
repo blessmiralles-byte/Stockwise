@@ -17,7 +17,7 @@ const navItems = [
   { href: '/inventory',       icon: Package,         label: 'Inventory'       },
   { href: '/transactions',    icon: ArrowLeftRight,  label: 'Transactions'    },
   { href: '/forecasting',     icon: TrendingUp,      label: 'Forecasting'     },
-  { href: '/suppliers',       icon: Building2,       label: 'Vendors'         },
+  { href: '/vendors',         icon: Building2,       label: 'Vendors'         },
   { href: '/purchase-orders', icon: ShoppingCart,    label: 'Purchase Orders' },
   { href: '/requisitions',    icon: ClipboardList,   label: 'Requisitions'    },
   { href: '/stock-counts',    icon: Truck,           label: 'Stock Counts'    },
