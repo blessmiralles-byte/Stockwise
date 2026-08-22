@@ -74,12 +74,12 @@ function SupplierForm({
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-lg">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-base">{isEdit ? 'Edit Supplier' : 'New Supplier'}</CardTitle>
+          <CardTitle className="text-base">{isEdit ? 'Edit Vendor' : 'New Vendor'}</CardTitle>
           <Button variant="ghost" size="icon" onClick={onClose}><X className="w-4 h-4" /></Button>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-3">
-            {field('Supplier Name *', 'name')}
+            {field('Vendor Name *', 'name')}
             <div className="grid grid-cols-2 gap-3">
               {field('Contact Name', 'contact_name')}
               {field('Email', 'email', 'email')}
@@ -101,7 +101,7 @@ function SupplierForm({
             {error && <p className="text-red-500 text-xs">{error}</p>}
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-              <Button type="submit" disabled={saving}>{saving ? 'Saving…' : (isEdit ? 'Save Changes' : 'Create Supplier')}</Button>
+              <Button type="submit" disabled={saving}>{saving ? 'Saving…' : (isEdit ? 'Save Changes' : 'Create Vendor')}</Button>
             </div>
           </form>
         </CardContent>
@@ -144,7 +144,7 @@ export default function SuppliersPage() {
 
   return (
     <div>
-      <Topbar title="Suppliers" />
+      <Topbar title="Vendors" />
       <div className="p-6 space-y-4">
 
         {/* Controls */}
@@ -152,7 +152,7 @@ export default function SuppliersPage() {
           <div className="flex items-center gap-2 flex-1">
             <div className="relative flex-1 max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input placeholder="Search suppliers…" className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
+              <Input placeholder="Search vendors…" className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
             </div>
             <Button
               size="sm" variant={showInactive ? 'default' : 'outline'}
@@ -163,7 +163,7 @@ export default function SuppliersPage() {
             </Button>
           </div>
           <Button onClick={() => setShowForm(true)} className="gap-2">
-            <Plus className="w-4 h-4" /> Add Supplier
+            <Plus className="w-4 h-4" /> Add Vendor
           </Button>
         </div>
 
@@ -179,8 +179,8 @@ export default function SuppliersPage() {
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-slate-400">
             <Building className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p className="text-sm font-medium">No suppliers yet</p>
-            <p className="text-xs mt-1">Add your first supplier to link it to products and purchase orders.</p>
+            <p className="text-sm font-medium">No vendors yet</p>
+            <p className="text-xs mt-1">Add your first vendor to link it to products and purchase orders.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

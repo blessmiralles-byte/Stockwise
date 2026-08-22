@@ -289,7 +289,7 @@ export async function GET(
     products:     'name,sku,barcode,unit_of_measure,reorder_point,description\nWD-40 Spray,WD40-350ML,4901234567890,pcs,10,Lubricant spray',
     assets:       'name,asset_tag,serial_number,purchase_cost,purchase_date,useful_life_years,depreciation_method,status,notes\nLaptop Dell XPS,LAP-001,SN12345,1200,2024-01-15,5,straight_line,active,IT Equipment',
     locations:    'name,code,type,address\nMain Warehouse,WH-01,warehouse,123 Industrial Ave',
-    suppliers:    'name,contact_name,email,phone,payment_terms,lead_time_days,notes\nAcme Corp,John Doe,john@acme.com,+1-555-1234,Net 30,7,Preferred supplier',
+    suppliers:    'name,contact_name,email,phone,payment_terms,lead_time_days,notes\nAcme Corp,John Doe,john@acme.com,+1-555-1234,Net 30,7,Preferred vendor',
     categories:   'name,type\nElectronics,inventory\nVehicles,fixed_asset\nOffice Supplies,both',
     job_codes:    'code,name,description,billing_entity,contact_name,contact_phone,contact_email\nJOB-001,Building Renovation,Phase 1 works,ABC Corp,John Smith,+1-555-0100,john@abc.com',
     cost_centers: 'code,name\nOPS,Operations\nMKT,Marketing\nFIN,Finance',

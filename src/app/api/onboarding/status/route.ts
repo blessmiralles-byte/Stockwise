@@ -77,8 +77,8 @@ export async function GET() {
     },
     {
       id:          'supplier',
-      label:       'Add vendors / suppliers',
-      description: 'The suppliers you buy from — needed to raise purchase orders and receive stock.',
+      label:       'Add vendors',
+      description: 'The vendors you buy from — needed to raise purchase orders and receive stock.',
       done:        (supplierCount ?? 0) > 0,
       href:        '/setup?tab=vendors',
       cta:         'Add vendors',

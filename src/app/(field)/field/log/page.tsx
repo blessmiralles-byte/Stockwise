@@ -263,7 +263,7 @@ export default function FieldLogPage() {
 
   const handleSubmit = async (mode: SaveMode) => {
     if (isPurchase && !receivedBy.trim()) { setErrorMsg('Please select who is receiving the goods'); return }
-    if (isPurchase && !supplierId)        { setErrorMsg('Please select the supplier'); return }
+    if (isPurchase && !supplierId)        { setErrorMsg('Please select the vendor'); return }
 
     // Blind receipts can never post directly — force them to a draft that a
     // manager must approve before stock/ledger update.
@@ -440,7 +440,7 @@ export default function FieldLogPage() {
                   <div key={po.id} className="border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-sm">
                     <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
                       <span className="font-mono text-xs font-bold text-gray-700">{po.po_number}</span>
-                      <span className="text-xs text-gray-500">{po.supplier?.name ?? 'No supplier'}</span>
+                      <span className="text-xs text-gray-500">{po.supplier?.name ?? 'No vendor'}</span>
                     </div>
                     {po.lines
                       .filter((l: any) => l.quantity_ordered > l.quantity_received)
@@ -716,7 +716,7 @@ export default function FieldLogPage() {
                     onChange={e => setSupplierId(e.target.value)}
                     className="w-full h-14 px-4 rounded-2xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
                   >
-                    <option value="">— Select supplier —</option>
+                    <option value="">— Select vendor —</option>
                     {suppliers.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}

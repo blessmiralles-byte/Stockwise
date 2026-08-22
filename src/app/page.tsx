@@ -125,7 +125,7 @@ const FEATURES = [
   {
     icon:  Truck,
     title: 'Purchase Orders & Receiving',
-    desc:  'Create POs, send them to suppliers, and receive goods in a few taps. Built-in controls mean the person who orders can\'t also approve the receipt — keeping your process clean.',
+    desc:  'Create POs, send them to vendors, and receive goods in a few taps. Built-in controls mean the person who orders can\'t also approve the receipt — keeping your process clean.',
   },
   {
     icon:  Smartphone,

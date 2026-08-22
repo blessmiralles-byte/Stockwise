@@ -55,12 +55,12 @@ const STEPS: Step[] = [
   {
     n: 4,
     icon: Truck,
-    title: 'Add your vendors / suppliers',
-    what: 'Your suppliers are needed to raise purchase orders and receive stock against them.',
+    title: 'Add your vendors',
+    what: 'Your vendors are needed to raise purchase orders and receive stock against them.',
     how: [
       'Go to Setup → Vendors.',
       'Capture payment terms, lead time, and an over-receipt tolerance so receiving is accurate.',
-      'Import your existing supplier list from CSV/Excel in one go.',
+      'Import your existing vendor list from CSV/Excel in one go.',
     ],
   },
   {

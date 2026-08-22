@@ -761,7 +761,7 @@ function VendorsTab() {
 
   return (
     <div className="space-y-4">
-      <SectionHeader title="Vendors / Suppliers" description="Manage your suppliers and import them in bulk via CSV or Excel." />
+      <SectionHeader title="Vendors" description="Manage your vendors and import them in bulk via CSV or Excel." />
       <div className="flex gap-2">
         <Button size="sm" className="gap-1.5" onClick={openAdd}><Plus className="w-3.5 h-3.5" /> Add Vendor</Button>
         <ImportPanel config={{ entity: 'suppliers', label: 'Vendors', required: ['name'], columns: ['name', 'contact_name', 'email', 'phone', 'address', 'payment_terms', 'lead_time_days', 'notes'] }} onImported={refetch} />

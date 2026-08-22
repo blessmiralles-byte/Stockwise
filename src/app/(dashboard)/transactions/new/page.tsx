@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 
 const transactionTypes = [
-  { value: 'purchase',    label: 'Purchase',    description: 'Receive goods from supplier',       icon: '📦' },
+  { value: 'purchase',    label: 'Purchase',    description: 'Receive goods from vendor',         icon: '📦' },
   { value: 'transfer',    label: 'Transfer',    description: 'Move items between locations',       icon: '🔄' },
   { value: 'consumption', label: 'Consumption', description: 'Issue to internal use or a job',    icon: '⚙️' },
   { value: 'sale',        label: 'Sale',        description: 'Sell or charge items to a customer', icon: '🛒' },
@@ -298,7 +298,7 @@ export default function NewTransactionPage() {
                         <div key={po.id} className="border border-slate-200 rounded-lg overflow-hidden">
                           <div className="px-3 py-2 bg-slate-50 flex items-center justify-between">
                             <span className="font-mono text-xs font-semibold text-slate-700">{po.po_number}</span>
-                            <span className="text-xs text-slate-500">{po.supplier?.name ?? 'No supplier'}</span>
+                            <span className="text-xs text-slate-500">{po.supplier?.name ?? 'No vendor'}</span>
                           </div>
                           {po.lines
                             .filter((l: any) => l.quantity_ordered > l.quantity_received)

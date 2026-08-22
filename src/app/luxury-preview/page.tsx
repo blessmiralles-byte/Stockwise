@@ -48,7 +48,7 @@ const FEATURES = [
   {
     icon: Truck,
     title: 'Purchase Orders',
-    desc: 'Create POs, send to suppliers, and receive goods in a few taps. Built-in controls keep your process clean and auditable.',
+    desc: 'Create POs, send to vendors, and receive goods in a few taps. Built-in controls keep your process clean and auditable.',
   },
   {
     icon: Package,

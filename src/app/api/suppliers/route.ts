@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   const { name, contact_name, email, phone, lead_time_days, payment_terms, notes, over_receipt_tolerance_pct } = body
 
   if (!name?.trim()) {
-    return NextResponse.json({ error: 'Supplier name is required' }, { status: 400 })
+    return NextResponse.json({ error: 'Vendor name is required' }, { status: 400 })
   }
 
   const supabase = createServiceClient()

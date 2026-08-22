@@ -42,7 +42,7 @@ const ROLE_CFG: Record<string, { label: string; variant: any; description: strin
   procurement: {
     label: 'Procurement',
     variant: 'secondary',
-    description: 'Create & send purchase orders, manage suppliers, view forecasting',
+    description: 'Create & send purchase orders, manage vendors, view forecasting',
     sodNote: '⚠ Cannot receive goods (SOD)',
   },
   operations: {
@@ -1336,7 +1336,7 @@ function DeleteAccountSection({ role }: { role?: string }) {
       </div>
       <p className="text-sm text-slate-600 mb-4">
         {isOwner
-          ? 'Permanently delete your organization and all its data — inventory, assets, suppliers, purchase orders, reports, and every team member’s access. This cannot be undone.'
+          ? 'Permanently delete your organization and all its data — inventory, assets, vendors, purchase orders, reports, and every team member’s access. This cannot be undone.'
           : 'Permanently delete your own login. Your organization’s data is not affected. This cannot be undone.'}
       </p>
 

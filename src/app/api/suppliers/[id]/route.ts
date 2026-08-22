@@ -19,7 +19,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     .single()
 
   if (error || !data) {
-    return NextResponse.json({ error: 'Supplier not found' }, { status: 404 })
+    return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
   }
 
   return NextResponse.json({ data })

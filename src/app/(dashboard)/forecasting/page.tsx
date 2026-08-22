@@ -346,7 +346,7 @@ export default function ForecastingPage() {
             <p>
               Forecast uses a <strong>simple moving average</strong> over the last <strong>{daysBack} days</strong>.
               Reorder point = avg_daily × (lead_time + review_period) + safety_stock.
-              "Critical" = stock will run out before the supplier can deliver.
+              "Critical" = stock will run out before the vendor can deliver.
               "At Reorder Point" = stock is below the lead-time-aware threshold.
               <strong> Run ABC/XYZ</strong> to classify items by consumption value and demand variability.
             </p>

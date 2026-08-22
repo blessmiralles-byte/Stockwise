@@ -60,7 +60,7 @@ export default function DeleteAccountPage() {
             </div>
             <ul className="space-y-1.5 text-sm text-slate-600">
               <li>• Your login and profile (name, email).</li>
-              <li>• If you&apos;re the account <strong>Owner</strong>: your entire organization — inventory, assets, suppliers, purchase orders, transactions, reports, and every team member&apos;s access.</li>
+              <li>• If you&apos;re the account <strong>Owner</strong>: your entire organization — inventory, assets, vendors, purchase orders, transactions, reports, and every team member&apos;s access.</li>
               <li>• If you&apos;re a <strong>team member</strong>: only your own login. Your organization&apos;s data stays with the owner.</li>
             </ul>
             <p className="text-xs text-slate-400 mt-4">

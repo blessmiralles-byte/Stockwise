@@ -20,13 +20,13 @@ export function roleCapabilities(role: string): string[] {
         'Invite and manage team members and their roles',
         'Manage settings, locations, cost centers, and job codes',
         'Create and approve purchase orders, requisitions, and receipts',
-        'Manage inventory, fixed assets, suppliers, and products',
+        'Manage inventory, fixed assets, vendors, and products',
         'View all finance reports — valuation, payables, and the journal',
       ]
     case 'procurement':
       return [
         'Create and manage purchase orders',
-        'Manage suppliers and reorder suggestions',
+        'Manage vendors and reorder suggestions',
         'Raise and track requisitions',
         'View inventory levels and reports',
       ]

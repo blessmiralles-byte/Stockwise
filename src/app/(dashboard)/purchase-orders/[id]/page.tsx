@@ -126,7 +126,7 @@ function GRNDialog({
 
   async function handleReceive() {
     const supplierLines = lines.filter(l => l.source_type === 'supplier')
-    if (supplierLines.length > 0 && !supplierId) { setError('Please select the supplier the goods are received from'); return }
+    if (supplierLines.length > 0 && !supplierId) { setError('Please select the vendor the goods are received from'); return }
     const missing = lines.find(l => l.qty > 0 && !l.to_location_id && l.condition !== 'missing')
     if (missing) { setError(`Select a destination location for "${missing.product_name}"`); return }
     const missingFrom = lines.find(l => l.qty > 0 && l.source_type === 'location' && !l.from_location_id)
@@ -221,7 +221,7 @@ function GRNDialog({
                               : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400'
                           }`}
                         >
-                          {t === 'supplier' ? 'Supplier' : 'Another Location'}
+                          {t === 'supplier' ? 'Vendor' : 'Another Location'}
                         </button>
                       ))}
                     </div>
@@ -231,7 +231,7 @@ function GRNDialog({
                         value={supplierId}
                         onChange={e => setSupplierId(e.target.value)}
                       >
-                        <option value="">— Select supplier —</option>
+                        <option value="">— Select vendor —</option>
                         {suppliers.map(s => (
                           <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
@@ -253,7 +253,7 @@ function GRNDialog({
                   {/* Cross-PO note — when this supplier has other open POs for this item */}
                   {l.source_type === 'supplier' && (altByProduct[l.product_id]?.length ?? 0) > 0 && (
                     <p className="text-[11px] text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-md px-2.5 py-1.5">
-                      This supplier has {poCount(l)} open orders for this item. The quantity fills the
+                      This vendor has {poCount(l)} open orders for this item. The quantity fills the
                       earliest order first, then spills into the next.
                     </p>
                   )}
@@ -372,11 +372,11 @@ function GRNDialog({
             </p>
             <p className="text-sm text-slate-600 mb-3">
               You entered <span className="font-semibold text-red-600">{capWarning.requested}</span>, but only{' '}
-              <span className="font-semibold text-slate-900">{capWarning.max}</span> can be received across this supplier&apos;s open orders for this item
+              <span className="font-semibold text-slate-900">{capWarning.max}</span> can be received across this vendor&apos;s open orders for this item
               {tolerancePct > 0 ? ` (including the ${tolerancePct}% over-receipt allowance)` : ''}. It was capped at {capWarning.max}.
             </p>
             <p className="text-xs text-slate-400 mb-4">
-              To accept more: raise this supplier&apos;s over-receipt tolerance in Setup → Vendors, or add another PO for the shortfall.
+              To accept more: raise this vendor&apos;s over-receipt tolerance in Setup → Vendors, or add another PO for the shortfall.
             </p>
             <button
               onClick={() => setCapWarning(null)}
@@ -858,7 +858,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
             {[
               { label: 'PO Amount',       value: poValue,    note: `${lines.reduce((s: number, l: any) => s + l.quantity_ordered, 0)} units ordered`,   color: 'text-slate-900' },
               { label: 'GRN Received',    value: grnValue,   note: `${lines.reduce((s: number, l: any) => s + l.quantity_received, 0)} units received`,  color: 'text-green-700' },
-              { label: 'Supplier Invoice',value: invoiceAmt, note: invoiceAmt !== null ? po.supplier_invoice_no : 'Not recorded yet',                    color: invoiceAmt !== null ? (matched ? 'text-green-700' : overInv ? 'text-red-600' : 'text-amber-600') : 'text-slate-400' },
+              { label: 'Vendor Invoice',value: invoiceAmt, note: invoiceAmt !== null ? po.supplier_invoice_no : 'Not recorded yet',                    color: invoiceAmt !== null ? (matched ? 'text-green-700' : overInv ? 'text-red-600' : 'text-amber-600') : 'text-slate-400' },
             ].map(col => (
               <div key={col.label} className="bg-slate-50 rounded-xl p-3 text-center">
                 <p className="text-xs text-slate-500 mb-1">{col.label}</p>
@@ -879,7 +879,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
               }
               {matched
                 ? 'Invoice matches goods received — cleared for payment.'
-                : `Variance: ${formatCurrency(Math.abs(variance))} ${overInv ? '(invoice exceeds GRN — query with supplier before paying)' : '(invoice below GRN — partial invoice or credit note expected)'}`
+                : `Variance: ${formatCurrency(Math.abs(variance))} ${overInv ? '(invoice exceeds GRN — query with vendor before paying)' : '(invoice below GRN — partial invoice or credit note expected)'}`
               }
             </div>
           )}
@@ -887,7 +887,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
           {/* Invoice recording */}
           {editing ? (
             <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50">
-              <p className="text-xs font-semibold text-slate-700">Record Supplier Invoice</p>
+              <p className="text-xs font-semibold text-slate-700">Record Vendor Invoice</p>
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="text-xs font-medium text-slate-500 block mb-1">Invoice No.</label>
@@ -991,7 +991,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
                 )}
                 {po.status === 'approved' && (
                   <Button size="sm" onClick={() => markStatus('sent')} disabled={statusBusy} className="gap-1">
-                    <Send className="w-3.5 h-3.5" /> Send to Supplier
+                    <Send className="w-3.5 h-3.5" /> Send to Vendor
                   </Button>
                 )}
                 {canReceive && (

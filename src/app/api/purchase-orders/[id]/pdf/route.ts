@@ -61,7 +61,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
     // ── Supplier + dates ──────────────────────────────────────────────────
     const supplier = (po as any).supplier
-    doc.fillColor(DARK).fontSize(9).font('Helvetica-Bold').text('SUPPLIER', 50, doc.y)
+    doc.fillColor(DARK).fontSize(9).font('Helvetica-Bold').text('VENDOR', 50, doc.y)
     doc.font('Helvetica').fillColor(SLATE)
     if (supplier) {
       doc.text(supplier.name ?? '—', 50, doc.y + 4)

@@ -232,7 +232,7 @@ function ResultCard({ result, onPrint }: { result: any; onPrint: () => void }) {
             {[
               ['Number', result.code],
               ['Status', d.status],
-              ...(d.supplier ? [['Supplier', d.supplier.name]] : []),
+              ...(d.supplier ? [['Vendor', d.supplier.name]] : []),
               ...(d.requested_by ? [['Requested by', d.requested_by.full_name]] : []),
             ].map(([label, value]) => (
               <div key={label} className="bg-slate-50 rounded-lg p-2.5">

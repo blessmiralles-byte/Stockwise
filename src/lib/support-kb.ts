@@ -21,7 +21,7 @@ up for an organization is its Owner.
   owner assigned (owner, admin, manager, or staff/field).
 - New organizations start on a **14-day free trial — no credit card required**.
 - The **Getting Started** page walks a new owner through first setup: adding
-  suppliers, products, locations, and inviting the team.
+  vendors, products, locations, and inviting the team.
 - To change your organization name, go to **Settings → Organization**.
 
 ## Inventory & products
@@ -58,14 +58,14 @@ up for an organization is its Owner.
 
 ## Purchase orders, requisitions & approvals (Delegation of Authority)
 - Requisitions and purchase orders follow an approval flow:
-  **Submit for Approval → Approve → Send to Supplier**.
+  **Submit for Approval → Approve → Send to Vendor**.
 - Each member can have a **reporting line** (who they report to) and
   **approval limits** for requisitions and for purchase orders, set by the
   owner in **Settings → Users**.
 - If a requisition or PO exceeds a member's approval limit, it escalates up the
   reporting chain to someone with sufficient authority.
 - The purchase order page shows the visual status flow and the buttons available
-  at each stage (Submit, Approve, Reject, Send to Supplier).
+  at each stage (Submit, Approve, Reject, Send to Vendor).
 
 ## Locations & moving stock
 - Locations are modeled as a hierarchy: **Building/Site → Floor/Area →
@@ -123,7 +123,7 @@ Available under **Reports**:
 - **Accounting export** — export accounting data.
 
 ## Import & setup
-- **Setup & Import** lets you bulk-import data (products, suppliers, etc.) from a
+- **Setup & Import** lets you bulk-import data (products, vendors, etc.) from a
   spreadsheet to get started quickly, and configure initial settings.
 
 ## Audit log

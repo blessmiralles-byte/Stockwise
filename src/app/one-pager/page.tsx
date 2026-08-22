@@ -32,7 +32,7 @@ const FEATURE_SECTIONS = [
     color: 'sky',
     items: [
       'Create POs with line items, quantities, and unit costs',
-      'Send to suppliers and track fulfilment status',
+      'Send to vendors and track fulfilment status',
       'Goods receipt (GRN) with partial receipt support',
       'Three-way match: PO → receipt → inventory update',
       'Segregation of duties: creator ≠ receiver',
