@@ -835,6 +835,10 @@ function OrgSettingsSection({ isAdmin }: { isAdmin: boolean }) {
   const [approvalOverride, setApprovalOverride] = useState<boolean | null>(null)
   const requireApproval = approvalOverride ?? !!data?.data?.require_checkout_approval
 
+  // Require a cost center or job code when consuming stock
+  const [costDimOverride, setCostDimOverride] = useState<boolean | null>(null)
+  const requireCostDim = costDimOverride ?? !!data?.data?.require_cost_dimension
+
   const saveOrg = async () => {
     const name = displayName.trim()
     if (!name || name.length < 2) { setOrgError('Name must be at least 2 characters'); return }
@@ -842,7 +846,7 @@ function OrgSettingsSection({ isAdmin }: { isAdmin: boolean }) {
     const res  = await fetch('/api/org', {
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ name, require_checkout_approval: requireApproval }),
+      body:    JSON.stringify({ name, require_checkout_approval: requireApproval, require_cost_dimension: requireCostDim }),
     })
     const json = await res.json()
     setSaving(false)
@@ -885,6 +889,26 @@ function OrgSettingsSection({ isAdmin }: { isAdmin: boolean }) {
               className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${requireApproval ? 'bg-indigo-600' : 'bg-slate-300'} ${!isAdmin ? 'opacity-50' : ''}`}
             >
               <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${requireApproval ? 'translate-x-5' : ''}`} />
+            </button>
+          </div>
+        )}
+
+        {data?.data && (
+          <div className="flex items-start justify-between gap-4 rounded-lg border border-slate-200 p-3">
+            <div>
+              <p className="text-sm font-medium text-slate-700">Require a cost center or job code when consuming stock</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                When on, issuing/consuming stock must be tagged to a cost center or job code, so
+                expenses are fully attributed in the Cost Analysis report. Remember to save.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={!isAdmin}
+              onClick={() => setCostDimOverride(!requireCostDim)}
+              className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${requireCostDim ? 'bg-indigo-600' : 'bg-slate-300'} ${!isAdmin ? 'opacity-50' : ''}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${requireCostDim ? 'translate-x-5' : ''}`} />
             </button>
           </div>
         )}

@@ -17,7 +17,7 @@ export async function GET() {
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('organizations')
-    .select('id, name, slug, plan, plan_status, trial_ends_at, max_users, require_checkout_approval, ls_subscription_id, created_at')
+    .select('id, name, slug, plan, plan_status, trial_ends_at, max_users, require_checkout_approval, require_cost_dimension, ls_subscription_id, created_at')
     .eq('id', auth.orgId)
     .single()
 
@@ -44,13 +44,16 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const allowed = ['name', 'require_checkout_approval']
+  const allowed = ['name', 'require_checkout_approval', 'require_cost_dimension']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]
   }
   if ('require_checkout_approval' in updates) {
     updates.require_checkout_approval = !!updates.require_checkout_approval
+  }
+  if ('require_cost_dimension' in updates) {
+    updates.require_cost_dimension = !!updates.require_cost_dimension
   }
 
   if ('name' in updates) {
@@ -92,7 +95,7 @@ export async function PATCH(req: NextRequest) {
     .from('organizations')
     .update(updates)
     .eq('id', auth.orgId)
-    .select('id, name, slug, plan, plan_status, trial_ends_at, max_users, require_checkout_approval, ls_subscription_id, created_at')
+    .select('id, name, slug, plan, plan_status, trial_ends_at, max_users, require_checkout_approval, require_cost_dimension, ls_subscription_id, created_at')
     .single()
 
   if (error) {

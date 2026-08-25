@@ -98,6 +98,23 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServiceClient()
 
+  // Org policy: require a cost centre or job code when consuming stock, so
+  // job-costing spend is fully attributed (no "Unassigned" leakage). Opt-in
+  // per org via organizations.require_cost_dimension.
+  if (transaction_type === 'consumption') {
+    const { data: orgRow } = await supabase
+      .from('organizations')
+      .select('require_cost_dimension')
+      .eq('id', auth.orgId)
+      .single()
+    if (orgRow?.require_cost_dimension && !cost_center_id && !job_code) {
+      return NextResponse.json(
+        { error: 'A cost center or job code is required when consuming stock. Select one, or turn off the requirement in Settings → Organization.' },
+        { status: 422 },
+      )
+    }
+  }
+
   // Blind receipt: goods received with no PO to validate cost against. Flag the
   // org's value approvers to verify the unit price/value after the fact.
   const flagValue = transaction_type === 'purchase' && price_review === true

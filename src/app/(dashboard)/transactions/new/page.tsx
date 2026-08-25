@@ -104,6 +104,10 @@ export default function NewTransactionPage() {
   const [notes, setNotes]                   = useState('')
   const [customer, setCustomer]             = useState('')
   const [jobRef, setJobRef]                 = useState('')
+  const [costCenterId, setCostCenterId]     = useState('')
+  const [jobCode, setJobCode]               = useState('')
+  const [costCenters, setCostCenters]       = useState<any[]>([])
+  const [jobCodes, setJobCodes]             = useState<any[]>([])
   const [batchNo, setBatchNo]               = useState('')
   const [expirationDate, setExpirationDate] = useState('')
   const [fromLocationId, setFromLocationId] = useState('')
@@ -127,6 +131,12 @@ export default function NewTransactionPage() {
   const isPurchase  = type === 'purchase'
 
   const resetLocations = () => { setFromLocationId(''); setToLocationId('') }
+
+  // Cost centers + job codes for consumption/sale tagging
+  useEffect(() => {
+    fetch('/api/cost-centers?active=true').then(r => r.json()).then(j => setCostCenters(j.data ?? [])).catch(() => {})
+    fetch('/api/job-codes?active=true').then(r => r.json()).then(j => setJobCodes(j.data ?? [])).catch(() => {})
+  }, [])
 
   // Load pending POs when purchase type is selected
   useEffect(() => {
@@ -204,6 +214,8 @@ export default function NewTransactionPage() {
     if (canChargeTo) {
       if (customer.trim()) body.customer_id  = customer.trim()
       if (jobRef.trim())   body.job_order_id = jobRef.trim()
+      if (costCenterId)    body.cost_center_id = costCenterId
+      if (jobCode)         body.job_code       = jobCode
     }
 
     try {
@@ -479,6 +491,34 @@ export default function NewTransactionPage() {
                       value={jobRef}
                       onChange={e => setJobRef(e.target.value)}
                     />
+                  </div>
+                </div>
+              )}
+
+              {/* Cost center + job code (consumption / sale) — drives cost analysis */}
+              {canChargeTo && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 block mb-1">Cost Center</label>
+                    <select
+                      value={costCenterId}
+                      onChange={e => setCostCenterId(e.target.value)}
+                      className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="">— None —</option>
+                      {costCenters.map(c => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 block mb-1">Job Code</label>
+                    <select
+                      value={jobCode}
+                      onChange={e => setJobCode(e.target.value)}
+                      className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="">— None —</option>
+                      {jobCodes.map(j => <option key={j.id} value={j.code}>{j.code} — {j.name}</option>)}
+                    </select>
                   </div>
                 </div>
               )}

@@ -135,6 +135,10 @@ export default function FieldLogPage() {
   const [fromLocation, setFromLocation] = useState('')
   const [toLocation, setToLocation]     = useState('')
   const [jobRef, setJobRef]       = useState('')
+  const [costCenterId, setCostCenterId] = useState('')
+  const [jobCode, setJobCode]     = useState('')
+  const [costCenters, setCostCenters] = useState<any[]>([])
+  const [jobCodes, setJobCodes]   = useState<any[]>([])
   const [refNo, setRefNo]         = useState('')
   const [notes, setNotes]         = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -170,6 +174,12 @@ export default function FieldLogPage() {
   // to validate cost against, so it must be approved by a manager before it
   // touches stock or the ledger.
   const isBlindReceipt = isPurchase && !selectedPO
+
+  // Cost centers + job codes for tagging consumption
+  useEffect(() => {
+    fetch('/api/cost-centers?active=true').then(r => r.json()).then(j => setCostCenters(j.data ?? [])).catch(() => {})
+    fetch('/api/job-codes?active=true').then(r => r.json()).then(j => setJobCodes(j.data ?? [])).catch(() => {})
+  }, [])
 
   // Load purchase-specific data when type = purchase
   useEffect(() => {
@@ -329,6 +339,8 @@ export default function FieldLogPage() {
     if (!logType.needsFrom)           body.to_location_id   = toLocation   || undefined
     if (logType.value === 'transfer') { body.from_location_id = fromLocation; body.to_location_id = toLocation }
     if (logType.needsJob && jobRef.trim()) body.job_order_id = jobRef.trim()
+    if (logType.needsJob && costCenterId)  body.cost_center_id = costCenterId
+    if (logType.needsJob && jobCode)       body.job_code       = jobCode
 
     try {
       const res  = await fetch('/api/inventory', {
@@ -347,7 +359,7 @@ export default function FieldLogPage() {
 
   const reset = () => {
     setStep('type'); setProduct(null); setQty(1); setUnitPrice('')
-    setFromLocation(''); setToLocation(''); setJobRef('')
+    setFromLocation(''); setToLocation(''); setJobRef(''); setCostCenterId(''); setJobCode('')
     setRefNo(''); setNotes(''); setErrorMsg(''); setScanError('')
     setSelectedPO(null); setSelectedLine(null); setSupplierId('')
     setReceivedBy(''); setCondition('good'); setConditionNotes('')
@@ -830,19 +842,43 @@ export default function FieldLogPage() {
               </div>
             )}
 
-            {/* Job reference */}
+            {/* Cost center + job code (drives cost analysis) */}
             {logType.needsJob && (
-              <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-                  Job Reference <span className="text-gray-300 font-normal normal-case">(for JobLedger)</span>
-                </p>
-                <input
-                  value={jobRef}
-                  onChange={e => setJobRef(e.target.value)}
-                  placeholder="e.g. JOB-2026-001"
-                  className="w-full h-14 px-4 rounded-2xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm font-mono"
-                />
-              </div>
+              <>
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Cost Center</p>
+                  <select
+                    value={costCenterId}
+                    onChange={e => setCostCenterId(e.target.value)}
+                    className="w-full h-14 px-4 rounded-2xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                  >
+                    <option value="">— None —</option>
+                    {costCenters.map(c => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Job Code</p>
+                  <select
+                    value={jobCode}
+                    onChange={e => setJobCode(e.target.value)}
+                    className="w-full h-14 px-4 rounded-2xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                  >
+                    <option value="">— None —</option>
+                    {jobCodes.map(j => <option key={j.id} value={j.code}>{j.code} — {j.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+                    Job Reference <span className="text-gray-300 font-normal normal-case">(for JobLedger)</span>
+                  </p>
+                  <input
+                    value={jobRef}
+                    onChange={e => setJobRef(e.target.value)}
+                    placeholder="e.g. JOB-2026-001"
+                    className="w-full h-14 px-4 rounded-2xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm font-mono"
+                  />
+                </div>
+              </>
             )}
 
             {/* Reference + notes */}
