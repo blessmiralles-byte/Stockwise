@@ -2,7 +2,9 @@ import type { NextConfig } from 'next'
 import { withSentryConfig } from '@sentry/nextjs'
 
 const nextConfig: NextConfig = {
-  typescript: { ignoreBuildErrors: true },
+  // Type errors fail the build. With no test suite, the typechecker is the
+  // safety net — don't re-enable ignoreBuildErrors to get a deploy out.
+  typescript: { ignoreBuildErrors: false },
 }
 
 export default withSentryConfig(nextConfig, {

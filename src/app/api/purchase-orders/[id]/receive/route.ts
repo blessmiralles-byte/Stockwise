@@ -221,7 +221,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     byPo.set(l.purchase_order_id, agg)
   }
 
-  const statusUpdates: Promise<any>[] = []
+  // PostgrestFilterBuilder is thenable but not a full Promise — PromiseLike is
+  // the accurate type, and Promise.all accepts it.
+  const statusUpdates: PromiseLike<any>[] = []
   for (const [poId, agg] of byPo) {
     if (agg.received <= 0) continue   // nothing received — leave status untouched
     const status = agg.received >= agg.ordered ? 'received' : 'partial'
