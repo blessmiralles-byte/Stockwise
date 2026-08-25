@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
+import {
+  inventoryPosting, depreciationPosting, assetPurchasePosting,
+  ppvPosting, computeDisposal, disposalLegs,
+} from '@/lib/journal-mapping'
 
 /**
  * GET /api/reports/journal
@@ -113,67 +117,35 @@ export async function GET(req: NextRequest) {
         cost_center: t.cost_center ? `${t.cost_center.code} — ${t.cost_center.name}` : '',
       }
 
+      const posting = inventoryPosting(t)
+
+      // Route-specific description text (accounts + type label come from the
+      // shared journal-mapping module so the two feeds never diverge).
+      let description: string
       switch (t.transaction_type) {
-        case 'purchase':
-          entries.push({
-            date, reference: ref, type: 'Purchase',
-            description: `Purchase — ${productRef}`,
-            debit_account:  'Inventory Asset',
-            credit_account: 'Accounts Payable',
-            amount, product: productRef, category, notes, ...dims,
-          })
-          break
-
         case 'sale':
-          entries.push({
-            date, reference: ref, type: 'Sale',
-            description: `COGS — ${productRef}`,
-            debit_account:  'Cost of Goods Sold',
-            credit_account: 'Inventory Asset',
-            amount, product: productRef, category, notes, ...dims,
-          })
-          break
-
+          description = `COGS — ${productRef}`; break
         case 'consumption':
-          entries.push({
-            date, reference: ref, type: 'Consumption',
-            description: `Consumption — ${productRef}`,
-            debit_account:  'Operating Expense',
-            credit_account: 'Inventory Asset',
-            amount, product: productRef, category, notes, ...dims,
-          })
-          break
-
+          description = `Consumption — ${productRef}`; break
         case 'adjustment':
-          if (t.quantity >= 0) {
-            entries.push({
-              date, reference: ref, type: 'Adjustment (+)',
-              description: `Inventory adjustment (increase) — ${productRef}`,
-              debit_account:  'Inventory Asset',
-              credit_account: 'Inventory Shrinkage',
-              amount, product: productRef, category, notes, ...dims,
-            })
-          } else {
-            entries.push({
-              date, reference: ref, type: 'Adjustment (−)',
-              description: `Inventory adjustment (decrease) — ${productRef}`,
-              debit_account:  'Inventory Shrinkage',
-              credit_account: 'Inventory Asset',
-              amount, product: productRef, category, notes, ...dims,
-            })
-          }
+          description = t.quantity >= 0
+            ? `Inventory adjustment (increase) — ${productRef}`
+            : `Inventory adjustment (decrease) — ${productRef}`
           break
-
         case 'transfer':
-          entries.push({
-            date, reference: ref, type: 'Transfer',
-            description: `Stock transfer — ${productRef} · ${t.from_location?.name ?? '?'} → ${t.to_location?.name ?? '?'}`,
-            debit_account:  `Inventory (${t.to_location?.name   ?? 'Destination'})`,
-            credit_account: `Inventory (${t.from_location?.name ?? 'Source'})`,
-            amount, product: productRef, category, notes, ...dims,
-          })
+          description = `Stock transfer — ${productRef} · ${t.from_location?.name ?? '?'} → ${t.to_location?.name ?? '?'}`
           break
+        default:
+          description = `${posting.type} — ${productRef}`
       }
+
+      entries.push({
+        date, reference: ref, type: posting.type,
+        description,
+        debit_account:  posting.debit_account,
+        credit_account: posting.credit_account,
+        amount, product: productRef, category, notes, ...dims,
+      })
     }
   }
 
@@ -190,16 +162,17 @@ export async function GET(req: NextRequest) {
       .lte('period_start', to)
       .order('period_start')
 
+    const depPosting = depreciationPosting()
     for (const d of deps ?? []) {
       const dep = d as any
       const assetRef = dep.asset?.asset_tag ? `${dep.asset.asset_tag} — ${dep.asset?.name}` : (dep.asset?.name ?? '')
       entries.push({
         date:           dep.period_start.slice(0, 10),
         reference:      dep.id.slice(0, 8).toUpperCase(),
-        type:           'Depreciation',
+        type:           depPosting.type,
         description:    `Depreciation — ${assetRef}`,
-        debit_account:  'Depreciation Expense',
-        credit_account: 'Accumulated Depreciation',
+        debit_account:  depPosting.debit_account,
+        credit_account: depPosting.credit_account,
         amount:         Number(dep.depreciation_amount ?? 0),
         product:        assetRef,
         category:       dep.asset?.category?.name ?? '',
@@ -219,15 +192,16 @@ export async function GET(req: NextRequest) {
       .gt('purchase_cost', 0)
       .order('purchase_date')
 
+    const apPosting = assetPurchasePosting()
     for (const a of (acquired ?? []) as any[]) {
       const assetRef = a.asset_tag ? `${a.asset_tag} — ${a.name}` : (a.name ?? '')
       entries.push({
         date:           a.purchase_date.slice(0, 10),
         reference:      a.asset_tag ?? a.id.slice(0, 8).toUpperCase(),
-        type:           'Asset Purchase',
+        type:           apPosting.type,
         description:    `Asset acquisition — ${assetRef}`,
-        debit_account:  'Fixed Assets',
-        credit_account: 'Accounts Payable',
+        debit_account:  apPosting.debit_account,
+        credit_account: apPosting.credit_account,
         amount:         Number(a.purchase_cost),
         product:        assetRef,
         category:       a.category?.name ?? '',
@@ -255,10 +229,7 @@ export async function GET(req: NextRequest) {
       const date = String(when).slice(0, 10)
       if (date < from || date > to) continue
 
-      const cost     = Number(a.purchase_cost ?? 0)
-      const book     = Math.max(0, Math.min(cost, Number(a.current_value ?? 0)))
-      const accum    = Math.max(0, cost - book)
-      const proceeds = a.status === 'sold' && a.sale_price != null ? Number(a.sale_price) : null
+      const { cost, book, accum, proceeds } = computeDisposal(a)
       if (cost <= 0) continue
 
       const assetRef = a.asset_tag ? `${a.asset_tag} — ${a.name}` : (a.name ?? '')
@@ -270,33 +241,13 @@ export async function GET(req: NextRequest) {
             : 'Asset marked sold but no sale price recorded — book the proceeds against Gain/Loss on Asset Disposal manually.')
         : ''
 
-      if (accum > 0) {
+      for (const leg of disposalLegs({ cost, book, accum, proceeds })) {
         entries.push({
           date, reference: ref, type: 'Asset Disposal',
-          description:    `Disposal — ${assetRef} (relieve accumulated depreciation)`,
-          debit_account:  'Accumulated Depreciation',
-          credit_account: 'Fixed Assets',
-          amount:         accum,
-          product:        assetRef, category, notes: note,
-        })
-      }
-      if (book > 0) {
-        entries.push({
-          date, reference: ref, type: 'Asset Disposal',
-          description:    `Disposal — ${assetRef} (write off remaining book value)`,
-          debit_account:  'Gain/Loss on Asset Disposal',
-          credit_account: 'Fixed Assets',
-          amount:         book,
-          product:        assetRef, category, notes: note,
-        })
-      }
-      if (proceeds != null && proceeds > 0) {
-        entries.push({
-          date, reference: ref, type: 'Asset Disposal',
-          description:    `Disposal — ${assetRef} (sale proceeds)`,
-          debit_account:  'Undeposited Funds',
-          credit_account: 'Gain/Loss on Asset Disposal',
-          amount:         proceeds,
+          description:    `Disposal — ${assetRef} (${leg.description_suffix})`,
+          debit_account:  leg.debit_account,
+          credit_account: leg.credit_account,
+          amount:         leg.amount,
           product:        assetRef, category, notes: note,
         })
       }
@@ -323,13 +274,14 @@ export async function GET(req: NextRequest) {
       if (Math.abs(variance) <= 0.01) continue   // matched — no entry
 
       const over = variance > 0
+      const ppv  = ppvPosting(over)
       entries.push({
         date:           String(p.supplier_invoice_date).slice(0, 10),
         reference:      p.supplier_invoice_no ?? p.po_number,
-        type:           'Purchase Price Variance',
+        type:           ppv.type,
         description:    `Invoice ${p.supplier_invoice_no ?? ''} vs GRN on ${p.po_number} — ${over ? 'over' : 'under'}-invoiced`,
-        debit_account:  over ? 'Purchase Price Variance' : 'Accounts Payable',
-        credit_account: over ? 'Accounts Payable' : 'Purchase Price Variance',
+        debit_account:  ppv.debit_account,
+        credit_account: ppv.credit_account,
         amount:         Math.abs(variance),
         product:        p.po_number,
         category:       '',
