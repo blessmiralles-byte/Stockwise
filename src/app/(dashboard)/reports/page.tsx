@@ -2,7 +2,7 @@
 
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent } from '@/components/ui/card'
-import { BarChart2, TrendingUp, Package, ChevronRight, Briefcase, TrendingDown, ScrollText, BookOpen, Wrench, HardHat } from 'lucide-react'
+import { BarChart2, TrendingUp, Package, ChevronRight, Briefcase, TrendingDown, ScrollText, BookOpen, Wrench, HardHat, Grid3x3 } from 'lucide-react'
 import Link from 'next/link'
 
 const reports = [
@@ -19,6 +19,13 @@ const reports = [
     color: 'bg-violet-50 text-violet-600',
     title: 'Expenses by Cost Center / Job',
     desc: 'Consumption and sales grouped by cost center or job code — drill down to SKU level.',
+  },
+  {
+    href: '/reports/cost-analysis',
+    icon: Grid3x3,
+    color: 'bg-fuchsia-50 text-fuchsia-600',
+    title: 'Cost Analysis (Matrix)',
+    desc: 'Expenses cross-tabulated by cost center × job code — matrix, per-job, and per-cost-center views. Download as CSV.',
   },
   {
     href: '/reports/depreciation',

@@ -116,7 +116,11 @@ up for an organization is its Owner.
 ## Reports
 Available under **Reports**:
 - **Inventory valuation** — current stock value.
-- **Expenses** — spend over a period.
+- **Expenses** — consumption/sales spend grouped by cost center OR job code.
+- **Cost Analysis** — expenses cross-tabulated by cost center × job code
+  (matrix, per-job, and per-cost-center views); shows how a job's cost splits
+  across cost centers. Expenses are tracked by tagging consumption/sale
+  transactions with a cost center and/or job code.
 - **Tools out** — all tools currently checked out.
 - **Tools by crew** — checked-out tools grouped by crew.
 - **Depreciation** and **Assets roll-forward** — asset value over time.
