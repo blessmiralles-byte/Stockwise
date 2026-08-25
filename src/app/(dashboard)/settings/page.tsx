@@ -1267,11 +1267,12 @@ function SettingsInner() {
             )}
 
             <div className="bg-slate-50 rounded-lg p-3 text-xs text-slate-500 space-y-1">
-              <p className="font-medium text-slate-700">To automate daily emails:</p>
-              <p>Call <code className="bg-white px-1 rounded border">POST /api/notifications/maintenance</code> from a cron job with:</p>
-              <code className="block bg-white p-2 rounded border font-mono">
-                Authorization: Bearer {'{POS_API_KEY}'}
-              </code>
+              <p className="font-medium text-slate-700">Daily emails are automatic</p>
+              <p>
+                A scheduled job runs every morning and emails overdue and upcoming maintenance
+                to your organization&apos;s owners and admins. Use <span className="font-medium">Send Now</span> above
+                to preview what that email contains right now.
+              </p>
             </div>
           </div>
         </Section>

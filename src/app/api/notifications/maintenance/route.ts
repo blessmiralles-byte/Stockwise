@@ -5,96 +5,150 @@ import { sendMaintenanceAlert, type MaintenanceAlert } from '@/lib/email'
 
 /**
  * POST /api/notifications/maintenance
- * Sends maintenance alert emails.
+ * Sends maintenance alert emails — overdue schedules plus ones due within their
+ * notify_days_before window.
  *
- * Accepts two auth methods:
- *  1. Session cookie — any authenticated user (e.g. "Send Now" button in Settings)
- *  2. CRON_SECRET header — for scheduled cron jobs (separate from POS key, M-3)
+ * Two auth paths:
+ *  1. CRON_SECRET header — scheduled run; processes EVERY org, each org's
+ *     alerts going only to that org's own owners/admins.
+ *  2. Session cookie — UI-triggered ("Send Now"); processes ONLY the caller's
+ *     org.
  *
- * Removed: Referer-based auth (was spoofable, H-4)
+ * Multi-tenant: alerts are grouped by org_id and delivered per-org. Previously
+ * this queried maintenance_schedules with no org filter and mailed everything to
+ * a single global NOTIFICATION_EMAIL, which leaked other orgs' data.
  */
-export async function POST(req: NextRequest) {
-  const cronSecret = req.headers.get('x-cron-secret')
-  const isValidCron = !!process.env.CRON_SECRET && cronSecret === process.env.CRON_SECRET
+/** True when the request carries the cron secret (Vercel Cron or an external scheduler). */
+function isCronRequest(req: NextRequest): boolean {
+  const secret = process.env.CRON_SECRET
+  if (!secret) return false
+  // Vercel Cron sends `Authorization: Bearer <CRON_SECRET>`; x-cron-secret
+  // supports other schedulers and manual curl runs.
+  return (
+    req.headers.get('x-cron-secret') === secret ||
+    req.headers.get('authorization') === `Bearer ${secret}`
+  )
+}
 
-  if (!isValidCron) {
-    // Fall back to session auth for UI-triggered calls
+/** Vercel Cron invokes scheduled jobs with GET. */
+export async function GET(req: NextRequest) {
+  if (!isCronRequest(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  return run(null)
+}
+
+export async function POST(req: NextRequest) {
+  // Cron runs across all orgs; a session run is scoped to the caller's org.
+  let scopedOrgId: string | null = null
+  if (!isCronRequest(req)) {
     const auth = await requireAuth()
     if (auth.error) return auth.error
+    if (!auth.orgId) {
+      return NextResponse.json({ error: 'No organization found for this account' }, { status: 404 })
+    }
+    scopedOrgId = auth.orgId
   }
+  return run(scopedOrgId)
+}
 
-  const notificationEmail = process.env.NOTIFICATION_EMAIL
-  if (!notificationEmail) {
-    return NextResponse.json({ error: 'NOTIFICATION_EMAIL not configured' }, { status: 500 })
-  }
+/** Build and send alerts. `scopedOrgId === null` processes every org. */
+async function run(scopedOrgId: string | null) {
   if (!process.env.RESEND_API_KEY) {
     return NextResponse.json({ error: 'RESEND_API_KEY not configured' }, { status: 500 })
   }
 
   const supabase = createServiceClient()
-  const today = new Date()
+  const today    = new Date()
+  const daysLeft = (d: string) => Math.ceil((new Date(d).getTime() - today.getTime()) / 86400000)
 
-  const { data: overdue } = await supabase
-    .from('maintenance_schedules')
-    .select('id, title, scheduled_date, cost, performed_by, asset:fixed_assets(asset_tag, name)')
-    .eq('status', 'overdue')
+  const select = 'id, org_id, title, scheduled_date, notify_days_before, cost, performed_by, asset:fixed_assets(asset_tag, name)'
 
-  const { data: upcoming } = await supabase
-    .from('maintenance_schedules')
-    .select('id, title, scheduled_date, notify_days_before, cost, performed_by, asset:fixed_assets(asset_tag, name)')
-    .eq('status', 'scheduled')
-
-  const upcomingDueSoon = (upcoming ?? []).filter((s: any) => {
-    const daysLeft = Math.ceil(
-      (new Date(s.scheduled_date).getTime() - today.getTime()) / 86400000
-    )
-    return daysLeft >= 0 && daysLeft <= (s.notify_days_before ?? 7)
-  })
-
-  const alerts: MaintenanceAlert[] = [
-    ...(overdue ?? []).map((s: any) => ({
-      asset_name:     s.asset?.name        ?? 'Unknown Asset',
-      asset_tag:      s.asset?.asset_tag   ?? '—',
-      title:          s.title,
-      scheduled_date: s.scheduled_date,
-      days_left:      Math.ceil((new Date(s.scheduled_date).getTime() - today.getTime()) / 86400000),
-      performed_by:   s.performed_by,
-      cost:           s.cost,
-      status:         'overdue' as const,
-    })),
-    ...upcomingDueSoon.map((s: any) => ({
-      asset_name:     s.asset?.name        ?? 'Unknown Asset',
-      asset_tag:      s.asset?.asset_tag   ?? '—',
-      title:          s.title,
-      scheduled_date: s.scheduled_date,
-      days_left:      Math.ceil((new Date(s.scheduled_date).getTime() - today.getTime()) / 86400000),
-      performed_by:   s.performed_by,
-      cost:           s.cost,
-      status:         'scheduled' as const,
-    })),
-  ]
-
-  if (alerts.length === 0) {
-    return NextResponse.json({ sent: false, reason: 'No alerts to send', alerts: 0 })
+  let overdueQ  = supabase.from('maintenance_schedules').select(select).eq('status', 'overdue')
+  let upcomingQ = supabase.from('maintenance_schedules').select(select).eq('status', 'scheduled')
+  if (scopedOrgId) {
+    overdueQ  = overdueQ.eq('org_id', scopedOrgId)
+    upcomingQ = upcomingQ.eq('org_id', scopedOrgId)
   }
 
-  const { data, error } = await sendMaintenanceAlert({
-    to:           notificationEmail,
-    businessName: process.env.BUSINESS_NAME ?? 'Your Business',
-    alerts,
+  const [{ data: overdue }, { data: upcoming }] = await Promise.all([overdueQ, upcomingQ])
+
+  const toAlert = (s: any, status: 'overdue' | 'scheduled'): MaintenanceAlert => ({
+    asset_name:     s.asset?.name      ?? 'Unknown Asset',
+    asset_tag:      s.asset?.asset_tag ?? '—',
+    title:          s.title,
+    scheduled_date: s.scheduled_date,
+    days_left:      daysLeft(s.scheduled_date),
+    performed_by:   s.performed_by,
+    cost:           s.cost,
+    status,
   })
 
-  if (error) {
-    console.error('[POST /api/notifications/maintenance]', error)
-    return NextResponse.json({ error: 'Failed to send notification' }, { status: 500 })
+  // Group alerts by org
+  const byOrg = new Map<string, MaintenanceAlert[]>()
+  const push  = (orgId: string, alert: MaintenanceAlert) => {
+    if (!orgId) return
+    const list = byOrg.get(orgId) ?? []
+    list.push(alert)
+    byOrg.set(orgId, list)
+  }
+
+  for (const s of (overdue ?? []) as any[]) push(s.org_id, toAlert(s, 'overdue'))
+  for (const s of (upcoming ?? []) as any[]) {
+    const left = daysLeft(s.scheduled_date)
+    if (left >= 0 && left <= (s.notify_days_before ?? 7)) push(s.org_id, toAlert(s, 'scheduled'))
+  }
+
+  if (byOrg.size === 0) {
+    return NextResponse.json({ sent: false, reason: 'No alerts to send', alerts: 0, orgs: 0 })
+  }
+
+  const orgIds = [...byOrg.keys()]
+
+  // Recipients: each org's active owners/admins, plus that org's own name.
+  const [{ data: orgs }, { data: recipients }] = await Promise.all([
+    supabase.from('organizations').select('id, name').in('id', orgIds),
+    supabase
+      .from('user_profiles')
+      .select('org_id, email, role, is_active')
+      .in('org_id', orgIds)
+      .in('role', ['owner', 'admin'])
+      .eq('is_active', true),
+  ])
+
+  const orgName = new Map((orgs ?? []).map((o: any) => [o.id, o.name as string]))
+  const mailTo  = new Map<string, string[]>()
+  for (const r of (recipients ?? []) as any[]) {
+    if (!r.email) continue
+    mailTo.set(r.org_id, [...(mailTo.get(r.org_id) ?? []), r.email])
+  }
+
+  let sentCount = 0, alertCount = 0
+  const skipped: string[] = []
+
+  for (const [orgId, alerts] of byOrg) {
+    const to = mailTo.get(orgId) ?? []
+    if (to.length === 0) { skipped.push(orgId); continue }
+
+    // One email per org, addressed to its owners/admins.
+    const { error } = await sendMaintenanceAlert({
+      to:           to.join(', '),
+      businessName: orgName.get(orgId) ?? 'Your Business',
+      alerts,
+    })
+    if (error) {
+      console.error('[POST /api/notifications/maintenance] org', orgId, error)
+      continue
+    }
+    sentCount  += 1
+    alertCount += alerts.length
   }
 
   return NextResponse.json({
-    sent:               true,
-    email_id:           (data as any)?.id,
-    to:                 notificationEmail,
-    alerts:             alerts.length,
-    overdue:            overdue?.length ?? 0,
-    upcoming_due_soon:  upcomingDueSoon.length,
+    sent:            sentCount > 0,
+    orgs_notified:   sentCount,
+    alerts:          alertCount,
+    orgs_skipped:    skipped.length,   // no active owner/admin with an email
+    scope:           scopedOrgId ? 'org' : 'all',
   })
 }
