@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
 import {
   inventoryPosting, depreciationPosting, assetPurchasePosting,
-  ppvPosting, computeDisposal, disposalLegs,
+  ppvPosting, computeDisposal, disposalLegs, JOURNAL_SCOPE,
 } from '@/lib/journal-mapping'
 
 /**
@@ -305,7 +305,16 @@ export async function GET(req: NextRequest) {
       e.notes,
     ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
 
-    const csv = [headers.join(','), ...rows].join('\r\n')
+    // "Notes for your accountant" — leading comment lines that travel with the
+    // file. Prefixed with '#'; most importers skip them, and a bookkeeper who
+    // opens the CSV in a spreadsheet first sees the scope up front. Delete these
+    // rows if your import tool does not skip comment lines.
+    const noteLines = [
+      `# Stocked general journal — ${from} to ${to}`,
+      ...JOURNAL_SCOPE.map(s => `# ${s.replace(/\s+/g, ' ')}`),
+      '#',
+    ]
+    const csv = [...noteLines, headers.join(','), ...rows].join('\r\n')
     return new NextResponse(csv, {
       headers: {
         'Content-Type':        'text/csv',

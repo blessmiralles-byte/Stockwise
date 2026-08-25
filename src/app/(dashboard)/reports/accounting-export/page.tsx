@@ -8,6 +8,7 @@ import {
   Download, Loader2, RefreshCw, BookOpen,
   AlertCircle, CheckCircle2, Info,
 } from 'lucide-react'
+import { postingReference, JOURNAL_SCOPE, JOURNAL_IMPORT_STEPS } from '@/lib/journal-mapping'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface JournalEntry {
@@ -116,6 +117,33 @@ export default function AccountingExportPage() {
             </p>
           </div>
         </div>
+
+        {/* How accounting entries work — the guide */}
+        <details className="bg-white border border-slate-200 rounded-xl overflow-hidden group">
+          <summary className="flex items-center gap-2 px-4 py-3 cursor-pointer text-sm font-semibold text-slate-700 hover:bg-slate-50 select-none">
+            <BookOpen className="w-4 h-4 text-slate-400" />
+            How accounting entries work in Stocked
+            <span className="ml-auto text-xs font-normal text-slate-400 group-open:hidden">Read before importing</span>
+          </summary>
+          <div className="px-4 pb-4 pt-1 space-y-4 text-xs text-slate-600">
+            <div>
+              <p className="font-semibold text-slate-700 mb-1.5">Scope &amp; assumptions</p>
+              <ul className="space-y-1.5">
+                {JOURNAL_SCOPE.map((s, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="text-slate-300 mt-0.5">•</span><span>{s}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="font-semibold text-slate-700 mb-1.5">How to import</p>
+              <ol className="space-y-1.5 list-decimal list-inside marker:text-slate-400">
+                {JOURNAL_IMPORT_STEPS.map((s, i) => <li key={i}>{s}</li>)}
+              </ol>
+            </div>
+          </div>
+        </details>
 
         {/* Filters */}
         <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
@@ -302,23 +330,15 @@ export default function AccountingExportPage() {
           </div>
         )}
 
-        {/* Account mapping legend */}
-        <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-xs text-slate-500 space-y-2">
+        {/* Account mapping reference — generated from the same code the feed uses */}
+        <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-xs text-slate-500 space-y-3">
           <p className="font-semibold text-slate-700">Account mapping reference</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-1.5 gap-x-4">
-            {[
-              ['Purchase',      'Dr Inventory Asset',      'Cr Accounts Payable'],
-              ['Sale / COGS',   'Dr Cost of Goods Sold',   'Cr Inventory Asset'],
-              ['Consumption',   'Dr Operating Expense',    'Cr Inventory Asset'],
-              ['Adjustment +',  'Dr Inventory Asset',      'Cr Inventory Adjustment'],
-              ['Adjustment −',  'Dr Inventory Adjustment', 'Cr Inventory Asset'],
-              ['Transfer',      'Dr Inventory (To)',       'Cr Inventory (From)'],
-              ['Depreciation',  'Dr Depreciation Expense', 'Cr Accum. Depreciation'],
-            ].map(([type, dr, cr]) => (
-              <div key={type} className="space-y-0.5">
-                <p className="font-medium text-slate-600">{type}</p>
-                <p><span className="text-green-600 font-semibold">Dr</span> {dr}</p>
-                <p><span className="text-red-500 font-semibold">Cr</span> {cr}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-6">
+            {postingReference().map((r, i) => (
+              <div key={i} className="space-y-0.5">
+                <p className="font-medium text-slate-600">{r.event}</p>
+                <p className="text-slate-400">{r.trigger}</p>
+                <p><span className="text-green-600 font-semibold">Dr</span> {r.debit}{'  '}<span className="text-red-500 font-semibold">Cr</span> {r.credit}</p>
               </div>
             ))}
           </div>

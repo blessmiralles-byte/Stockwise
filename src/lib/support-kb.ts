@@ -152,6 +152,34 @@ Available under **Reports**:
 - Terms of Service and Privacy Policy links are in the app footer and on the
   signup page. Users consent to them at signup.
 
+## Accounting & the journal export
+- Stocked produces a **double-entry general journal** from inventory and
+  fixed-asset activity, downloadable from **Reports → Accounting Export** as CSV
+  for QuickBooks, Xero, MYOB, Wave, or any journal import.
+- **Scope:** inventory and fixed assets only. It does **not** post sales revenue
+  (revenue is invoiced/journaled in JobLedger — the Sale entry here is the cost
+  side, COGS, only) and does **not** calculate sales tax / VAT.
+- **How entries map (debit / credit):**
+  - Purchase (goods received): Dr Inventory Asset / Cr Accounts Payable
+  - Sale: Dr Cost of Goods Sold / Cr Inventory Asset (cost side only)
+  - Consumption: Dr Operating Expense / Cr Inventory Asset
+  - Stock adjustment +: Dr Inventory Asset / Cr Inventory Shrinkage; − reverses it
+  - Transfer: Dr Inventory (destination) / Cr Inventory (source)
+  - Depreciation: Dr Depreciation Expense / Cr Accumulated Depreciation
+  - Asset purchase: Dr Fixed Assets / Cr Accounts Payable
+  - Asset disposal: relieves accumulated depreciation and remaining book value
+    against Gain/Loss on Asset Disposal; sale proceeds go to Undeposited Funds
+  - Purchase price variance (invoice vs goods received): posts the difference to
+    Purchase Price Variance against Accounts Payable
+- **Important:** purchases credit Accounts Payable at goods receipt (a "GRNI"
+  simplification). Use this export as your source of payables, or map the credit
+  to a GRNI / accrued-purchases account so invoices entered elsewhere aren't
+  double-counted.
+- The Accounting Export page has a "How accounting entries work in Stocked"
+  section with the full scope, the mapping, and import steps. For specific
+  bookkeeping questions, an accountant should review the export against your
+  chart of accounts.
+
 ## Support
 - For anything not covered here, or for account-specific issues (billing
   disputes, data problems, bugs), contact **support@stocked.tech**.

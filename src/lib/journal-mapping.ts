@@ -121,6 +121,66 @@ export interface DisposalLeg {
   amount:            number
 }
 
+// ── Human-facing reference (generated from the postings above) ────────────────
+// Rendered in-app and referenced in docs so the explanation can never fall out
+// of sync with the code.
+
+export interface PostingRef {
+  event:   string
+  trigger: string
+  debit:   string
+  credit:  string
+}
+
+/** Every posting kind, derived from the same functions the feeds use. */
+export function postingReference(): PostingRef[] {
+  const inv = (transaction_type: string, quantity = 1) =>
+    inventoryPosting({ transaction_type, quantity })
+  const purchase = inv('purchase')
+  const sale     = inv('sale')
+  const consume  = inv('consumption')
+  const adjUp    = inv('adjustment', 1)
+  const adjDown  = inv('adjustment', -1)
+  const transfer = inv('transfer')
+  const dep      = depreciationPosting()
+  const assetBuy = assetPurchasePosting()
+  const ppvOver  = ppvPosting(true)
+  const ppvUnder = ppvPosting(false)
+  // Sample amounts so every disposal leg is present in the reference.
+  const legs     = disposalLegs({ cost: 1, book: 1, accum: 1, proceeds: 1 })
+
+  return [
+    { event: purchase.type, trigger: 'Goods received against a purchase (or blind receipt)', debit: purchase.debit_account, credit: purchase.credit_account },
+    { event: sale.type,     trigger: 'Item sold — records the cost side (COGS) only',        debit: sale.debit_account,     credit: sale.credit_account },
+    { event: consume.type,  trigger: 'Materials issued / consumed',                          debit: consume.debit_account,  credit: consume.credit_account },
+    { event: adjUp.type,    trigger: 'Positive stock adjustment (overage / found stock)',    debit: adjUp.debit_account,    credit: adjUp.credit_account },
+    { event: adjDown.type,  trigger: 'Negative stock adjustment (shrinkage / loss)',         debit: adjDown.debit_account,  credit: adjDown.credit_account },
+    { event: transfer.type, trigger: 'Stock moved between locations',                        debit: transfer.debit_account, credit: transfer.credit_account },
+    { event: dep.type,      trigger: 'Depreciation run',                                     debit: dep.debit_account,      credit: dep.credit_account },
+    { event: assetBuy.type, trigger: 'Fixed asset acquired',                                 debit: assetBuy.debit_account, credit: assetBuy.credit_account },
+    ...legs.map(l => ({ event: 'Asset Disposal', trigger: `Asset disposed / retired / sold — ${l.description_suffix}`, debit: l.debit_account, credit: l.credit_account })),
+    { event: ppvOver.type,  trigger: 'Vendor invoice higher than goods received (over-invoiced)',  debit: ppvOver.debit_account,  credit: ppvOver.credit_account },
+    { event: 'Purchase Price Variance', trigger: 'Vendor invoice lower than goods received (under-invoiced)', debit: ppvUnder.debit_account, credit: ppvUnder.credit_account },
+  ]
+}
+
+/** What this journal does and does not cover — read before importing. */
+export const JOURNAL_SCOPE: string[] = [
+  'Covers inventory and fixed-asset activity only.',
+  'No sales revenue — revenue is invoiced and journaled in JobLedger. The Sale entry here records the cost side (COGS) only, so land JobLedger revenue and this COGS in the same period.',
+  'No sales tax / VAT is calculated or accrued anywhere in these entries.',
+  'Purchases credit Accounts Payable at goods receipt (a GRNI simplification). Use this feed as your source of AP, or remap the credit to a GRNI / accrued-purchases clearing account so invoices entered elsewhere are not double-counted.',
+  'Every line is a single balanced entry (debit = credit). Amounts are always positive; direction is carried by the accounts.',
+]
+
+/** How to get the entries into an accounting system. */
+export const JOURNAL_IMPORT_STEPS: string[] = [
+  'Pick a date range (and optionally specific transaction types).',
+  'Run the report to preview the double-entry lines.',
+  'Download the CSV — its column headers match QuickBooks / Xero journal import templates. It begins with a few "#" note lines; most importers skip them, otherwise delete those rows before importing.',
+  'Map the account names in the reference below to your own chart of accounts, then import.',
+]
+
 /** The (up to three) postings that make up a disposal, in order. */
 export function disposalLegs(d: DisposalAmounts): DisposalLeg[] {
   const legs: DisposalLeg[] = []
