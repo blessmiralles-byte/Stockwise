@@ -54,15 +54,24 @@ export async function PATCH(
 
   const supabase = createServiceClient()
 
-  // Verify the record exists before patching (must be in same org)
+  // Verify the record exists before patching (must be in same org).
+  // Select only `id` — selecting an unused column here meant a schema mismatch
+  // surfaced as a misleading "not found" 404 instead of a real error.
   const { data: existing, error: fetchErr } = await supabase
     .from('maintenance_schedules')
-    .select('id, reported_by')
+    .select('id')
     .eq('id', id)
     .eq('org_id', auth.orgId)
-    .single()
+    .maybeSingle()
 
-  if (fetchErr || !existing) {
+  if (fetchErr) {
+    console.error('[PATCH /api/maintenance/[id]] lookup failed', fetchErr)
+    return NextResponse.json(
+      { error: `Could not load the maintenance record: ${fetchErr.message}` },
+      { status: 500 },
+    )
+  }
+  if (!existing) {
     return NextResponse.json({ error: 'Maintenance record not found' }, { status: 404 })
   }
 
@@ -75,8 +84,13 @@ export async function PATCH(
     .single()
 
   if (error) {
-    console.error('[PATCH /api/maintenance/[id]]', error.code)
-    return NextResponse.json({ error: 'Failed to update maintenance record' }, { status: 500 })
+    // Log the whole error (code alone made schema problems undiagnosable) and
+    // return the DB message so the cause is visible in the UI.
+    console.error('[PATCH /api/maintenance/[id]]', error)
+    return NextResponse.json(
+      { error: `Failed to update maintenance record: ${error.message}` },
+      { status: 500 },
+    )
   }
 
   return NextResponse.json({ data })
