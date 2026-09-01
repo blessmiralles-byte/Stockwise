@@ -58,6 +58,8 @@ export async function POST(req: NextRequest) {
       .from('fixed_assets')
       .update({ status: 'maintenance' })
       .eq('id', asset_id)
+      .eq('org_id', auth.orgId)   // never touch another org's asset
+      .eq('status', 'active')     // don't override disposed/retired/sold
   }
 
   const { data, error } = await supabase

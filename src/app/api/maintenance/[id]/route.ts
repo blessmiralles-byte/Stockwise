@@ -55,11 +55,11 @@ export async function PATCH(
   const supabase = createServiceClient()
 
   // Verify the record exists before patching (must be in same org).
-  // Select only `id` — selecting an unused column here meant a schema mismatch
-  // surfaced as a misleading "not found" 404 instead of a real error.
+  // Select only what we use — selecting an unused column here meant a schema
+  // mismatch surfaced as a misleading "not found" 404 instead of a real error.
   const { data: existing, error: fetchErr } = await supabase
     .from('maintenance_schedules')
-    .select('id')
+    .select('id, asset_id')
     .eq('id', id)
     .eq('org_id', auth.orgId)
     .maybeSingle()
@@ -91,6 +91,27 @@ export async function PATCH(
       { error: `Failed to update maintenance record: ${error.message}` },
       { status: 500 },
     )
+  }
+
+  // Completing maintenance returns the asset to service — but only once it has
+  // no other open work. Reporting an issue flags the asset "maintenance"; without
+  // this it stayed flagged forever, so the asset looked permanently unavailable.
+  if (update.status === 'completed' && existing.asset_id) {
+    const { count: stillOpen } = await supabase
+      .from('maintenance_schedules')
+      .select('id', { count: 'exact', head: true })
+      .eq('asset_id', existing.asset_id)
+      .eq('org_id', auth.orgId)
+      .in('status', ['scheduled', 'overdue'])
+
+    if ((stillOpen ?? 0) === 0) {
+      await supabase
+        .from('fixed_assets')
+        .update({ status: 'active' })
+        .eq('id', existing.asset_id)
+        .eq('org_id', auth.orgId)
+        .eq('status', 'maintenance')   // leave disposed/retired/sold alone
+    }
   }
 
   return NextResponse.json({ data })
