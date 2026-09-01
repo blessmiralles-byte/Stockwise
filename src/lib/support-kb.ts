@@ -109,7 +109,14 @@ up for an organization is its Owner.
 ## Assets: maintenance & depreciation
 - **Maintenance**: schedule maintenance for an asset (with a due date), and mark
   it done — recording who performed it, the cost, and notes. Overdue items are
-  flagged as urgent.
+  flagged as urgent, and a daily email goes to owners/admins listing overdue and
+  upcoming work.
+- **Recurring (preventive) maintenance**: a schedule can repeat weekly, monthly,
+  quarterly, every 6 months, or annually. Choose the interval under **Repeat**
+  when scheduling; when an occurrence is marked done, the next one is created
+  automatically from the original due date (so the cadence doesn't drift).
+- Reporting a fault puts the asset **In Maintenance**; completing the work
+  returns it to active once nothing overdue remains for it.
 - **Depreciation**: assets can be depreciated over time; the depreciation run
   posts the periodic depreciation, and reports show the asset roll-forward.
 

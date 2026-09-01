@@ -11,8 +11,9 @@ import { useApi } from '@/lib/use-api'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import {
   Search, Plus, Wrench, Bell, CheckCircle2, Clock,
-  AlertCircle, Calendar, Loader2, X,
+  AlertCircle, Calendar, Loader2, X, Repeat,
 } from 'lucide-react'
+import { RECURRENCE_PRESETS, describeRecurrence } from '@/lib/maintenance-recurrence'
 
 const statusConfig: Record<string, { label: string; variant: any; icon: any; color: string }> = {
   scheduled: { label: 'Scheduled', variant: 'default',     icon: Clock,        color: 'text-indigo-600 bg-indigo-50' },
@@ -30,6 +31,7 @@ function ScheduleDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
   const [description,    setDescription]    = useState('')
   const [scheduledDate,  setScheduledDate]  = useState(new Date().toISOString().split('T')[0])
   const [notifyBefore,   setNotifyBefore]   = useState('3')
+  const [recurrenceIdx,  setRecurrenceIdx]  = useState(0)   // index into RECURRENCE_PRESETS
   const [saving,         setSaving]         = useState(false)
   const [error,          setError]          = useState('')
 
@@ -57,6 +59,10 @@ function ScheduleDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
           scheduled_date:     scheduledDate,
           notify_days_before: Number(notifyBefore) || 3,
           status:             'scheduled',
+          // Preventive maintenance — the next occurrence is created automatically
+          // when this one is completed.
+          recurrence_every:   RECURRENCE_PRESETS[recurrenceIdx].every || undefined,
+          recurrence_unit:    RECURRENCE_PRESETS[recurrenceIdx].unit  || undefined,
         }),
       })
       const json = await res.json()
@@ -173,6 +179,27 @@ function ScheduleDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
             </div>
           </div>
 
+          {/* Repeat (preventive maintenance) */}
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1 flex items-center gap-1">
+              <Repeat className="w-3.5 h-3.5" /> Repeat
+            </label>
+            <select
+              value={recurrenceIdx}
+              onChange={e => setRecurrenceIdx(Number(e.target.value))}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+            >
+              {RECURRENCE_PRESETS.map((p, i) => (
+                <option key={p.label} value={i}>{p.label}</option>
+              ))}
+            </select>
+            {recurrenceIdx > 0 && (
+              <p className="text-xs text-slate-400 mt-1">
+                When you mark this done, the next one is scheduled automatically.
+              </p>
+            )}
+          </div>
+
           {error && (
             <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">
               <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
@@ -200,7 +227,8 @@ function MarkDoneDialog({
 }: {
   schedule: any
   onClose: () => void
-  onSaved: () => void
+  /** `nextOccurrence` is the date of the auto-created next occurrence, if recurring. */
+  onSaved: (nextOccurrence: string | null) => void
 }) {
   const [performedBy, setPerformedBy] = useState('')
   const [notes,       setNotes]       = useState('')
@@ -223,8 +251,9 @@ function MarkDoneDialog({
           cost:           cost               ? Number(cost) : undefined,
         }),
       })
-      if (!res.ok) { const j = await res.json(); setError(j.error ?? 'Failed'); return }
-      onSaved()
+      const j = await res.json()
+      if (!res.ok) { setError(j.error ?? 'Failed'); return }
+      onSaved(j.next_occurrence ?? null)
     } finally {
       setSaving(false)
     }
@@ -287,6 +316,8 @@ function MarkDoneDialog({
 export default function MaintenancePage() {
   const [search,       setSearch]       = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  // Set after completing a recurring task, to confirm the next one was created.
+  const [nextScheduled, setNextScheduled] = useState<string | null>(null)
   const [showSchedule, setShowSchedule] = useState(false)
   const [markingDone,  setMarkingDone]  = useState<any | null>(null)
 
@@ -342,6 +373,15 @@ export default function MaintenancePage() {
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-wrap flex-1">
+            {nextScheduled && (
+              <div className="w-full flex items-center gap-2 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 text-sm text-indigo-800 mb-1">
+                <Repeat className="w-4 h-4 flex-shrink-0" />
+                <span>Next occurrence scheduled for <span className="font-semibold">{formatDate(nextScheduled)}</span>.</span>
+                <button onClick={() => setNextScheduled(null)} className="ml-auto text-indigo-400 hover:text-indigo-700">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
@@ -418,6 +458,12 @@ export default function MaintenancePage() {
                               <Bell className="w-3 h-3" />
                               Notify {schedule.notify_days_before}d before
                             </span>
+                            {schedule.recurrence_every > 0 && schedule.recurrence_unit && (
+                              <span className="flex items-center gap-1 text-indigo-600 font-medium">
+                                <Repeat className="w-3 h-3" />
+                                {describeRecurrence(schedule.recurrence_every, schedule.recurrence_unit)}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -458,7 +504,11 @@ export default function MaintenancePage() {
         <MarkDoneDialog
           schedule={markingDone}
           onClose={() => setMarkingDone(null)}
-          onSaved={() => { setMarkingDone(null); refetch?.() }}
+          onSaved={(next) => {
+            setMarkingDone(null)
+            setNextScheduled(next)
+            refetch?.()
+          }}
         />
       )}
     </div>

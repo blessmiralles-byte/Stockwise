@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
+import { isRecurrence } from '@/lib/maintenance-recurrence'
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth()
@@ -44,10 +45,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { asset_id, title, description, scheduled_date, notify_days_before, status } = body
+  const {
+    asset_id, title, description, scheduled_date, notify_days_before, status,
+    recurrence_every, recurrence_unit,
+  } = body
 
   if (!asset_id)  return NextResponse.json({ error: 'asset_id is required' }, { status: 400 })
   if (!title?.trim()) return NextResponse.json({ error: 'title is required' }, { status: 400 })
+
+  const recurs = isRecurrence(recurrence_every, recurrence_unit)
+  if ((recurrence_every || recurrence_unit) && !recurs) {
+    return NextResponse.json(
+      { error: 'recurrence_every must be a positive number and recurrence_unit one of day, week, month, year' },
+      { status: 422 },
+    )
+  }
 
   const supabase = createServiceClient()
 
@@ -73,6 +85,10 @@ export async function POST(req: NextRequest) {
       status: status ?? (scheduled_date ? 'scheduled' : 'overdue'),
       notify_days_before: notify_days_before ?? 1,
       reported_by: auth.userId,
+      // Preventive maintenance: repeat every N days/weeks/months/years. The
+      // next occurrence is created when this one is completed.
+      recurrence_every: recurs ? Number(recurrence_every) : null,
+      recurrence_unit:  recurs ? recurrence_unit          : null,
     })
     .select(`
       id, title, description, scheduled_date, status,
