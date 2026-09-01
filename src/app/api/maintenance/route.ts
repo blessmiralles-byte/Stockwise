@@ -74,22 +74,28 @@ export async function POST(req: NextRequest) {
       .eq('status', 'active')     // don't override disposed/retired/sold
   }
 
+  const row: Record<string, any> = {
+    org_id: auth.orgId,
+    asset_id,
+    title: title.trim(),
+    description: description?.trim() || null,
+    scheduled_date: scheduled_date || new Date().toISOString().split('T')[0],
+    status: status ?? (scheduled_date ? 'scheduled' : 'overdue'),
+    notify_days_before: notify_days_before ?? 1,
+    reported_by: auth.userId,
+  }
+  // Preventive maintenance: repeat every N days/weeks/months/years. The next
+  // occurrence is created when this one is completed. Only sent when actually
+  // recurring, so a one-off schedule still works if the recurrence migration
+  // hasn't been applied yet.
+  if (recurs) {
+    row.recurrence_every = Number(recurrence_every)
+    row.recurrence_unit  = recurrence_unit
+  }
+
   const { data, error } = await supabase
     .from('maintenance_schedules')
-    .insert({
-      org_id: auth.orgId,
-      asset_id,
-      title: title.trim(),
-      description: description?.trim() || null,
-      scheduled_date: scheduled_date || new Date().toISOString().split('T')[0],
-      status: status ?? (scheduled_date ? 'scheduled' : 'overdue'),
-      notify_days_before: notify_days_before ?? 1,
-      reported_by: auth.userId,
-      // Preventive maintenance: repeat every N days/weeks/months/years. The
-      // next occurrence is created when this one is completed.
-      recurrence_every: recurs ? Number(recurrence_every) : null,
-      recurrence_unit:  recurs ? recurrence_unit          : null,
-    })
+    .insert(row)
     .select(`
       id, title, description, scheduled_date, status,
       asset:fixed_assets(id, asset_tag, name)
@@ -98,7 +104,10 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     console.error('[POST /api/maintenance]', error)
-    return NextResponse.json({ error: 'Failed to create maintenance record' }, { status: 500 })
+    return NextResponse.json(
+      { error: `Failed to create maintenance record: ${error.message}` },
+      { status: 500 },
+    )
   }
 
   return NextResponse.json({ data }, { status: 201 })
