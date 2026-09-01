@@ -17,6 +17,14 @@
 export const ACCOUNTS = {
   inventory:                'Inventory Asset',
   accountsPayable:          'Accounts Payable',
+  /**
+   * Goods-Receipt / Invoice-Receipt clearing. Credited when goods are received
+   * and debited when the vendor invoice is recorded, so the two sides net to
+   * zero. A residual balance is genuinely "received but not yet invoiced" —
+   * this is what keeps Stocked's receipts from double-counting payables that
+   * are also entered from vendor bills in the accounting system.
+   */
+  grIrClearing:             'GR/IR Clearing',
   cogs:                     'Cost of Goods Sold',
   operatingExpense:         'Operating Expense',
   inventoryShrinkage:       'Inventory Shrinkage',
@@ -50,7 +58,9 @@ export function inventoryPosting(tx: {
 }): Posting {
   switch (tx.transaction_type) {
     case 'purchase':
-      return { type: 'Purchase', debit_account: ACCOUNTS.inventory, credit_account: ACCOUNTS.accountsPayable }
+      // Goods receipt accrues to GR/IR, not straight to AP — the invoice
+      // receipt (below) is what moves it to Accounts Payable.
+      return { type: 'Purchase', debit_account: ACCOUNTS.inventory, credit_account: ACCOUNTS.grIrClearing }
     case 'sale':
       return { type: 'Sale', debit_account: ACCOUNTS.cogs, credit_account: ACCOUNTS.inventory }
     case 'consumption':
@@ -78,6 +88,15 @@ export function depreciationPosting(): Posting {
 /** Capitalising a fixed-asset acquisition. */
 export function assetPurchasePosting(): Posting {
   return { type: 'Asset Purchase', debit_account: ACCOUNTS.fixedAssets, credit_account: ACCOUNTS.accountsPayable }
+}
+
+/**
+ * Vendor invoice recorded against a PO — relieves the GR/IR accrual raised at
+ * goods receipt and books the real payable. Posted at the GOODS-RECEIPT value;
+ * any difference to the invoice amount is carried separately by ppvPosting().
+ */
+export function invoiceReceiptPosting(): Posting {
+  return { type: 'Invoice Receipt', debit_account: ACCOUNTS.grIrClearing, credit_account: ACCOUNTS.accountsPayable }
 }
 
 /** Purchase price variance from three-way match (invoice vs GRN). */
@@ -144,13 +163,15 @@ export function postingReference(): PostingRef[] {
   const transfer = inv('transfer')
   const dep      = depreciationPosting()
   const assetBuy = assetPurchasePosting()
+  const invRec   = invoiceReceiptPosting()
   const ppvOver  = ppvPosting(true)
   const ppvUnder = ppvPosting(false)
   // Sample amounts so every disposal leg is present in the reference.
   const legs     = disposalLegs({ cost: 1, book: 1, accum: 1, proceeds: 1 })
 
   return [
-    { event: purchase.type, trigger: 'Goods received against a purchase (or blind receipt)', debit: purchase.debit_account, credit: purchase.credit_account },
+    { event: purchase.type, trigger: 'Goods received against a purchase (or blind receipt) — accrues to GR/IR, not AP', debit: purchase.debit_account, credit: purchase.credit_account },
+    { event: invRec.type,   trigger: 'Vendor invoice recorded against a PO — clears the GR/IR accrual into Accounts Payable', debit: invRec.debit_account, credit: invRec.credit_account },
     { event: sale.type,     trigger: 'Item sold — records the cost side (COGS) only',        debit: sale.debit_account,     credit: sale.credit_account },
     { event: consume.type,  trigger: 'Materials issued / consumed',                          debit: consume.debit_account,  credit: consume.credit_account },
     { event: adjUp.type,    trigger: 'Positive stock adjustment (overage / found stock)',    debit: adjUp.debit_account,    credit: adjUp.credit_account },
@@ -169,7 +190,8 @@ export const JOURNAL_SCOPE: string[] = [
   'Covers inventory and fixed-asset activity only.',
   'No sales revenue — revenue is invoiced and journaled in JobLedger. The Sale entry here records the cost side (COGS) only, so land JobLedger revenue and this COGS in the same period.',
   'No sales tax / VAT is calculated or accrued anywhere in these entries.',
-  'Purchases credit Accounts Payable at goods receipt (a GRNI simplification). Use this feed as your source of AP, or remap the credit to a GRNI / accrued-purchases clearing account so invoices entered elsewhere are not double-counted.',
+  'Purchases use a GR/IR clearing account: receiving goods credits GR/IR Clearing, and recording the vendor invoice debits GR/IR Clearing and credits Accounts Payable. The two net to zero, so a residual GR/IR balance is stock received but not yet invoiced.',
+  'Because payables are only raised when an invoice is recorded, this feed will not double-count vendor bills you also enter directly in your accounting system.',
   'Every line is a single balanced entry (debit = credit). Amounts are always positive; direction is carried by the accounts.',
 ]
 

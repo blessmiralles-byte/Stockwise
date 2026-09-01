@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
 import {
   inventoryPosting, depreciationPosting, assetPurchasePosting,
-  ppvPosting, computeDisposal, disposalLegs,
+  invoiceReceiptPosting, ppvPosting, computeDisposal, disposalLegs,
 } from '@/lib/journal-mapping'
 
 /**
@@ -16,14 +16,15 @@ import {
  *
  * SCOPE: entries cover INVENTORY and FIXED ASSETS only — no revenue entries
  * (sales are invoiced and journaled in JobLedger) and no sales tax / VAT.
- * Purchases credit Accounts Payable at goods receipt (GRNI simplification).
+ * Purchases run through a GR/IR clearing account: goods receipt credits GR/IR
+ * Clearing; recording the vendor invoice debits GR/IR and credits AP.
  *
  * Query params:
  *   from     YYYY-MM-DD   required
  *   to       YYYY-MM-DD   required
  *   cursor   ISO datetime  optional — return only entries after this timestamp (for incremental sync)
  *   types    csv list      optional — purchase,sale,consumption,adjustment,transfer,
- *            depreciation,asset_purchase,asset_disposal,ppv
+ *            depreciation,asset_purchase,asset_disposal,invoice_receipt,ppv
  *   limit    number        optional — max 500, default 200
  *
  * Response:
@@ -243,8 +244,8 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // ── Purchase price variance (invoice vs GRN, from three-way match) ──────────
-  if (inc('ppv')) {
+  // ── Vendor invoice recorded: clear GR/IR into AP, plus any price variance ───
+  if (inc('invoice_receipt') || inc('ppv')) {
     const { data: matchedPos } = await supabase
       .from('purchase_orders')
       .select(`
@@ -258,10 +259,33 @@ export async function GET(req: NextRequest) {
       .order('supplier_invoice_date')
       .limit(limit)
 
+    const invRec = invoiceReceiptPosting()
     for (const p of (matchedPos ?? []) as any[]) {
       const grn      = ((p.lines ?? []) as any[]).reduce((s, l) => s + l.quantity_received * l.unit_cost, 0)
       const variance = Number(p.supplier_invoice_amount) - grn
-      if (Math.abs(variance) <= 0.01) continue   // matched — no entry
+
+      // Relieve the GR/IR accrual raised at goods receipt, at receipt value.
+      if (inc('invoice_receipt') && grn > 0) {
+        entries.push({
+          id:             `ir-${p.id}`,
+          timestamp:      p.supplier_invoice_date,
+          date:           String(p.supplier_invoice_date).slice(0, 10),
+          reference:      p.supplier_invoice_no ?? p.po_number,
+          source:         'three_way_match',
+          type:           invRec.type,
+          description:    `Vendor invoice ${p.supplier_invoice_no ?? ''} on ${p.po_number} — clear GR/IR to payables`.replace(/\s+/g, ' ').trim(),
+          debit_account:  invRec.debit_account,
+          credit_account: invRec.credit_account,
+          amount:         grn,
+          currency:       'USD',
+          product_sku:    null,
+          product_name:   p.po_number,
+          category:       null,
+          notes:          `Goods received ${grn.toFixed(2)}; invoice ${Number(p.supplier_invoice_amount).toFixed(2)}`,
+        })
+      }
+
+      if (!inc('ppv') || Math.abs(variance) <= 0.01) continue   // matched — no variance entry
 
       const over = variance > 0
       const ppv  = ppvPosting(over)

@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
 import {
   inventoryPosting, depreciationPosting, assetPurchasePosting,
-  ppvPosting, computeDisposal, disposalLegs, JOURNAL_SCOPE,
+  invoiceReceiptPosting, ppvPosting, computeDisposal, disposalLegs, JOURNAL_SCOPE,
 } from '@/lib/journal-mapping'
 
 /**
@@ -16,8 +16,9 @@ import {
  * SCOPE (read before importing):
  *   • Entries cover INVENTORY and FIXED ASSETS only. No revenue entries are
  *     produced — sales revenue is invoiced and journaled in JobLedger.
- *   • Purchases credit Accounts Payable at goods receipt (a GRNI
- *     simplification); review period-end cutoff for received-not-invoiced.
+ *   • Purchases use a GR/IR clearing account: goods receipt credits GR/IR
+ *     Clearing, and recording the vendor invoice debits GR/IR and credits
+ *     Accounts Payable. A residual GR/IR balance = received not yet invoiced.
  *   • No sales tax / VAT is computed or accrued anywhere in these entries.
  *   • Disposals: catch-up depreciation is posted through the disposal date at
  *     status change, and recorded sale proceeds (sale_price) are journaled to
@@ -27,11 +28,13 @@ import {
  *   from   YYYY-MM-DD  required
  *   to     YYYY-MM-DD  required
  *   types  comma-separated: purchase,sale,consumption,adjustment,transfer,
- *          depreciation,asset_purchase,asset_disposal,ppv — defaults to all
+ *          depreciation,asset_purchase,asset_disposal,invoice_receipt,ppv
+ *          — defaults to all
  *   format json (default) | csv
  *
  * Journal entry mapping:
- *   purchase       → Dr Inventory Asset          / Cr Accounts Payable
+ *   purchase        → Dr Inventory Asset         / Cr GR/IR Clearing
+ *   invoice_receipt → Dr GR/IR Clearing          / Cr Accounts Payable
  *   sale           → Dr Cost of Goods Sold       / Cr Inventory Asset   (COGS side only)
  *   consumption    → Dr Operating Expense        / Cr Inventory Asset   (job/cost-center dimensions included)
  *   adjustment+    → Dr Inventory Asset          / Cr Inventory Shrinkage
@@ -254,8 +257,8 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // ── Purchase price variance (invoice vs GRN, from three-way match) ──────────
-  if (include('ppv')) {
+  // ── Vendor invoice recorded: clear GR/IR into AP, plus any price variance ───
+  if (include('invoice_receipt') || include('ppv')) {
     const { data: matchedPos } = await supabase
       .from('purchase_orders')
       .select(`
@@ -268,10 +271,28 @@ export async function GET(req: NextRequest) {
       .lte('supplier_invoice_date', to)
       .order('supplier_invoice_date')
 
+    const invRec = invoiceReceiptPosting()
     for (const p of (matchedPos ?? []) as any[]) {
       const grn      = ((p.lines ?? []) as any[]).reduce((s, l) => s + l.quantity_received * l.unit_cost, 0)
       const variance = Number(p.supplier_invoice_amount) - grn
-      if (Math.abs(variance) <= 0.01) continue   // matched — no entry
+      const invDate  = String(p.supplier_invoice_date).slice(0, 10)
+      const invRef   = p.supplier_invoice_no ?? p.po_number
+
+      // Relieve the GR/IR accrual raised at goods receipt, at receipt value.
+      if (include('invoice_receipt') && grn > 0) {
+        entries.push({
+          date: invDate, reference: invRef, type: invRec.type,
+          description:    `Vendor invoice ${p.supplier_invoice_no ?? ''} on ${p.po_number} — clear GR/IR to payables`.replace(/\s+/g, ' ').trim(),
+          debit_account:  invRec.debit_account,
+          credit_account: invRec.credit_account,
+          amount:         grn,
+          product:        p.po_number,
+          category:       '',
+          notes:          `Goods received ${grn.toFixed(2)}; invoice ${Number(p.supplier_invoice_amount).toFixed(2)}`,
+        })
+      }
+
+      if (!include('ppv') || Math.abs(variance) <= 0.01) continue   // matched — no variance entry
 
       const over = variance > 0
       const ppv  = ppvPosting(over)

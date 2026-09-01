@@ -31,6 +31,8 @@ const TX_TYPES = [
   { id: 'adjustment',   label: 'Adjustments',  color: 'bg-amber-100 text-amber-700'  },
   { id: 'transfer',     label: 'Transfers',    color: 'bg-slate-100 text-slate-600'  },
   { id: 'depreciation', label: 'Depreciation', color: 'bg-rose-100 text-rose-700'    },
+  { id: 'invoice_receipt', label: 'Invoice Receipts', color: 'bg-teal-100 text-teal-700' },
+  { id: 'ppv',          label: 'Price Variance', color: 'bg-orange-100 text-orange-700' },
 ]
 
 const TYPE_COLOR: Record<string, string> = Object.fromEntries(TX_TYPES.map(t => [t.id.toLowerCase(), t.color]))
@@ -43,6 +45,8 @@ function typeBadgeColor(type: string) {
   if (key.includes('adjustment'))  return 'bg-amber-100 text-amber-700'
   if (key.includes('transfer'))    return 'bg-slate-100 text-slate-600'
   if (key.includes('depreciation'))return 'bg-rose-100 text-rose-700'
+  if (key.includes('invoicereceipt')) return 'bg-teal-100 text-teal-700'
+  if (key.includes('variance'))    return 'bg-orange-100 text-orange-700'
   return 'bg-slate-100 text-slate-500'
 }
 

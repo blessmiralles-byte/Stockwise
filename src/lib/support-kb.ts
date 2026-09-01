@@ -164,7 +164,8 @@ Available under **Reports**:
   (revenue is invoiced/journaled in JobLedger — the Sale entry here is the cost
   side, COGS, only) and does **not** calculate sales tax / VAT.
 - **How entries map (debit / credit):**
-  - Purchase (goods received): Dr Inventory Asset / Cr Accounts Payable
+  - Purchase (goods received): Dr Inventory Asset / Cr GR/IR Clearing
+  - Vendor invoice recorded: Dr GR/IR Clearing / Cr Accounts Payable
   - Sale: Dr Cost of Goods Sold / Cr Inventory Asset (cost side only)
   - Consumption: Dr Operating Expense / Cr Inventory Asset
   - Stock adjustment +: Dr Inventory Asset / Cr Inventory Shrinkage; − reverses it
@@ -175,9 +176,11 @@ Available under **Reports**:
     against Gain/Loss on Asset Disposal; sale proceeds go to Undeposited Funds
   - Purchase price variance (invoice vs goods received): posts the difference to
     Purchase Price Variance against Accounts Payable
-- **Important:** purchases credit Accounts Payable at goods receipt (a "GRNI"
-  simplification). Use this export as your source of payables, or map the credit
-  to a GRNI / accrued-purchases account so invoices entered elsewhere aren't
+- **How payables work:** receiving goods credits a **GR/IR Clearing** account
+  (not Accounts Payable). Accounts Payable is only raised when the vendor
+  invoice is recorded against the PO, which clears GR/IR. The two net to zero,
+  so a leftover GR/IR balance means "received but not yet invoiced" — and
+  vendor bills entered directly in your accounting system are never
   double-counted.
 - The Accounting Export page has a "How accounting entries work in Stocked"
   section with the full scope, the mapping, and import steps. For specific
