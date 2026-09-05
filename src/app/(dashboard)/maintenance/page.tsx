@@ -11,7 +11,7 @@ import { useApi } from '@/lib/use-api'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import {
   Search, Plus, Wrench, Bell, CheckCircle2, Clock,
-  AlertCircle, Calendar, Loader2, X, Repeat,
+  AlertCircle, Calendar, Loader2, X, Repeat, UserCheck,
 } from 'lucide-react'
 import { RECURRENCE_PRESETS, describeRecurrence } from '@/lib/maintenance-recurrence'
 
@@ -274,8 +274,20 @@ function MarkDoneDialog({
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Performed By</label>
-            <Input value={performedBy} onChange={e => setPerformedBy(e.target.value)} placeholder="Name or team…" />
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              Performed By
+              <span className="ml-1 font-normal text-slate-400">— who did the work</span>
+            </label>
+            <Input value={performedBy} onChange={e => setPerformedBy(e.target.value)} placeholder="Technician, crew, or vendor…" />
+          </div>
+
+          {/* Sign-off is recorded from the session, not typed */}
+          <div className="flex items-start gap-2 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2.5 text-xs text-slate-500">
+            <UserCheck className="w-4 h-4 flex-shrink-0 mt-0.5 text-slate-400" />
+            <span>
+              Completing this records <span className="font-medium text-slate-700">your name and the time</span> as
+              the sign-off on this maintenance log. That is separate from “Performed By” above, and cannot be edited.
+            </span>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -449,6 +461,18 @@ export default function MaintenancePage() {
                             {schedule.performed_by && (
                               <span className="flex items-center gap-1">
                                 <Wrench className="w-3 h-3" />{schedule.performed_by}
+                              </span>
+                            )}
+                            {schedule.signed_off_by && (
+                              <span
+                                className="flex items-center gap-1 text-slate-500"
+                                title={
+                                  `Signed off by ${schedule.signed_off_by.full_name ?? schedule.signed_off_by.email}` +
+                                  (schedule.completed_at ? ` on ${formatDate(schedule.completed_at)}` : '')
+                                }
+                              >
+                                <UserCheck className="w-3 h-3" />
+                                Signed off by {schedule.signed_off_by.full_name ?? schedule.signed_off_by.email}
                               </span>
                             )}
                             {schedule.cost > 0 && (

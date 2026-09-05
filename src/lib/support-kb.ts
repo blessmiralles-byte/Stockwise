@@ -117,6 +117,12 @@ up for an organization is its Owner.
   automatically from the original due date (so the cadence doesn't drift).
 - Reporting a fault puts the asset **In Maintenance**; completing the work
   returns it to active once nothing overdue remains for it.
+- **Sign-off:** completing a maintenance job records the logged-in user's name
+  and a timestamp against that log ("Signed off by …"). This is set
+  automatically from the account signing off — it can't be typed or edited — and
+  is separate from **Performed By**, which is free text for whoever actually did
+  the work (a technician, crew, or outside vendor who may not have a login).
+  Re-opening a completed job clears the sign-off.
 - **Depreciation**: assets can be depreciated over time; the depreciation run
   posts the periodic depreciation, and reports show the asset roll-forward.
 

@@ -16,9 +16,11 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from('maintenance_schedules')
     .select(`
-      id, title, description, scheduled_date, completed_date,
+      id, title, description, scheduled_date, completed_date, completed_at,
       status, notify_days_before, cost, performed_by, notes, created_at,
-      asset:fixed_assets(id, asset_tag, name, status)
+      recurrence_every, recurrence_unit,
+      asset:fixed_assets(id, asset_tag, name, status),
+      signed_off_by:user_profiles!completed_by(id, full_name, email)
     `)
     .eq('org_id', auth.orgId)
     .order('scheduled_date', { ascending: true })

@@ -53,6 +53,25 @@ export async function PATCH(
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 422 })
   }
 
+  // Sign-off: record WHO logged the completion. Server-set from the session —
+  // never read from the body — so it can't be typed or spoofed. This is
+  // distinct from `performed_by`, which is free text for whoever did the
+  // physical work (often an external vendor with no login).
+  if (update.status === 'completed') {
+    update.completed_by = auth.userId
+    update.completed_at = new Date().toISOString()
+    // Default the work date to today if the caller didn't supply one.
+    if (!update.completed_date) {
+      update.completed_date = new Date().toISOString().slice(0, 10)
+    }
+  } else if ('status' in update) {
+    // Re-opening clears the sign-off — a record that isn't complete must not
+    // carry someone's name against it.
+    update.completed_by   = null
+    update.completed_at   = null
+    update.completed_date = null
+  }
+
   const supabase = createServiceClient()
 
   // Verify the record exists before patching (must be in same org).
