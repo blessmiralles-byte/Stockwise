@@ -11,7 +11,7 @@ import { useApi } from '@/lib/use-api'
 import { Settings, Bell, Shield, Key, Send, CheckCircle2, AlertCircle, Loader2,
   ToggleLeft, ToggleRight, Briefcase, CalendarRange, Plus, X, Lock, Unlock,
   UserPlus, Building2, CreditCard, Zap, ExternalLink, Star, Trash2 } from 'lucide-react'
-import { PLAN_CONFIG, type PlanKey } from '@/lib/plan-config'
+import { PLAN_CONFIG, PAID_PLANS, isPaidPlan, type PlanKey } from '@/lib/plan-config'
 import { createClient } from '@/lib/supabase/client'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -629,7 +629,7 @@ function BillingSection() {
   // intent isn't lost across the trial signup.
   useEffect(() => {
     const intended = localStorage.getItem('stocked.intended_plan')
-    if (intended === 'starter' || intended === 'pro') {
+    if (isPaidPlan(intended)) {
       setHighlightPlan(intended)
       localStorage.removeItem('stocked.intended_plan')
     }
@@ -738,8 +738,8 @@ function BillingSection() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {(['starter', 'pro'] as const).map(plan => {
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {PAID_PLANS.map(plan => {
                   const cfg       = PLAN_CONFIG[plan]
                   const isCurrent = currentPlan === plan
                   const isPro     = plan === 'pro'

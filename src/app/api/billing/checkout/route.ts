@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
 import { createCheckout, variantFor, type BillingInterval } from '@/lib/lemonsqueezy'
+import { isPaidPlan, PAID_PLANS } from '@/lib/plan-config'
 
 /**
  * POST /api/billing/checkout
  * Creates a Lemon Squeezy hosted checkout for upgrading to a paid plan.
  *
- * Body: { plan: 'starter' | 'pro' }
+ * Body: { plan: PaidPlanKey, interval?: 'monthly' | 'annual' }
  *
  * Returns: { url: string } — redirect the browser to this URL.
  * Restricted to: owner
@@ -26,8 +27,11 @@ export async function POST(req: NextRequest) {
   }
 
   const { plan } = body
-  if (!plan || !['starter', 'pro'].includes(plan)) {
-    return NextResponse.json({ error: "plan must be 'starter' or 'pro'" }, { status: 400 })
+  if (!isPaidPlan(plan)) {
+    return NextResponse.json(
+      { error: `plan must be one of: ${PAID_PLANS.join(', ')}` },
+      { status: 400 },
+    )
   }
 
   const interval: BillingInterval = body.interval === 'annual' ? 'annual' : 'monthly'

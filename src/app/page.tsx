@@ -345,11 +345,12 @@ function Pricing() {
   const plans = [
     { key: 'starter' as const, highlight: false, cta: 'Start free trial' },
     { key: 'pro'     as const, highlight: true,  cta: 'Start free trial' },
+    { key: 'business' as const, highlight: false, cta: 'Start free trial' },
   ]
 
   return (
     <section className="py-24 bg-white" id="pricing">
-      <div className="max-w-5xl mx-auto px-6">
+      <div className="max-w-7xl mx-auto px-6">
         <div className="text-center mb-8">
           <h2 className="text-3xl font-bold text-slate-900 mb-3">Honest pricing. No surprises.</h2>
           <p className="text-slate-500">
@@ -372,7 +373,7 @@ function Pricing() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-start">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
           {plans.map(({ key, highlight, cta }) => {
             const cfg = PLAN_CONFIG[key]
             return (

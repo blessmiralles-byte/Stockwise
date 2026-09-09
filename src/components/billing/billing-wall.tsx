@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { PLAN_CONFIG } from '@/lib/plan-config'
+import { PLAN_CONFIG, PAID_PLANS, type PaidPlanKey } from '@/lib/plan-config'
 import { Lock, CheckCircle2, Loader2 } from 'lucide-react'
 import type { BillingReason } from '@/lib/billing'
 
@@ -29,7 +29,7 @@ export function BillingWall({
     ? 'Reactivate a plan to get back into your account. Your data is safe and waiting.'
     : 'Choose a plan to keep using Stocked. Your data is safe and waiting.'
 
-  async function checkout(plan: 'starter' | 'pro') {
+  async function checkout(plan: PaidPlanKey) {
     setBusy(plan); setError('')
     try {
       const res = await fetch('/api/billing/checkout', {
@@ -62,7 +62,7 @@ export function BillingWall({
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
-      <div className="w-full max-w-2xl">
+      <div className="w-full max-w-4xl">
         <div className="text-center mb-8">
           <div className="w-14 h-14 rounded-2xl bg-indigo-100 flex items-center justify-center mx-auto mb-4">
             <Lock className="w-7 h-7 text-indigo-600" />
@@ -88,8 +88,8 @@ export function BillingWall({
               </div>
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-4">
-              {(['starter', 'pro'] as const).map(plan => {
+            <div className="grid sm:grid-cols-3 gap-4">
+              {PAID_PLANS.map(plan => {
                 const cfg = PLAN_CONFIG[plan]
                 const highlight = plan === 'pro'
                 return (

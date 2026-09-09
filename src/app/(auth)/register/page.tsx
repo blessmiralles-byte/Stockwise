@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Eye, EyeOff, UserPlus, Mail } from 'lucide-react'
 import { captureAttribution, getAttribution } from '@/lib/attribution'
+import { isPaidPlan } from '@/lib/plan-config'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -28,7 +29,7 @@ export default function RegisterPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const plan = params.get('plan')
-    if (plan === 'starter' || plan === 'pro') {
+    if (isPaidPlan(plan)) {
       localStorage.setItem('stocked.intended_plan', plan)
     }
     const interval = params.get('interval')

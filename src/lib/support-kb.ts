@@ -150,7 +150,15 @@ Available under **Reports**:
 ## Billing & plans
 - Billing runs through **Lemon Squeezy** (the merchant of record, which handles
   sales tax automatically). Prices are in USD.
-- Plans: **Starter** ($49/mo or $490/yr) and **Pro** ($99/mo or $990/yr).
+- Plans (every plan includes **every feature** — tiers differ by team size and
+  level of support, not by locked functionality):
+  - **Starter** — $59/mo or $590/yr, up to 5 users, email support.
+  - **Pro** — $149/mo or $1,490/yr, up to 15 users, priority support.
+  - **Business** — $299/mo or $2,990/yr, up to 50 users, guided onboarding and
+    priority support with an SLA.
+  - **Enterprise** — custom pricing, unlimited users; contact sales.
+- If an org reaches its user limit, inviting another member is blocked until the
+  owner upgrades.
   Annual billing is effectively **2 months free**.
 - Only the **Owner** can start or change a subscription, from **Settings →
   Billing** or from the paywall when a trial ends.

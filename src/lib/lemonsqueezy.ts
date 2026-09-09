@@ -1,6 +1,7 @@
 'server only'
 
 import crypto from 'crypto'
+import { PLAN_CONFIG, PAID_PLANS } from '@/lib/plan-config'
 
 /**
  * Server-side Lemon Squeezy client — never import this in client components.
@@ -34,7 +35,8 @@ export type BillingInterval = 'monthly' | 'annual'
 
 /**
  * Resolve the Lemon Squeezy variant id for a plan + billing interval.
- * Env vars: LEMONSQUEEZY_VARIANT_STARTER[_ANNUAL], LEMONSQUEEZY_VARIANT_PRO[_ANNUAL].
+ * Env vars: LEMONSQUEEZY_VARIANT_<PLAN>[_ANNUAL] — e.g. LEMONSQUEEZY_VARIANT_PRO,
+ * LEMONSQUEEZY_VARIANT_BUSINESS_ANNUAL.
  */
 export function variantFor(plan: string, interval: BillingInterval): string | undefined {
   const key = `LEMONSQUEEZY_VARIANT_${plan.toUpperCase()}${interval === 'annual' ? '_ANNUAL' : ''}`
@@ -42,20 +44,22 @@ export function variantFor(plan: string, interval: BillingInterval): string | un
 }
 
 /** Map a Lemon Squeezy variant id back to our internal plan + seat count
- *  (monthly and annual variants both map to the same plan). */
+ *  (monthly and annual variants both map to the same plan). Seat counts come
+ *  from PLAN_CONFIG so they can't drift from what the pricing page advertises. */
 export function planFromVariant(variantId: string | number | null | undefined): {
   plan: string
   maxUsers: number
 } {
   const v = String(variantId ?? '')
-  if (!v) return { plan: 'enterprise', maxUsers: 999 }
-  if (v === process.env.LEMONSQUEEZY_VARIANT_PRO || v === process.env.LEMONSQUEEZY_VARIANT_PRO_ANNUAL) {
-    return { plan: 'pro', maxUsers: 20 }
+  const fallback = { plan: 'enterprise', maxUsers: PLAN_CONFIG.enterprise.maxUsers }
+  if (!v) return fallback
+
+  for (const plan of PAID_PLANS) {
+    if (v === variantFor(plan, 'monthly') || v === variantFor(plan, 'annual')) {
+      return { plan, maxUsers: PLAN_CONFIG[plan].maxUsers }
+    }
   }
-  if (v === process.env.LEMONSQUEEZY_VARIANT_STARTER || v === process.env.LEMONSQUEEZY_VARIANT_STARTER_ANNUAL) {
-    return { plan: 'starter', maxUsers: 5 }
-  }
-  return { plan: 'enterprise', maxUsers: 999 }
+  return fallback
 }
 
 /**
