@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireAnyRole } from '@/lib/api-auth'
 import { logAudit } from '@/lib/audit'
+import { resolveOrgPricingRegion } from '@/lib/pricing-region-server'
 
 /**
  * GET /api/org — return the current user's organization details
@@ -17,7 +18,7 @@ export async function GET() {
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('organizations')
-    .select('id, name, slug, plan, plan_status, trial_ends_at, max_users, require_checkout_approval, require_cost_dimension, ls_subscription_id, created_at')
+    .select('id, name, slug, plan, plan_status, trial_ends_at, max_users, require_checkout_approval, require_cost_dimension, pricing_region, ls_subscription_id, created_at')
     .eq('id', auth.orgId)
     .single()
 
@@ -25,7 +26,10 @@ export async function GET() {
     return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
   }
 
-  return NextResponse.json({ data })
+  // Billing UI prices in the org's locked region (set on first sight).
+  const pricing_region = await resolveOrgPricingRegion(data.id, (data as any).pricing_region)
+
+  return NextResponse.json({ data: { ...data, pricing_region } })
 }
 
 /**

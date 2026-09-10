@@ -4,6 +4,7 @@ import { SupportChat } from '@/components/support/support-chat'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { billingState } from '@/lib/billing'
+import { resolveOrgPricingRegion } from '@/lib/pricing-region-server'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   // Access gate: an org whose trial has ended or whose subscription was
@@ -23,11 +24,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
     if (profile?.org_id) {
       const { data: org } = await service
         .from('organizations')
-        .select('plan, plan_status, trial_ends_at, ls_subscription_id')
+        .select('plan, plan_status, trial_ends_at, ls_subscription_id, pricing_region')
         .eq('id', profile.org_id)
         .single()
 
       if (org) {
+        // Locks the org's pricing region on its first dashboard load (right
+        // after signup); a no-op read afterwards.
+        const region = await resolveOrgPricingRegion(profile.org_id, (org as any).pricing_region)
+
         const state = billingState(org)
         if (state.locked) {
           const canManage = ['owner', 'admin'].includes(profile.role ?? '')
@@ -36,6 +41,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               reason={state.reason}
               canManage={canManage}
               hasSubscription={!!(org as any).ls_subscription_id}
+              region={region}
             />
           )
         }

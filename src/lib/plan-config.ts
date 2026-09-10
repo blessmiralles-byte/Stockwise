@@ -2,13 +2,35 @@
  * Plan configuration — safe to import in client components.
  * Contains no secrets and does not import any payment SDK.
  *
- * PRICING MODEL: every plan includes every feature. Tiers differ by team size
- * and level of support. This matches what the code actually enforces — the only
- * hard limit is `maxUsers` (checked in /api/users/invite). Do NOT advertise a
- * capability as tier-exclusive unless a gate is genuinely implemented for it.
+ * REGIONAL PRICING: self-serve plans are priced per region. ASEAN countries get
+ * the `asean` price; every other country gets `standard` (North America rates).
+ * An organization's region is locked when it is first seen (see
+ * lib/pricing-region-server.ts) so the price doesn't move when the owner travels.
+ *
+ * Prices live ONLY in `prices` — there is deliberately no flat `price` field on
+ * paid plans, so any UI that forgets to pass a region fails to compile instead
+ * of silently showing the wrong market's price.
  *
  * Annual price = 10x monthly (two months free).
  */
+
+export type PricingRegion = 'standard' | 'asean'
+export const PRICING_REGIONS: readonly PricingRegion[] = ['standard', 'asean']
+
+/** ISO 3166-1 alpha-2 codes of ASEAN member states (Timor-Leste joined in 2025). */
+export const ASEAN_COUNTRIES = [
+  'BN', 'KH', 'ID', 'LA', 'MY', 'MM', 'PH', 'SG', 'TH', 'VN', 'TL',
+] as const
+
+export function regionForCountry(country: string | null | undefined): PricingRegion {
+  if (!country) return 'standard'
+  return (ASEAN_COUNTRIES as readonly string[]).includes(country.toUpperCase()) ? 'asean' : 'standard'
+}
+
+export function isPricingRegion(v: unknown): v is PricingRegion {
+  return v === 'standard' || v === 'asean'
+}
+
 export const PLAN_CONFIG = {
   trial: {
     label:    'Free Trial',
@@ -17,47 +39,32 @@ export const PLAN_CONFIG = {
     features: ['14-day free trial', 'Up to 5 users', 'All features included'],
   },
   starter: {
-    label:       'Starter',
-    price:       59,
-    priceAnnual: 590,
-    maxUsers:    5,
+    label:    'Starter',
+    maxUsers: 5,
+    prices:   { standard: 75, asean: 49 },
     features: [
       'Up to 5 users',
-      'All features included',
       'Inventory, fixed assets & maintenance',
-      'Purchase orders, approvals & receiving',
+      'Purchase orders & receiving',
       'Barcode scanning & mobile app',
       'Accounting export (QuickBooks / Xero)',
       'Email support — real humans',
     ],
   },
   pro: {
-    label:       'Pro',
-    price:       149,
-    priceAnnual: 1490,
-    maxUsers:    15,
+    label:    'Pro',
+    maxUsers: 15,
+    prices:   { standard: 149, asean: 99 },
     features: [
       'Up to 15 users',
-      'All features included — nothing locked',
+      'Everything in Starter',
       'Priority support — same-day response',
       'Help importing your existing data',
     ],
   },
-  business: {
-    label:       'Business',
-    price:       299,
-    priceAnnual: 2990,
-    maxUsers:    50,
-    features: [
-      'Up to 50 users',
-      'All features included — nothing locked',
-      'Guided onboarding & data migration',
-      'Priority support with response SLA',
-    ],
-  },
   enterprise: {
     label:    'Enterprise',
-    price:    null, // contact sales
+    price:    null, // contact sales — priced per deal, same in every region
     maxUsers: 999,
     features: ['Unlimited users', 'Guided team onboarding', 'Uptime SLA guarantee', 'Dedicated support'],
   },
@@ -67,12 +74,22 @@ export type PlanKey = keyof typeof PLAN_CONFIG
 
 /**
  * The self-serve, checkout-able plans, in display order. Single source of truth —
- * import this instead of hardcoding ['starter','pro'], so adding a tier doesn't
- * mean hunting through the pricing UI, checkout validation and paywall.
+ * import this instead of hardcoding plan names, so adding or removing a tier
+ * doesn't mean hunting through the pricing UI, checkout validation and paywall.
  */
-export const PAID_PLANS = ['starter', 'pro', 'business'] as const
+export const PAID_PLANS = ['starter', 'pro'] as const
 export type PaidPlanKey = (typeof PAID_PLANS)[number]
 
 export function isPaidPlan(v: unknown): v is PaidPlanKey {
   return typeof v === 'string' && (PAID_PLANS as readonly string[]).includes(v)
+}
+
+/** Monthly price in USD for a plan in a region. */
+export function monthlyPrice(plan: PaidPlanKey, region: PricingRegion): number {
+  return PLAN_CONFIG[plan].prices[region]
+}
+
+/** Annual price in USD — ten months' worth (two months free). */
+export function annualPrice(plan: PaidPlanKey, region: PricingRegion): number {
+  return monthlyPrice(plan, region) * 10
 }

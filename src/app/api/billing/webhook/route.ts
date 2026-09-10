@@ -56,8 +56,17 @@ export async function POST(req: NextRequest) {
           break
         }
 
-        const { plan, maxUsers } = planFromVariant(attrs.variant_id)
-        const planStatus         = planStatusFromLS(String(attrs.status ?? ''))
+        const { plan, maxUsers, known } = planFromVariant(attrs.variant_id)
+        const planStatus                = planStatusFromLS(String(attrs.status ?? ''))
+        if (!known) {
+          // Misconfiguration, not a customer error: the variant isn't wired to
+          // any LEMONSQUEEZY_VARIANT_* env var. Provisioned as the lowest paid
+          // plan so they keep access — fix the env var, then correct the plan.
+          console.error(
+            `[webhook] UNKNOWN Lemon Squeezy variant ${attrs.variant_id} for org ${orgId} (${eventName}) — ` +
+            `provisioned as ${plan}. Add it to the matching LEMONSQUEEZY_VARIANT_* env var.`,
+          )
+        }
 
         await supabase
           .from('organizations')

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { PLAN_CONFIG, PAID_PLANS, type PaidPlanKey } from '@/lib/plan-config'
+import { PLAN_CONFIG, PAID_PLANS, monthlyPrice, annualPrice, type PaidPlanKey, type PricingRegion } from '@/lib/plan-config'
 import { Lock, CheckCircle2, Loader2 } from 'lucide-react'
 import type { BillingReason } from '@/lib/billing'
 
@@ -15,10 +15,12 @@ export function BillingWall({
   reason,
   canManage,
   hasSubscription,
+  region,
 }: {
   reason: BillingReason
   canManage: boolean
   hasSubscription: boolean
+  region: PricingRegion
 }) {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -62,7 +64,7 @@ export function BillingWall({
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
-      <div className="w-full max-w-4xl">
+      <div className="w-full max-w-2xl">
         <div className="text-center mb-8">
           <div className="w-14 h-14 rounded-2xl bg-indigo-100 flex items-center justify-center mx-auto mb-4">
             <Lock className="w-7 h-7 text-indigo-600" />
@@ -88,7 +90,7 @@ export function BillingWall({
               </div>
             </div>
 
-            <div className="grid sm:grid-cols-3 gap-4">
+            <div className="grid sm:grid-cols-2 gap-4">
               {PAID_PLANS.map(plan => {
                 const cfg = PLAN_CONFIG[plan]
                 const highlight = plan === 'pro'
@@ -98,13 +100,13 @@ export function BillingWall({
                     {interval === 'annual' ? (
                       <>
                         <p className="text-3xl font-extrabold text-slate-900 mt-1">
-                          ${cfg.priceAnnual}<span className="text-sm font-normal text-slate-500">/yr</span>
+                          ${annualPrice(plan, region)}<span className="text-sm font-normal text-slate-500">/yr</span>
                         </p>
-                        <p className="text-xs text-green-600">≈ ${Math.round(cfg.priceAnnual / 12)}/mo · 2 months free</p>
+                        <p className="text-xs text-green-600">≈ ${Math.round(annualPrice(plan, region) / 12)}/mo · 2 months free</p>
                       </>
                     ) : (
                       <p className="text-3xl font-extrabold text-slate-900 mt-1">
-                        ${cfg.price}<span className="text-sm font-normal text-slate-500">/mo</span>
+                        ${monthlyPrice(plan, region)}<span className="text-sm font-normal text-slate-500">/mo</span>
                       </p>
                     )}
                     <ul className="mt-3 space-y-1.5 mb-4">

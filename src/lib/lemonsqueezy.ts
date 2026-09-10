@@ -1,7 +1,7 @@
 'server only'
 
 import crypto from 'crypto'
-import { PLAN_CONFIG, PAID_PLANS } from '@/lib/plan-config'
+import { PLAN_CONFIG, PAID_PLANS, PRICING_REGIONS, type PricingRegion } from '@/lib/plan-config'
 
 /**
  * Server-side Lemon Squeezy client — never import this in client components.
@@ -33,33 +33,62 @@ function authHeaders() {
 
 export type BillingInterval = 'monthly' | 'annual'
 
-/**
- * Resolve the Lemon Squeezy variant id for a plan + billing interval.
- * Env vars: LEMONSQUEEZY_VARIANT_<PLAN>[_ANNUAL] — e.g. LEMONSQUEEZY_VARIANT_PRO,
- * LEMONSQUEEZY_VARIANT_BUSINESS_ANNUAL.
- */
-export function variantFor(plan: string, interval: BillingInterval): string | undefined {
-  const key = `LEMONSQUEEZY_VARIANT_${plan.toUpperCase()}${interval === 'annual' ? '_ANNUAL' : ''}`
-  return process.env[key]
+/** Env var name for a plan/region/interval variant. */
+export function variantEnvKey(plan: string, interval: BillingInterval, region: PricingRegion): string {
+  return `LEMONSQUEEZY_VARIANT_${plan.toUpperCase()}_${region.toUpperCase()}${interval === 'annual' ? '_ANNUAL' : ''}`
 }
 
-/** Map a Lemon Squeezy variant id back to our internal plan + seat count
- *  (monthly and annual variants both map to the same plan). Seat counts come
- *  from PLAN_CONFIG so they can't drift from what the pricing page advertises. */
-export function planFromVariant(variantId: string | number | null | undefined): {
-  plan: string
-  maxUsers: number
-} {
-  const v = String(variantId ?? '')
-  const fallback = { plan: 'enterprise', maxUsers: PLAN_CONFIG.enterprise.maxUsers }
-  if (!v) return fallback
+/**
+ * Resolve the Lemon Squeezy variant id for a plan + billing interval + region.
+ * Env vars: LEMONSQUEEZY_VARIANT_<PLAN>_<REGION>[_ANNUAL], e.g.
+ *   LEMONSQUEEZY_VARIANT_STARTER_ASEAN, LEMONSQUEEZY_VARIANT_PRO_STANDARD_ANNUAL.
+ * There is intentionally no un-suffixed fallback: a missing variant must fail
+ * checkout loudly rather than charge one region another region's price.
+ */
+export function variantFor(plan: string, interval: BillingInterval, region: PricingRegion): string | undefined {
+  return process.env[variantEnvKey(plan, interval, region)]
+}
 
-  for (const plan of PAID_PLANS) {
-    if (v === variantFor(plan, 'monthly') || v === variantFor(plan, 'annual')) {
-      return { plan, maxUsers: PLAN_CONFIG[plan].maxUsers }
+/**
+ * Map a Lemon Squeezy variant id back to our internal plan + seat count.
+ * Monthly/annual and every region's variant map to the same plan. Seat counts
+ * come from PLAN_CONFIG so they can't drift from what the pricing page says.
+ *
+ * `known: false` means the id matched no configured variant — a misconfigured
+ * env var or a variant created in Lemon Squeezy but never wired up. That now
+ * falls back to the LOWEST paid plan: the customer keeps access (no lockout once
+ * the trial ends) without being over-provisioned. Previously any unknown id was
+ * provisioned as Enterprise with 999 seats, so one missing env var could hand
+ * out unlimited Enterprise at Starter prices.
+ *
+ * Custom Enterprise deals billed through Lemon Squeezy: list their variant ids
+ * (comma-separated) in LEMONSQUEEZY_VARIANT_ENTERPRISE.
+ */
+export function planFromVariant(variantId: string | number | null | undefined): {
+  plan:     string
+  maxUsers: number
+  known:    boolean
+} {
+  const v = String(variantId ?? '').trim()
+
+  const enterpriseIds = (process.env.LEMONSQUEEZY_VARIANT_ENTERPRISE ?? '')
+    .split(',').map(s => s.trim()).filter(Boolean)
+  if (v && enterpriseIds.includes(v)) {
+    return { plan: 'enterprise', maxUsers: PLAN_CONFIG.enterprise.maxUsers, known: true }
+  }
+
+  if (v) {
+    for (const plan of PAID_PLANS) {
+      for (const region of PRICING_REGIONS) {
+        if (v === variantFor(plan, 'monthly', region) || v === variantFor(plan, 'annual', region)) {
+          return { plan, maxUsers: PLAN_CONFIG[plan].maxUsers, known: true }
+        }
+      }
     }
   }
-  return fallback
+
+  const lowest = PAID_PLANS[0]
+  return { plan: lowest, maxUsers: PLAN_CONFIG[lowest].maxUsers, known: false }
 }
 
 /**

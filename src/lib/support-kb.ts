@@ -150,13 +150,16 @@ Available under **Reports**:
 ## Billing & plans
 - Billing runs through **Lemon Squeezy** (the merchant of record, which handles
   sales tax automatically). Prices are in USD.
-- Plans (every plan includes **every feature** — tiers differ by team size and
-  level of support, not by locked functionality):
-  - **Starter** — $59/mo or $590/yr, up to 5 users, email support.
-  - **Pro** — $149/mo or $1,490/yr, up to 15 users, priority support.
-  - **Business** — $299/mo or $2,990/yr, up to 50 users, guided onboarding and
-    priority support with an SLA.
+- Plans (prices in USD; annual = two months free):
+  - **Starter** — up to 5 users, email support.
+    Philippines & ASEAN: $49/mo or $490/yr. Everywhere else: $75/mo or $750/yr.
+  - **Pro** — up to 15 users, priority support.
+    Philippines & ASEAN: $99/mo or $990/yr. Everywhere else: $149/mo or $1,490/yr.
   - **Enterprise** — custom pricing, unlimited users; contact sales.
+- **Regional pricing:** the price band is set by the country the organization
+  signed up from (ASEAN member states get the ASEAN price) and then stays fixed,
+  so it doesn't change if the owner travels. If a customer believes their
+  organization is in the wrong band, they should email support@stocked.tech.
 - If an org reaches its user limit, inviting another member is blocked until the
   owner upgrades.
   Annual billing is effectively **2 months free**.

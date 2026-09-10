@@ -19,7 +19,8 @@ import {
   HardHat, Gauge, Hammer, HeartPulse, UtensilsCrossed,
   Building2, MapPin,
 } from 'lucide-react'
-import { PLAN_CONFIG } from '@/lib/plan-config'
+import { PLAN_CONFIG, monthlyPrice } from '@/lib/plan-config'
+import { usePricingRegion } from '@/lib/use-pricing-region'
 
 const serif = Playfair_Display({
   subsets: ['latin'],
@@ -476,6 +477,7 @@ function AssetsSpotlight() {
 // ── Pricing ───────────────────────────────────────────────────────────────────
 
 function Pricing() {
+  const region = usePricingRegion()
   return (
     <section className="py-28 bg-[#09090E]" id="pricing">
       <div className="max-w-5xl mx-auto px-6">
@@ -511,7 +513,7 @@ function Pricing() {
                 <div>
                   <p className="font-semibold text-[#F0F0F4]">{cfg.label}</p>
                   <p className="text-3xl font-bold mt-1 text-white tabular-nums">
-                    ${cfg.price}
+                    {region ? `$${monthlyPrice(key, region)}` : <span className="inline-block w-20 h-8 align-middle rounded-md animate-pulse bg-white/10" />}
                     <span className="text-sm font-normal text-[#8A8A9E]">/mo</span>
                   </p>
                 </div>

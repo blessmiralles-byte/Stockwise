@@ -17,6 +17,9 @@ const API_EXEMPT_PATHS = [
   '/api/billing/webhook',
   '/api/accounting/',
   '/api/jobledger/',
+  // Anonymous: tells the public pricing page which regional prices to show.
+  // Returns only a region code; no data, no side effects.
+  '/api/pricing/region',
 ]
 
 // Update last_seen_at at most once per minute per user to avoid hammering the DB

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
-import { createCheckout, variantFor, type BillingInterval } from '@/lib/lemonsqueezy'
+import { createCheckout, variantFor, variantEnvKey, type BillingInterval } from '@/lib/lemonsqueezy'
 import { isPaidPlan, PAID_PLANS } from '@/lib/plan-config'
+import { resolveOrgPricingRegion } from '@/lib/pricing-region-server'
 
 /**
  * POST /api/billing/checkout
@@ -36,15 +37,6 @@ export async function POST(req: NextRequest) {
 
   const interval: BillingInterval = body.interval === 'annual' ? 'annual' : 'monthly'
 
-  const variantId = variantFor(plan, interval)
-  if (!variantId) {
-    const suffix = interval === 'annual' ? '_ANNUAL' : ''
-    return NextResponse.json(
-      { error: `LEMONSQUEEZY_VARIANT_${plan.toUpperCase()}${suffix} is not configured` },
-      { status: 500 }
-    )
-  }
-
   // Lemon Squeezy rejects relative redirect URLs. Fail loudly here with a clear
   // message instead of letting the checkout return an opaque error if the site
   // URL env var is missing or misconfigured.
@@ -60,12 +52,23 @@ export async function POST(req: NextRequest) {
 
   const { data: org } = await supabase
     .from('organizations')
-    .select('id, name')
+    .select('id, name, pricing_region')
     .eq('id', auth.orgId)
     .single()
 
   if (!org) {
     return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
+  }
+
+  // Charge the ORG's locked region, not whatever country this request comes
+  // from — the price the owner was shown must be the price they're charged.
+  const region    = await resolveOrgPricingRegion(org.id, (org as any).pricing_region)
+  const variantId = variantFor(plan, interval, region)
+  if (!variantId) {
+    return NextResponse.json(
+      { error: `${variantEnvKey(plan, interval, region)} is not configured` },
+      { status: 500 },
+    )
   }
 
   // Prefill the checkout with the owner's email/name.

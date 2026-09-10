@@ -9,7 +9,8 @@ import {
   ChevronRight, Smartphone, TrendingDown, CalendarClock, History,
   Hammer, HardHat, HeartPulse, UtensilsCrossed, Building2, MapPin,
 } from 'lucide-react'
-import { PLAN_CONFIG } from '@/lib/plan-config'
+import { PLAN_CONFIG, monthlyPrice, annualPrice } from '@/lib/plan-config'
+import { usePricingRegion } from '@/lib/use-pricing-region'
 
 // ── Nav ───────────────────────────────────────────────────────────────────────
 function Nav() {
@@ -342,15 +343,17 @@ function Industries() {
 // ── Pricing ───────────────────────────────────────────────────────────────────
 function Pricing() {
   const [interval, setInterval] = useState<'monthly' | 'annual'>('monthly')
+  // Regional price for this visitor; null until known (prices stay hidden).
+  const region = usePricingRegion()
+
   const plans = [
     { key: 'starter' as const, highlight: false, cta: 'Start free trial' },
     { key: 'pro'     as const, highlight: true,  cta: 'Start free trial' },
-    { key: 'business' as const, highlight: false, cta: 'Start free trial' },
   ]
 
   return (
     <section className="py-24 bg-white" id="pricing">
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="max-w-5xl mx-auto px-6">
         <div className="text-center mb-8">
           <h2 className="text-3xl font-bold text-slate-900 mb-3">Honest pricing. No surprises.</h2>
           <p className="text-slate-500">
@@ -373,9 +376,12 @@ function Pricing() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-start">
           {plans.map(({ key, highlight, cta }) => {
             const cfg = PLAN_CONFIG[key]
+            const pricePlaceholder = (
+              <span className={`inline-block w-24 h-8 align-middle rounded-md animate-pulse ${highlight ? 'bg-white/25' : 'bg-slate-200'}`} />
+            )
             return (
               <div
                 key={key}
@@ -392,17 +398,19 @@ function Pricing() {
                 )}
                 <div>
                   <p className={`font-bold text-lg ${highlight ? 'text-white' : 'text-slate-900'}`}>{cfg.label}</p>
-                  {interval === 'annual' ? (
+                  {!region ? (
+                    <p className="mt-1 h-9 flex items-center">{pricePlaceholder}</p>
+                  ) : interval === 'annual' ? (
                     <>
                       <p className={`text-3xl font-extrabold mt-1 ${highlight ? 'text-white' : 'text-slate-900'}`}>
-                        ${cfg.priceAnnual}
+                        ${annualPrice(key, region).toLocaleString()}
                         <span className={`text-sm font-normal ${highlight ? 'text-indigo-200' : 'text-slate-500'}`}>/yr</span>
                       </p>
-                      <p className={`text-xs mt-0.5 ${highlight ? 'text-indigo-200' : 'text-green-600'}`}>≈ ${Math.round(cfg.priceAnnual / 12)}/mo · 2 months free</p>
+                      <p className={`text-xs mt-0.5 ${highlight ? 'text-indigo-200' : 'text-green-600'}`}>≈ ${Math.round(annualPrice(key, region) / 12)}/mo · 2 months free</p>
                     </>
                   ) : (
                     <p className={`text-3xl font-extrabold mt-1 ${highlight ? 'text-white' : 'text-slate-900'}`}>
-                      ${cfg.price}
+                      ${monthlyPrice(key, region)}
                       <span className={`text-sm font-normal ${highlight ? 'text-indigo-200' : 'text-slate-500'}`}>/mo</span>
                     </p>
                   )}

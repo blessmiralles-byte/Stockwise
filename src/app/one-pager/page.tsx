@@ -6,7 +6,8 @@ import {
   FileText, Bell, ArrowUpDown, Layers, ScanLine, Building2,
   Printer, Smartphone
 } from 'lucide-react'
-import { PLAN_CONFIG } from '@/lib/plan-config'
+import { PLAN_CONFIG, monthlyPrice } from '@/lib/plan-config'
+import { usePricingRegion } from '@/lib/use-pricing-region'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Data
@@ -144,6 +145,8 @@ const TRUST_ITEMS = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function OnePagerPage() {
+  // Regional price for this visitor; null until known (prices stay hidden).
+  const region = usePricingRegion()
   return (
     <div className="bg-white min-h-screen font-sans">
 
@@ -279,9 +282,13 @@ export default function OnePagerPage() {
                       <p className={`text-2xl font-extrabold mt-1 ${isPro ? 'text-white' : 'text-slate-900'}`}>
                         Custom
                       </p>
+                    ) : !region ? (
+                      <p className="mt-1 h-8 flex items-center">
+                        <span className={`inline-block w-20 h-7 rounded-md animate-pulse ${isPro ? 'bg-white/25' : 'bg-slate-200'}`} />
+                      </p>
                     ) : (
                       <p className={`text-2xl font-extrabold mt-1 ${isPro ? 'text-white' : 'text-slate-900'}`}>
-                        ${cfg.price}
+                        ${monthlyPrice(key, region)}
                         <span className={`text-xs font-normal ${isPro ? 'text-indigo-200' : 'text-slate-400'}`}> /month</span>
                       </p>
                     )}
