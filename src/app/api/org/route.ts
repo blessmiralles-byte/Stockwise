@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireAnyRole } from '@/lib/api-auth'
 import { logAudit } from '@/lib/audit'
@@ -58,6 +59,27 @@ export async function PATCH(req: NextRequest) {
   }
   if ('require_cost_dimension' in updates) {
     updates.require_cost_dimension = !!updates.require_cost_dimension
+  }
+
+  // Plan gates: these policies can't be switched ON without the feature.
+  // Re-saving a value that's already on (e.g. after a downgrade) is allowed so
+  // the rest of the form still saves; switching off is always allowed.
+  const gatedFlags = [
+    ['require_checkout_approval', 'approvals'],
+    ['require_cost_dimension',    'job_costing'],
+  ] as const
+  if (gatedFlags.some(([key]) => updates[key] === true)) {
+    const { data: current } = await createServiceClient()
+      .from('organizations')
+      .select('require_checkout_approval, require_cost_dimension')
+      .eq('id', auth.orgId)
+      .single()
+    for (const [key, feature] of gatedFlags) {
+      if (updates[key] === true && !(current as any)?.[key]) {
+        const gate = await requireFeature(auth.orgId, feature)
+        if (gate) return gate
+      }
+    }
   }
 
   if ('name' in updates) {

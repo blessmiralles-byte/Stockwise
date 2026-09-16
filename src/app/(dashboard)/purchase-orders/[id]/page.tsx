@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useApi } from '@/lib/use-api'
+import { usePlan } from '@/lib/use-plan'
 import { formatCurrency, formatDate, receivableCap } from '@/lib/utils'
 import { PurchaseOrder, Location } from '@/types'
 import { ArrowLeft, Truck, CheckCircle2, Send, X, FileText, AlertTriangle, Scale, Loader2, Plus, Trash2, Download, PackagePlus } from 'lucide-react'
@@ -745,6 +746,8 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
   const { id } = use(params)
   const [showGRN, setShowGRN]       = useState(false)
   const [grnSuccess, setGrnSuccess] = useState('')
+  // Starter has no approval workflow: a draft PO is sent straight to the vendor.
+  const approvalsEnabled = usePlan().has('approvals')
 
   const { data: poData, loading, error, refetch } = useApi<{ data: PurchaseOrder }>(`/api/purchase-orders/${id}`)
   const { data: locData }      = useApi<{ data: Location[] }>('/api/locations')
@@ -974,9 +977,14 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
                     <Download className="w-3.5 h-3.5" /> Download PDF
                   </Button>
                 </a>
-                {po.status === 'draft' && (
+                {po.status === 'draft' && approvalsEnabled && (
                   <Button size="sm" onClick={() => markStatus('pending_approval')} disabled={statusBusy} className="gap-1">
                     <Send className="w-3.5 h-3.5" /> Submit for Approval
+                  </Button>
+                )}
+                {po.status === 'draft' && !approvalsEnabled && (
+                  <Button size="sm" onClick={() => markStatus('sent')} disabled={statusBusy} className="gap-1">
+                    <Send className="w-3.5 h-3.5" /> Send to Vendor
                   </Button>
                 )}
                 {po.status === 'pending_approval' && (

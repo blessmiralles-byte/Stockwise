@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { orgHasFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
 import { isRecurrence, nextDueDate } from '@/lib/maintenance-recurrence'
@@ -118,7 +119,10 @@ export async function PATCH(
   // it. Best-effort — a failure here must not fail the completion itself.
   let next_occurrence: string | null = null
   const e = existing as any
-  if (update.status === 'completed' && isRecurrence(e.recurrence_every, e.recurrence_unit)) {
+  // On a plan without recurring maintenance (e.g. after a downgrade) the series
+  // is kept but pauses — no next occurrence — until the org upgrades.
+  if (update.status === 'completed' && isRecurrence(e.recurrence_every, e.recurrence_unit)
+      && await orgHasFeature(auth.orgId, 'recurring_maintenance')) {
     try {
       const nextDate = nextDueDate(
         e.scheduled_date,

@@ -36,7 +36,7 @@ export const PLAN_CONFIG = {
     label:    'Free Trial',
     price:    0,
     maxUsers: 5,
-    features: ['14-day free trial', 'Up to 5 users', 'All features included'],
+    features: ['14-day free trial', 'Up to 5 users', 'All Pro features included'],
   },
   starter: {
     label:    'Starter',
@@ -44,10 +44,10 @@ export const PLAN_CONFIG = {
     prices:   { standard: 75, asean: 49 },
     features: [
       'Up to 5 users',
-      'Inventory, fixed assets & maintenance',
-      'Purchase orders & receiving',
+      'Inventory, purchase orders & receiving',
+      'Fixed assets, tool check-out & maintenance',
       'Barcode scanning & mobile app',
-      'Accounting export (QuickBooks / Xero)',
+      'Accounting journal export (CSV)',
       'Email support — real humans',
     ],
   },
@@ -56,8 +56,12 @@ export const PLAN_CONFIG = {
     maxUsers: 15,
     prices:   { standard: 149, asean: 99 },
     features: [
-      'Up to 15 users',
-      'Everything in Starter',
+      'Up to 15 users, everything in Starter',
+      'Approvals & delegation of authority',
+      'Job costing by cost center & job code',
+      'Bookkeeping connection (no CSV imports)',
+      'Recurring preventive maintenance',
+      'Demand forecasting & audit log',
       'Priority support — same-day response',
       'Help importing your existing data',
     ],
@@ -66,7 +70,7 @@ export const PLAN_CONFIG = {
     label:    'Enterprise',
     price:    null, // contact sales — priced per deal, same in every region
     maxUsers: 999,
-    features: ['Unlimited users', 'Guided team onboarding', 'Uptime SLA guarantee', 'Dedicated support'],
+    features: ['Unlimited users, everything in Pro', 'JobLedger & POS integrations', 'Guided team onboarding', 'Uptime SLA guarantee', 'Dedicated support'],
   },
 } as const
 

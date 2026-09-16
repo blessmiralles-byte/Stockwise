@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
 
@@ -6,6 +7,9 @@ import { requireAnyRole } from '@/lib/api-auth'
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAnyRole('owner', 'finance', 'procurement')
   if (auth.error) return auth.error
+
+  const gate = await requireFeature(auth.orgId, 'job_costing')
+  if (gate) return gate
 
   const { id } = await params
   let body: any

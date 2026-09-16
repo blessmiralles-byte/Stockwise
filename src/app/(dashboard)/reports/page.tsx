@@ -4,8 +4,11 @@ import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent } from '@/components/ui/card'
 import { BarChart2, TrendingUp, Package, ChevronRight, Briefcase, TrendingDown, ScrollText, BookOpen, Wrench, HardHat, Grid3x3 } from 'lucide-react'
 import Link from 'next/link'
+import { type Feature, FEATURES } from '@/lib/entitlements'
+import { usePlan } from '@/lib/use-plan'
+import { PlanBadge } from '@/components/billing/upgrade-prompt'
 
-const reports = [
+const reports: { href: string; icon: any; color: string; title: string; desc: string; feature?: Feature }[] = [
   {
     href: '/reports/valuation',
     icon: BarChart2,
@@ -18,6 +21,7 @@ const reports = [
     icon: Briefcase,
     color: 'bg-violet-50 text-violet-600',
     title: 'Expenses by Cost Center / Job',
+    feature: 'job_costing',
     desc: 'Consumption and sales grouped by cost center or job code — drill down to SKU level.',
   },
   {
@@ -25,6 +29,7 @@ const reports = [
     icon: Grid3x3,
     color: 'bg-fuchsia-50 text-fuchsia-600',
     title: 'Cost Analysis (Matrix)',
+    feature: 'job_costing',
     desc: 'Expenses cross-tabulated by cost center × job code — matrix, per-job, and per-cost-center views. Download as CSV.',
   },
   {
@@ -67,6 +72,7 @@ const reports = [
     icon: TrendingUp,
     color: 'bg-green-50 text-green-600',
     title: 'Demand Forecast',
+    feature: 'forecasting',
     desc: 'Lead-time-aware reorder alerts, ABC/XYZ classification, and projected demand.',
   },
   {
@@ -79,6 +85,7 @@ const reports = [
 ]
 
 export default function ReportsPage() {
+  const { has } = usePlan()
   return (
     <div>
       <Topbar title="Reports" />
@@ -93,7 +100,10 @@ export default function ReportsPage() {
                     <r.icon className="w-5 h-5" />
                   </div>
                   <div className="flex-1">
-                    <p className="font-semibold text-slate-900 text-sm">{r.title}</p>
+                    <p className="font-semibold text-slate-900 text-sm flex items-center gap-2">
+                      {r.title}
+                      {r.feature && !has(r.feature) && <PlanBadge tier={FEATURES[r.feature].minPlan} />}
+                    </p>
                     <p className="text-xs text-slate-500 mt-0.5">{r.desc}</p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0" />

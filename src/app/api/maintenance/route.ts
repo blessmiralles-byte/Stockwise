@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
 import { isRecurrence } from '@/lib/maintenance-recurrence'
@@ -61,6 +62,10 @@ export async function POST(req: NextRequest) {
       { error: 'recurrence_every must be a positive number and recurrence_unit one of day, week, month, year' },
       { status: 422 },
     )
+  }
+  if (recurs) {
+    const gate = await requireFeature(auth.orgId, 'recurring_maintenance')
+    if (gate) return gate
   }
 
   const supabase = createServiceClient()

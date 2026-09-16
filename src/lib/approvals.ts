@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/service'
+import { orgHasFeature } from '@/lib/entitlements-server'
 
 type Svc = ReturnType<typeof createServiceClient>
 
@@ -81,6 +82,8 @@ export async function checkApprovalLimit(
 ): Promise<string | null> {
   const { orgId, approverId, approverRole, kind, amount } = opts
   if (amount <= 0 || isUnlimited(approverRole)) return null
+  // Approval limits are a Pro feature. On Starter they're kept but not enforced.
+  if (!(await orgHasFeature(orgId, 'approvals'))) return null
 
   const col = kind === 'requisition' ? 'requisition_approval_limit' : 'po_approval_limit'
   const { data: me } = await supabase

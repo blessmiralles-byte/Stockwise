@@ -461,8 +461,9 @@ function Pricing() {
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-8">
-          Every plan includes the full inventory, asset, and field toolkit. Higher tiers simply add
-          seats, priority support, and audit-trail export.
+          Every plan includes the full inventory, asset, and field toolkit. Pro adds the controls a
+          growing team needs — approvals, job costing, and a live bookkeeping connection. The free
+          trial includes everything in Pro.
         </p>
       </div>
     </section>

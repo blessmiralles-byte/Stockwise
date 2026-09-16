@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 
 /**
@@ -39,6 +40,9 @@ export async function POST(req: NextRequest) {
 
   const { org_id, job_id, materials } = body
   if (!org_id)                       return NextResponse.json({ error: 'org_id is required' },    { status: 400 })
+
+  const gate = await requireFeature(org_id, 'integrations')
+  if (gate) return gate
   if (!Array.isArray(materials) || materials.length === 0) {
     return NextResponse.json({ error: 'materials array is required' }, { status: 400 })
   }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { orgHasFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireRole } from '@/lib/api-auth'
 import { createNotification } from '@/lib/notify'
@@ -107,7 +108,8 @@ export async function POST(req: NextRequest) {
       .select('require_cost_dimension')
       .eq('id', auth.orgId)
       .single()
-    if (orgRow?.require_cost_dimension && !cost_center_id && !job_code) {
+    if (orgRow?.require_cost_dimension && !cost_center_id && !job_code
+        && await orgHasFeature(auth.orgId, 'job_costing')) {
       return NextResponse.json(
         { error: 'A cost center or job code is required when consuming stock. Select one, or turn off the requirement in Settings → Organization.' },
         { status: 422 },

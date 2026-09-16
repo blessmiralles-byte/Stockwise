@@ -11,21 +11,23 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
+import { type Feature, FEATURES, planHasFeature } from '@/lib/entitlements'
+import { PlanBadge } from '@/components/billing/upgrade-prompt'
 
-const navItems = [
+const navItems: { href: string; icon: any; label: string; feature?: Feature }[] = [
   { href: '/dashboard',       icon: LayoutDashboard, label: 'Dashboard'       },
   { href: '/inventory',       icon: Package,         label: 'Inventory'       },
   { href: '/transactions',    icon: ArrowLeftRight,  label: 'Transactions'    },
-  { href: '/forecasting',     icon: TrendingUp,      label: 'Forecasting'     },
+  { href: '/forecasting',     icon: TrendingUp,      label: 'Forecasting',     feature: 'forecasting' },
   { href: '/vendors',         icon: Building2,       label: 'Vendors'         },
   { href: '/purchase-orders', icon: ShoppingCart,    label: 'Purchase Orders' },
-  { href: '/requisitions',    icon: ClipboardList,   label: 'Requisitions'    },
+  { href: '/requisitions',    icon: ClipboardList,   label: 'Requisitions',    feature: 'approvals' },
   { href: '/stock-counts',    icon: Truck,           label: 'Stock Counts'    },
   { href: '/assets',          icon: Cpu,             label: 'Fixed Assets'    },
   { href: '/maintenance',     icon: Wrench,          label: 'Maintenance'     },
   { href: '/reports',         icon: BarChart3,       label: 'Reports'         },
   { href: '/setup',           icon: Sliders,         label: 'Setup & Import'  },
-  { href: '/audit-log',       icon: Shield,          label: 'Audit Log'       },
+  { href: '/audit-log',       icon: Shield,          label: 'Audit Log',       feature: 'audit_log' },
   { href: '/settings',        icon: Settings,        label: 'Settings'        },
 ]
 
@@ -33,7 +35,7 @@ const fieldItems = [
   { href: '/field', icon: ScanBarcode, label: 'Field View' },
 ]
 
-export function Sidebar() {
+export function Sidebar({ plan }: { plan?: string | null }) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
 
@@ -67,8 +69,9 @@ export function Sidebar() {
             Workspace
           </p>
         )}
-        {navItems.map(({ href, icon: Icon, label }) => {
+        {navItems.map(({ href, icon: Icon, label, feature }) => {
           const active = pathname.startsWith(href)
+          const lockedTier = feature && !planHasFeature(plan, feature) ? FEATURES[feature].minPlan : null
           return (
             <Link
               key={href}
@@ -83,7 +86,8 @@ export function Sidebar() {
               )}
             >
               <Icon className={cn('flex-shrink-0', collapsed ? 'w-5 h-5' : 'w-4 h-4', active ? 'text-white' : 'text-slate-500')} />
-              {!collapsed && <span>{label}</span>}
+              {!collapsed && <span className="flex-1">{label}</span>}
+              {!collapsed && lockedTier && <PlanBadge tier={lockedTier} />}
             </Link>
           )
         })}

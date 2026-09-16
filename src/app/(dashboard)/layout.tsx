@@ -12,6 +12,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // row — no cron required to lock. Middleware already handles unauthenticated.
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  let plan: string | null = null
 
   if (user) {
     const service = createServiceClient()
@@ -29,6 +30,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         .single()
 
       if (org) {
+        plan = org.plan
         // Locks the org's pricing region on its first dashboard load (right
         // after signup); a no-op read afterwards.
         const region = await resolveOrgPricingRegion(profile.org_id, (org as any).pricing_region)
@@ -51,7 +53,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
-      <Sidebar />
+      <Sidebar plan={plan} />
       <main className="flex-1 overflow-y-auto bg-slate-50">{children}</main>
       <SupportChat />
     </div>

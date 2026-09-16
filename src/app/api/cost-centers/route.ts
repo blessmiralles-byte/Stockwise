@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireAnyRole } from '@/lib/api-auth'
 
@@ -22,6 +23,9 @@ export async function GET(_req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = await requireAnyRole('owner', 'finance', 'procurement')
   if (auth.error) return auth.error
+
+  const gate = await requireFeature(auth.orgId, 'job_costing')
+  if (gate) return gate
 
   let body: any
   try { body = await req.json() } catch {

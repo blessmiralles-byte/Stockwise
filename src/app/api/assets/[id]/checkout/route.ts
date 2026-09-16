@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
 import { createNotification } from '@/lib/notify'
+import { orgHasFeature } from '@/lib/entitlements-server'
 
 /**
  * POST /api/assets/:id/checkout
@@ -43,7 +44,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'This tool is already checked out or awaiting approval' }, { status: 409 })
   }
 
-  const needsApproval = !!asset.requires_checkout_approval
+  // Check-out approval is a Pro feature; on Starter the tool's flag is kept but
+  // custody transfers immediately.
+  const needsApproval = !!asset.requires_checkout_approval && await orgHasFeature(auth.orgId, 'approvals')
   const jobLabel = String(body.job_code ?? body.job_reference ?? '').trim() || null
 
   const { data: checkout, error: coErr } = await supabase

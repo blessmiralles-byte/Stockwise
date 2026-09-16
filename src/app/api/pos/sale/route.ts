@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { timingSafeEqual } from 'crypto'
 import { createServiceClient } from '@/lib/supabase/service'
 import { POSSaleRequest } from '@/types'
+import { requireFeature } from '@/lib/entitlements-server'
 
 /**
  * POST /api/pos/sale
@@ -49,6 +50,20 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServiceClient()
+
+  // The POS key is not org-specific, so the org is the one that owns the
+  // selling location. Needed for the plan gate and to tag the transactions.
+  const { data: loc } = await supabase
+    .from('locations')
+    .select('org_id')
+    .eq('id', location_id)
+    .maybeSingle()
+  if (!loc?.org_id) {
+    return NextResponse.json({ error: 'Unknown location_id' }, { status: 422 })
+  }
+  const gate = await requireFeature(loc.org_id, 'integrations')
+  if (gate) return gate
+
   const transactionRef = reference_no ?? `POS-${Date.now()}`
   const results: any[] = []
 
@@ -117,6 +132,7 @@ export async function POST(req: NextRequest) {
     const { data: tx, error: txError } = await supabase
       .from('inventory_transactions')
       .insert({
+        org_id:           loc.org_id,
         transaction_type: 'sale',
         product_id:       item.product_id,
         from_location_id: location_id,

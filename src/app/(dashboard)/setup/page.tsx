@@ -6,6 +6,8 @@ import { Topbar } from '@/components/layout/topbar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useApi } from '@/lib/use-api'
+import { usePlan } from '@/lib/use-plan'
+import { UpgradePrompt } from '@/components/billing/upgrade-prompt'
 import { cn } from '@/lib/utils'
 import { GettingStartedGuide } from '@/components/onboarding/getting-started-guide'
 import {
@@ -455,6 +457,10 @@ function CategoriesTab() {
 // ─────────────────────────────────────────────────────────────────────────────
 // 3. COST CENTERS TAB
 // ─────────────────────────────────────────────────────────────────────────────
+function JobCostingNotice() {
+  return usePlan().has('job_costing') ? null : <UpgradePrompt feature="job_costing" compact />
+}
+
 function CostCentersTab() {
   const { data, loading, refetch } = useApi<{ data: any[] }>('/api/cost-centers')
   const centers = data?.data ?? []
@@ -490,6 +496,7 @@ function CostCentersTab() {
   return (
     <div className="space-y-4">
       <SectionHeader title="Cost Centers" description="Assign costs and expenses to departments or projects for reporting." />
+      <JobCostingNotice />
       <div className="flex gap-2">
         <Button size="sm" className="gap-1.5" onClick={openAdd}><Plus className="w-3.5 h-3.5" /> Add Cost Center</Button>
         <ImportPanel config={{ entity: 'cost_centers', label: 'Cost Centers', required: ['code', 'name'], columns: ['code', 'name'] }} onImported={refetch} />
@@ -601,6 +608,7 @@ function JobCodesTab() {
   return (
     <div className="space-y-4">
       <SectionHeader title="Job Codes" description="Tag purchase orders and transactions to specific projects or jobs for cost tracking." />
+      <JobCostingNotice />
 
       {tablesMissing && (
         <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">

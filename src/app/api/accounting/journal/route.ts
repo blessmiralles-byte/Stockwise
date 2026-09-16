@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
 import {
@@ -54,6 +55,10 @@ export async function GET(req: NextRequest) {
       )
     }
     orgId = qOrgId
+    // A live bookkeeping connection is a paid feature; the CSV export (session
+    // auth, below) stays available on every plan.
+    const gate = await requireFeature(orgId, 'accounting_sync')
+    if (gate) return gate
   } else {
     // Session auth
     const auth = await requireAuth()

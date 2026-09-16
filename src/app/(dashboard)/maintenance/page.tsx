@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/lib/use-api'
+import { usePlan } from '@/lib/use-plan'
+import { UpgradePrompt } from '@/components/billing/upgrade-prompt'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import {
   Search, Plus, Wrench, Bell, CheckCircle2, Clock,
@@ -32,6 +34,7 @@ function ScheduleDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
   const [scheduledDate,  setScheduledDate]  = useState(new Date().toISOString().split('T')[0])
   const [notifyBefore,   setNotifyBefore]   = useState('3')
   const [recurrenceIdx,  setRecurrenceIdx]  = useState(0)   // index into RECURRENCE_PRESETS
+  const canRepeat = usePlan().has('recurring_maintenance')
   const [saving,         setSaving]         = useState(false)
   const [error,          setError]          = useState('')
 
@@ -187,12 +190,14 @@ function ScheduleDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
             <select
               value={recurrenceIdx}
               onChange={e => setRecurrenceIdx(Number(e.target.value))}
+              disabled={!canRepeat}
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
             >
               {RECURRENCE_PRESETS.map((p, i) => (
                 <option key={p.label} value={i}>{p.label}</option>
               ))}
             </select>
+            {!canRepeat && <div className="mt-2"><UpgradePrompt feature="recurring_maintenance" compact /></div>}
             {recurrenceIdx > 0 && (
               <p className="text-xs text-slate-400 mt-1">
                 When you mark this done, the next one is scheduled automatically.

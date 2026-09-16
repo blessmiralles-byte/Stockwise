@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useApi } from '@/lib/use-api'
+import { usePlan } from '@/lib/use-plan'
+import { UpgradePrompt, PlanBadge } from '@/components/billing/upgrade-prompt'
 import { Settings, Bell, Shield, Key, Send, CheckCircle2, AlertCircle, Loader2,
   ToggleLeft, ToggleRight, Briefcase, CalendarRange, Plus, X, Lock, Unlock,
   UserPlus, Building2, CreditCard, Zap, ExternalLink, Star, Trash2 } from 'lucide-react'
@@ -82,6 +84,7 @@ function InviteUserForm({ onSuccess, members }: { onSuccess: () => void; members
   const [role,      setRole]      = useState<Role>('viewer')
   const [reportsTo, setReportsTo] = useState('')
   const [reqLimit,  setReqLimit]  = useState('')
+  const approvalsOn = usePlan().has('approvals')
   const [poLimit,   setPoLimit]   = useState('')
   const [loading,   setLoading]   = useState(false)
   const [result,    setResult]    = useState<{ ok: boolean; msg: string } | null>(null)
@@ -184,6 +187,7 @@ function InviteUserForm({ onSuccess, members }: { onSuccess: () => void; members
             className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         </div>
       </div>
+      {!approvalsOn && <UpgradePrompt feature="approvals" compact />}
       <p className="text-xs text-slate-400">
         Approval limits are the maximum value this person can approve. Leave blank for no approval
         authority (the owner always has unlimited authority).
@@ -225,6 +229,7 @@ function ApprovalsEditorRow({ user, members, onSaved, onCancel }: {
   const [reqLimit,  setReqLimit]  = useState(user.requisition_approval_limit != null ? String(user.requisition_approval_limit) : '')
   const [poLimit,   setPoLimit]   = useState(user.po_approval_limit != null ? String(user.po_approval_limit) : '')
   const [saving,    setSaving]    = useState(false)
+  const approvalsOn = usePlan().has('approvals')
 
   const save = async () => {
     setSaving(true)
@@ -244,6 +249,7 @@ function ApprovalsEditorRow({ user, members, onSaved, onCancel }: {
   return (
     <tr className="bg-indigo-50/40 border-b border-slate-100">
       <td colSpan={5} className="px-4 py-4">
+        {!approvalsOn && <div className="mb-3 max-w-2xl"><UpgradePrompt feature="approvals" compact /></div>}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl">
           <div>
             <label className="text-xs font-medium text-slate-600 block mb-1">Reports to</label>
@@ -456,6 +462,7 @@ function CostCentersSection() {
   const [name, setName]   = useState('')
   const [saving, setSave] = useState(false)
   const [err, setErr]     = useState('')
+  const jobCostingOn = usePlan().has('job_costing')
 
   const add = async () => {
     if (!code.trim() || !name.trim()) { setErr('Code and name are required'); return }
@@ -480,6 +487,7 @@ function CostCentersSection() {
 
   return (
     <div className="space-y-4">
+      {!jobCostingOn && <UpgradePrompt feature="job_costing" compact />}
       {/* Add form */}
       <div className="flex gap-2">
         <input value={code} onChange={e => setCode(e.target.value.toUpperCase())}
@@ -841,6 +849,11 @@ function OrgSettingsSection({ isAdmin }: { isAdmin: boolean }) {
   const [costDimOverride, setCostDimOverride] = useState<boolean | null>(null)
   const requireCostDim = costDimOverride ?? !!data?.data?.require_cost_dimension
 
+  // Locked policies can still be switched OFF (e.g. after a downgrade), never ON.
+  const { has } = usePlan()
+  const approvalLocked = !has('approvals')
+  const costDimLocked  = !has('job_costing')
+
   const saveOrg = async () => {
     const name = displayName.trim()
     if (!name || name.length < 2) { setOrgError('Name must be at least 2 characters'); return }
@@ -879,16 +892,16 @@ function OrgSettingsSection({ isAdmin }: { isAdmin: boolean }) {
         {data?.data && (
           <div className="flex items-start justify-between gap-4 rounded-lg border border-slate-200 p-3">
             <div>
-              <p className="text-sm font-medium text-slate-700">Require approval to check out tools</p>
+              <p className="text-sm font-medium text-slate-700 flex items-center gap-2">Require approval to check out tools {approvalLocked && <PlanBadge tier="pro" />}</p>
               <p className="text-xs text-slate-400 mt-0.5">
                 Default for new tools. You can override this per tool or per category.
               </p>
             </div>
             <button
               type="button"
-              disabled={!isAdmin}
+              disabled={!isAdmin || (approvalLocked && !requireApproval)}
               onClick={() => setApprovalOverride(!requireApproval)}
-              className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${requireApproval ? 'bg-indigo-600' : 'bg-slate-300'} ${!isAdmin ? 'opacity-50' : ''}`}
+              className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${requireApproval ? 'bg-indigo-600' : 'bg-slate-300'} ${!isAdmin || (approvalLocked && !requireApproval) ? 'opacity-50' : ''}`}
             >
               <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${requireApproval ? 'translate-x-5' : ''}`} />
             </button>
@@ -898,7 +911,7 @@ function OrgSettingsSection({ isAdmin }: { isAdmin: boolean }) {
         {data?.data && (
           <div className="flex items-start justify-between gap-4 rounded-lg border border-slate-200 p-3">
             <div>
-              <p className="text-sm font-medium text-slate-700">Require a cost center or job code when consuming stock</p>
+              <p className="text-sm font-medium text-slate-700 flex items-center gap-2">Require a cost center or job code when consuming stock {costDimLocked && <PlanBadge tier="pro" />}</p>
               <p className="text-xs text-slate-400 mt-0.5">
                 When on, issuing/consuming stock must be tagged to a cost center or job code, so
                 expenses are fully attributed in the Cost Analysis report. Remember to save.
@@ -906,9 +919,9 @@ function OrgSettingsSection({ isAdmin }: { isAdmin: boolean }) {
             </div>
             <button
               type="button"
-              disabled={!isAdmin}
+              disabled={!isAdmin || (costDimLocked && !requireCostDim)}
               onClick={() => setCostDimOverride(!requireCostDim)}
-              className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${requireCostDim ? 'bg-indigo-600' : 'bg-slate-300'} ${!isAdmin ? 'opacity-50' : ''}`}
+              className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${requireCostDim ? 'bg-indigo-600' : 'bg-slate-300'} ${!isAdmin || (costDimLocked && !requireCostDim) ? 'opacity-50' : ''}`}
             >
               <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${requireCostDim ? 'translate-x-5' : ''}`} />
             </button>

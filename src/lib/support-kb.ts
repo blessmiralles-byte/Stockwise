@@ -151,11 +151,28 @@ Available under **Reports**:
 - Billing runs through **Lemon Squeezy** (the merchant of record, which handles
   sales tax automatically). Prices are in USD.
 - Plans (prices in USD; annual = two months free):
-  - **Starter** — up to 5 users, email support.
+  - **Starter** — up to 5 users, email support. Inventory, purchase orders &
+    receiving, barcode scanning & mobile app, fixed assets, tool check-out,
+    one-off maintenance with sign-off, stock counts, standard reports, and the
+    accounting journal CSV export.
     Philippines & ASEAN: $49/mo or $490/yr. Everywhere else: $75/mo or $750/yr.
-  - **Pro** — up to 15 users, priority support.
+  - **Pro** — up to 15 users, priority support, plus: approvals & delegation of
+    authority (requisitions, approval limits, reporting lines, PO approval
+    workflow, tool check-out approvals), job costing (cost centers, job codes,
+    Expenses and Cost Analysis reports, requiring a cost center/job code),
+    recurring preventive maintenance, demand forecasting, the audit log, and a
+    live bookkeeping connection (journal feed API instead of CSV imports).
     Philippines & ASEAN: $99/mo or $990/yr. Everywhere else: $149/mo or $1,490/yr.
-  - **Enterprise** — custom pricing, unlimited users; contact sales.
+  - **Enterprise** — custom pricing, unlimited users, everything in Pro plus
+    JobLedger and POS integrations, guided onboarding, SLA; contact sales.
+- The **14-day free trial includes all Pro features.**
+- On Starter, Pro features show a **Pro** badge and an upgrade prompt. On Starter
+  a purchase order goes straight from draft to **Send to Vendor** (no approval
+  step), approval limits aren't enforced, and tools check out without approval.
+- **Downgrading never deletes data.** Existing requisitions, cost centers, job
+  codes, approval limits and recurring schedules are kept; they just stop being
+  usable or enforced (a recurring schedule stops creating its next occurrence)
+  until the organization upgrades again.
 - **Regional pricing:** the price band is set by the country the organization
   signed up from (ASEAN member states get the ASEAN price) and then stays fixed,
   so it doesn't change if the owner travels. If a customer believes their

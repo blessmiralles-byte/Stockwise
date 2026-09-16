@@ -110,7 +110,7 @@ export function BillingWall({
                       </p>
                     )}
                     <ul className="mt-3 space-y-1.5 mb-4">
-                      {cfg.features.slice(0, 4).map(f => (
+                      {cfg.features.slice(0, 6).map(f => (
                         <li key={f} className="flex items-start gap-2 text-xs text-slate-600">
                           <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0 mt-0.5" /> {f}
                         </li>

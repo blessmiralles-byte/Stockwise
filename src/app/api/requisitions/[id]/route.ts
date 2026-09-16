@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
 import { logAudit } from '@/lib/audit'
@@ -33,6 +34,9 @@ export async function GET(
   const auth = await requireAuth()
   if (auth.error) return auth.error
 
+  const gate = await requireFeature(auth.orgId, 'approvals')
+  if (gate) return gate
+
   const { id } = await params
   const supabase = createServiceClient()
 
@@ -60,6 +64,9 @@ export async function PATCH(
 ) {
   const auth = await requireAuth()
   if (auth.error) return auth.error
+
+  const gate = await requireFeature(auth.orgId, 'approvals')
+  if (gate) return gate
 
   const { id } = await params
   let body: any

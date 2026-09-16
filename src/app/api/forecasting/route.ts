@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
 
@@ -17,6 +18,9 @@ import { requireAuth } from '@/lib/api-auth'
 export async function GET(req: NextRequest) {
   const auth = await requireAuth()
   if (auth.error) return auth.error
+
+  const gate = await requireFeature(auth.orgId, 'forecasting')
+  if (gate) return gate
 
   const { searchParams } = new URL(req.url)
   const daysBack     = Math.max(7,  Math.min(365, parseInt(searchParams.get('days_back')     ?? '90')))

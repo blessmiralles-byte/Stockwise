@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
 
@@ -26,6 +27,9 @@ const NONE = '__none__'
 export async function GET(req: NextRequest) {
   const auth = await requireAnyRole('owner', 'finance', 'operations', 'procurement')
   if (auth.error) return auth.error
+
+  const gate = await requireFeature(auth.orgId, 'job_costing')
+  if (gate) return gate
 
   const { searchParams } = new URL(req.url)
   const from   = searchParams.get('from')

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
 
@@ -21,6 +22,9 @@ const CAN_SEE_ALL_ROLES = new Set(['owner', 'admin', 'operations', 'procurement'
 export async function GET(req: NextRequest) {
   const auth = await requireAuth()
   if (auth.error) return auth.error
+
+  const gate = await requireFeature(auth.orgId, 'approvals')
+  if (gate) return gate
 
   const { searchParams } = req.nextUrl
   const status = searchParams.get('status')
@@ -52,6 +56,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = await requireAuth()
   if (auth.error) return auth.error
+
+  const gate = await requireFeature(auth.orgId, 'approvals')
+  if (gate) return gate
 
   let body: any
   try { body = await req.json() } catch {

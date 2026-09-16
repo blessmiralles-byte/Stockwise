@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 
 /**
@@ -25,6 +26,9 @@ export async function GET(req: NextRequest) {
   const limit  = Math.min(Number(searchParams.get('limit') ?? '50'), 200)
 
   if (!orgId) return NextResponse.json({ error: 'org_id is required' }, { status: 400 })
+
+  const gate = await requireFeature(orgId, 'integrations')
+  if (gate) return gate
 
   const supabase = createServiceClient()
 
