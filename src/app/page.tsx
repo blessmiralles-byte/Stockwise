@@ -534,6 +534,7 @@ const SHARED_ROWS = [
   'Tool check-out & custody',
   'Maintenance scheduling with sign-off',
   'Reports & accounting journal export (CSV)',
+  'Audit log — who changed what, and when',
 ]
 
 function PlanComparison() {

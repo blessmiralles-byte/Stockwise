@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
 
@@ -20,9 +19,6 @@ import { requireAnyRole } from '@/lib/api-auth'
 export async function GET(req: NextRequest) {
   const auth = await requireAnyRole('owner', 'admin', 'finance')
   if (auth.error) return auth.error
-
-  const gate = await requireFeature(auth.orgId, 'audit_log')
-  if (gate) return gate
 
   const sp    = req.nextUrl.searchParams
   const page  = Math.max(1, Number(sp.get('page')  ?? 1))

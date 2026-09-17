@@ -12,8 +12,8 @@
  *    their rules stop being enforced) but everything recorded is kept and
  *    comes back on upgrade.
  *  - Everything not listed here is available on every plan (inventory, POs,
- *    receiving, barcodes, assets, maintenance, stock counts, the accounting
- *    journal CSV export, reports).
+ *    receiving, barcodes, assets, maintenance, stock counts, the audit log,
+ *    the accounting journal CSV export, reports).
  */
 
 export type TierPlan = 'starter' | 'pro' | 'enterprise'
@@ -23,7 +23,6 @@ export type Feature =
   | 'recurring_maintenance' // repeating preventive maintenance schedules
   | 'job_costing'           // cost centers, job codes, Expenses + Cost Analysis reports
   | 'forecasting'           // demand forecasting & reorder suggestions
-  | 'audit_log'             // viewing the audit log
   | 'accounting_sync'       // live connection to bookkeeping apps (journal feed API)
   | 'integrations'          // JobLedger and POS integrations (API)
 
@@ -47,11 +46,6 @@ export const FEATURES: Record<Feature, { label: string; minPlan: TierPlan; descr
     label: 'Demand forecasting',
     minPlan: 'pro',
     description: 'Projected usage, reorder points and suggested order quantities from your real consumption.',
-  },
-  audit_log: {
-    label: 'Audit log',
-    minPlan: 'pro',
-    description: 'A searchable record of who changed what, and when.',
   },
   accounting_sync: {
     label: 'Bookkeeping connection',

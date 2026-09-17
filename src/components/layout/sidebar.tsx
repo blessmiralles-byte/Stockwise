@@ -27,7 +27,7 @@ const navItems: { href: string; icon: any; label: string; feature?: Feature }[] 
   { href: '/maintenance',     icon: Wrench,          label: 'Maintenance'     },
   { href: '/reports',         icon: BarChart3,       label: 'Reports'         },
   { href: '/setup',           icon: Sliders,         label: 'Setup & Import'  },
-  { href: '/audit-log',       icon: Shield,          label: 'Audit Log',       feature: 'audit_log' },
+  { href: '/audit-log',       icon: Shield,          label: 'Audit Log'       },
   { href: '/settings',        icon: Settings,        label: 'Settings'        },
 ]
 

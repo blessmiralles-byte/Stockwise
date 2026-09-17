@@ -153,14 +153,14 @@ Available under **Reports**:
 - Plans (prices in USD; annual = two months free):
   - **Starter** — up to 5 users, email support. Inventory, purchase orders &
     receiving, barcode scanning & mobile app, fixed assets, tool check-out,
-    one-off maintenance with sign-off, stock counts, standard reports, and the
-    accounting journal CSV export.
+    one-off maintenance with sign-off, stock counts, standard reports, the audit
+    log, and the accounting journal CSV export.
     Philippines & ASEAN: $49/mo or $490/yr. Everywhere else: $75/mo or $750/yr.
   - **Pro** — up to 15 users, priority support, plus: approvals & delegation of
     authority (requisitions, approval limits, reporting lines, PO approval
     workflow, tool check-out approvals), job costing (cost centers, job codes,
     Expenses and Cost Analysis reports, requiring a cost center/job code),
-    recurring preventive maintenance, demand forecasting, the audit log, and a
+    recurring preventive maintenance, demand forecasting, and a
     live bookkeeping connection (journal feed API instead of CSV imports).
     Philippines & ASEAN: $99/mo or $990/yr. Everywhere else: $149/mo or $1,490/yr.
   - Only Starter and Pro are offered publicly. Teams that need more than 15
