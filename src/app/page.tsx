@@ -5,12 +5,13 @@ import Link from 'next/link'
 import { captureAttribution } from '@/lib/attribution'
 import {
   Package, BarChart3, Truck, ClipboardList, Wrench,
-  CheckCircle2, ArrowRight, Shield, Zap, Users, Star,
+  CheckCircle2, ArrowRight, Shield, Zap, Users, Star, Minus,
   ChevronRight, Smartphone, TrendingDown, CalendarClock, History,
   Hammer, HardHat, HeartPulse, UtensilsCrossed, Building2, MapPin,
 } from 'lucide-react'
 import { PLAN_CONFIG, monthlyPrice, annualPrice } from '@/lib/plan-config'
 import { usePricingRegion } from '@/lib/use-pricing-region'
+import { FEATURES as PLAN_FEATURES, featuresIntroducedAt } from '@/lib/entitlements'
 
 // ── Nav ───────────────────────────────────────────────────────────────────────
 function Nav() {
@@ -376,7 +377,7 @@ function Pricing() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-start">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start max-w-3xl mx-auto">
           {plans.map(({ key, highlight, cta }) => {
             const cfg = PLAN_CONFIG[key]
             const pricePlaceholder = (
@@ -437,33 +438,13 @@ function Pricing() {
             )
           })}
 
-          {/* Enterprise */}
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 space-y-5">
-            <div>
-              <p className="font-bold text-lg text-slate-900">Enterprise</p>
-              <p className="text-2xl font-extrabold mt-1 text-slate-900">Custom</p>
-            </div>
-            <ul className="space-y-2">
-              {PLAN_CONFIG.enterprise.features.map(f => (
-                <li key={f} className="flex items-start gap-2 text-sm text-slate-600">
-                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5 text-green-500" />
-                  {f}
-                </li>
-              ))}
-            </ul>
-            <a
-              href="mailto:hello@stocked.tech"
-              className="block text-center py-2.5 rounded-xl text-sm font-semibold bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors"
-            >
-              Contact Sales
-            </a>
-          </div>
         </div>
 
-        <p className="text-center text-xs text-slate-400 mt-8">
-          Every plan includes the full inventory, asset, and field toolkit. Pro adds the controls a
-          growing team needs — approvals, job costing, and a live bookkeeping connection. The free
-          trial includes everything in Pro.
+        <PlanComparison />
+
+        <p className="text-center text-sm text-slate-500 mt-6">
+          The free trial includes everything in Pro. Need more than 15 users?{' '}
+          <a href="mailto:hello@stocked.tech" className="font-medium text-indigo-600 hover:underline">Talk to us</a>.
         </p>
       </div>
     </section>
@@ -537,6 +518,60 @@ export default function LandingPage() {
         <CtaBanner />
         <Footer />
       </div>
+    </div>
+  )
+}
+
+// ── Starter vs Pro comparison ──────────────────────────────────────────────────
+// Pro rows come from lib/entitlements.ts, so this table can't drift from what the
+// app actually unlocks.
+const SHARED_ROWS = [
+  'Inventory, locations & stock transfers',
+  'Purchase orders & receiving',
+  'Barcode scanning & mobile field app',
+  'Stock counts with sign-off',
+  'Fixed assets, depreciation & disposal',
+  'Tool check-out & custody',
+  'Maintenance scheduling with sign-off',
+  'Reports & accounting journal export (CSV)',
+]
+
+function PlanComparison() {
+  const proRows = featuresIntroducedAt('pro').map(f => PLAN_FEATURES[f])
+  const yes = <CheckCircle2 className="w-4 h-4 text-green-500 mx-auto" aria-label="Included" />
+  const no  = <Minus className="w-4 h-4 text-slate-300 mx-auto" aria-label="Not included" />
+  const row = (label: React.ReactNode, starter: React.ReactNode, pro: React.ReactNode, key: string) => (
+    <tr key={key} className="border-t border-slate-100">
+      <td className="py-3 pr-3 text-slate-700">{label}</td>
+      <td className="py-3 px-2 text-center text-slate-600 w-20 sm:w-28">{starter}</td>
+      <td className="py-3 px-2 text-center text-slate-900 font-medium w-20 sm:w-28 bg-indigo-50/60">{pro}</td>
+    </tr>
+  )
+  return (
+    <div className="mt-16 max-w-3xl mx-auto">
+      <h3 className="text-xl font-bold text-slate-900 text-center mb-6">Compare plans</h3>
+      <table className="w-full text-sm">
+        <thead>
+          <tr>
+            <th className="text-left pb-3 font-semibold text-slate-500 text-xs uppercase tracking-wide">Feature</th>
+            <th className="pb-3 font-semibold text-slate-900">Starter</th>
+            <th className="pb-3 font-semibold text-indigo-700 bg-indigo-50/60 rounded-t-lg">Pro</th>
+          </tr>
+        </thead>
+        <tbody>
+          {row('Users', 'Up to 5', 'Up to 15', 'users')}
+          {SHARED_ROWS.map(r => row(r, yes, yes, r))}
+          {proRows.map(f => row(
+            <>
+              <span className="font-medium text-slate-900">{f.label}</span>
+              <span className="block text-xs text-slate-500 mt-0.5">{f.description}</span>
+            </>,
+            no, yes, f.label,
+          ))}
+          {row('Support', 'Email', 'Priority, same-day', 'support')}
+          {row('Help importing your existing data', no, yes, 'import')}
+        </tbody>
+      </table>
     </div>
   )
 }

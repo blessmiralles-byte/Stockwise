@@ -813,12 +813,12 @@ function BillingSection() {
               </>
             )}
 
-            {/* Enterprise CTA */}
+            {/* Larger teams */}
             {currentPlan !== 'enterprise' && (
               <p className="text-xs text-center text-slate-400">
-                Need more than 20 users?{' '}
+                Need more than 15 users?{' '}
                 <a href="mailto:hello@stocked.tech" className="text-indigo-600 hover:underline font-medium">
-                  Contact us for Enterprise pricing
+                  Talk to us
                 </a>
               </p>
             )}

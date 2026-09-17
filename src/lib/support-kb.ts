@@ -163,8 +163,8 @@ Available under **Reports**:
     recurring preventive maintenance, demand forecasting, the audit log, and a
     live bookkeeping connection (journal feed API instead of CSV imports).
     Philippines & ASEAN: $99/mo or $990/yr. Everywhere else: $149/mo or $1,490/yr.
-  - **Enterprise** — custom pricing, unlimited users, everything in Pro plus
-    JobLedger and POS integrations, guided onboarding, SLA; contact sales.
+  - Only Starter and Pro are offered publicly. Teams that need more than 15
+    users should email hello@stocked.tech.
 - The **14-day free trial includes all Pro features.**
 - On Starter, Pro features show a **Pro** badge and an upgrade prompt. On Starter
   a purchase order goes straight from draft to **Send to Vendor** (no approval

@@ -252,12 +252,10 @@ export default function OnePagerPage() {
             Pricing
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {/* Starter */}
-            {(['starter', 'pro', 'enterprise'] as const).map(key => {
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {(['starter', 'pro'] as const).map(key => {
               const cfg      = PLAN_CONFIG[key]
               const isPro    = key === 'pro'
-              const isEnt    = key === 'enterprise'
 
               return (
                 <div
@@ -278,11 +276,7 @@ export default function OnePagerPage() {
                     <p className={`font-bold text-base ${isPro ? 'text-white' : 'text-slate-900'}`}>
                       {cfg.label}
                     </p>
-                    {isEnt ? (
-                      <p className={`text-2xl font-extrabold mt-1 ${isPro ? 'text-white' : 'text-slate-900'}`}>
-                        Custom
-                      </p>
-                    ) : !region ? (
+                    {!region ? (
                       <p className="mt-1 h-8 flex items-center">
                         <span className={`inline-block w-20 h-7 rounded-md animate-pulse ${isPro ? 'bg-white/25' : 'bg-slate-200'}`} />
                       </p>
@@ -304,7 +298,7 @@ export default function OnePagerPage() {
                   </ul>
 
                   <div className={`pt-2 border-t text-xs ${isPro ? 'border-indigo-500 text-indigo-200' : 'border-slate-100 text-slate-400'}`}>
-                    {isEnt ? 'Contact us for a custom quote' : '14-day free trial included'}
+                    14-day free trial included
                   </div>
                 </div>
               )
