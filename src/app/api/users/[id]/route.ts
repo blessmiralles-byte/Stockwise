@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
 import { logAudit } from '@/lib/audit'
+import { handOverApprovals } from '@/lib/approval-chain'
 
 // PATCH /api/users/:id — update role or is_active (owner only)
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -74,13 +75,33 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // Fetch current values before update for audit trail (must be in same org)
   const { data: before } = await supabase
     .from('user_profiles')
-    .select('role, is_active, full_name')
+    .select('role, is_active, full_name, reports_to')
     .eq('id', id)
     .eq('org_id', auth.orgId)
     .single()
 
   if (!before) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  }
+
+  if ('full_name' in updates) {
+    const name = String(updates.full_name ?? '').trim().slice(0, 100)
+    updates.full_name = name || null
+  }
+
+  // Reactivating takes a seat back — respect the plan's user limit.
+  if (updates.is_active === true && before.is_active === false) {
+    const [{ count }, { data: org }] = await Promise.all([
+      supabase.from('user_profiles').select('*', { count: 'exact', head: true })
+        .eq('org_id', auth.orgId).eq('is_active', true),
+      supabase.from('organizations').select('max_users').eq('id', auth.orgId).single(),
+    ])
+    if (org && (count ?? 0) >= (org.max_users ?? 5)) {
+      return NextResponse.json(
+        { error: `Your plan allows up to ${org.max_users} active users. Deactivate someone or upgrade to restore this member.` },
+        { status: 403 },
+      )
+    }
   }
 
   const { data, error } = await supabase
@@ -120,5 +141,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     })
   }
 
-  return NextResponse.json({ data })
+  // Deactivating hands their work over so nothing is left stuck with them:
+  // approvals waiting on them move up their reporting line, and anyone who
+  // reported to them now reports to their manager. History keeps their name.
+  let message: string | undefined
+  if (updates.is_active === false && before.is_active !== false) {
+    const moved = await handOverApprovals(supabase, auth.orgId, id)
+    const { data: reports } = await supabase
+      .from('user_profiles')
+      .update({ reports_to: before.reports_to && before.reports_to !== id ? before.reports_to : null })
+      .eq('org_id', auth.orgId)
+      .eq('reports_to', id)
+      .select('id')
+    const parts = [
+      moved ? `${moved} pending approval${moved === 1 ? '' : 's'} reassigned` : null,
+      reports?.length ? `${reports.length} direct report${reports.length === 1 ? '' : 's'} moved to their manager` : null,
+    ].filter(Boolean)
+    message = `${before.full_name || 'Member'} deactivated${parts.length ? ' — ' + parts.join(', ') : ''}.`
+  }
+
+  return NextResponse.json({ data, message })
 }

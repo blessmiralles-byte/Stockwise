@@ -23,6 +23,17 @@ up for an organization is its Owner.
 - The **Getting Started** page walks a new owner through first setup: adding
   vendors, products, locations, and inviting the team.
 - To change your organization name, go to **Settings → Organization**.
+- **Managing members (Settings → Users, owner only):** change someone's role
+  from the Role dropdown; click **edit** in the Approvals column to change their
+  name, job title, reporting line and approval limits. Members who haven't set
+  up their account show **Invite pending** with a **Resend invite** link.
+- **Removing someone:** switch them to **Inactive**. They can't sign in, their
+  seat is freed, anything waiting on them for approval moves to their manager,
+  and their direct reports move to their manager. Members aren't permanently
+  deleted, so their name stays on past transactions, approvals and the audit
+  log. Inactive members are hidden (use "Show inactive members") and can be
+  reactivated if a seat is free. To change someone's login email, invite the
+  new email and deactivate the old account.
 
 ## Inventory & products
 - Add products manually or by scanning a barcode in the field app.

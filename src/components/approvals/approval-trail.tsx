@@ -31,7 +31,10 @@ export function ApprovalTrail({ steps, className }: { steps: TrailStep[]; classN
         const actor = s.acted_by ?? s.approver
         let icon = <Clock className="w-3.5 h-3.5 text-amber-500" />
         let text: React.ReactNode = <>Waiting on <span className="font-medium text-slate-700">{who(s.approver)}</span></>
-        if (s.status === 'endorsed') {
+        if (s.status === 'cancelled') {
+          icon = <CornerRightUp className="w-3.5 h-3.5 text-slate-400" />
+          text = <>Was with <span className="font-medium text-slate-700">{who(s.approver)}</span></>
+        } else if (s.status === 'endorsed') {
           icon = <CornerRightUp className="w-3.5 h-3.5 text-indigo-500" />
           text = <>Endorsed by <span className="font-medium text-slate-700">{who(actor)}</span></>
         } else if (s.status === 'approved') {

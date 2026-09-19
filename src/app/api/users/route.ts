@@ -19,5 +19,12 @@ export async function GET() {
     return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
   }
 
-  return NextResponse.json({ data: data ?? [] })
+  // Flag members who were invited but have never signed in, so the owner can
+  // resend the invite. Teams are small (plan-capped), so one lookup each is fine.
+  const rows = await Promise.all((data ?? []).map(async u => {
+    const { data: au } = await supabase.auth.admin.getUserById(u.id)
+    return { ...u, invite_pending: !!au?.user && !au.user.last_sign_in_at }
+  }))
+
+  return NextResponse.json({ data: rows })
 }

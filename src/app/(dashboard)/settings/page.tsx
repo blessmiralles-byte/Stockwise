@@ -24,6 +24,7 @@ type UserProfile = {
   id: string; full_name: string; email: string; role: Role
   is_active: boolean; created_at: string
   job_title?: string | null
+  invite_pending?: boolean
   reports_to?: string | null
   requisition_approval_limit?: number | null
   po_approval_limit?: number | null
@@ -236,6 +237,7 @@ function ApprovalsEditorRow({ user, members, onSaved, onCancel }: {
   onSaved: () => void
   onCancel: () => void
 }) {
+  const [fullName,  setFullName]  = useState(user.full_name ?? '')
   const [jobTitle,  setJobTitle]  = useState(user.job_title ?? '')
   const [reportsTo, setReportsTo] = useState(user.reports_to ?? '')
   const [reqLimit,  setReqLimit]  = useState(user.requisition_approval_limit != null ? String(user.requisition_approval_limit) : '')
@@ -249,6 +251,7 @@ function ApprovalsEditorRow({ user, members, onSaved, onCancel }: {
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        full_name:                  fullName.trim() || null,
         job_title:                  jobTitle.trim() || null,
         reports_to:                 reportsTo || null,
         requisition_approval_limit: reqLimit === '' ? null : Number(reqLimit),
@@ -263,7 +266,13 @@ function ApprovalsEditorRow({ user, members, onSaved, onCancel }: {
     <tr className="bg-indigo-50/40 border-b border-slate-100">
       <td colSpan={5} className="px-4 py-4">
         {!approvalsOn && <div className="mb-3 max-w-2xl"><UpgradePrompt feature="approvals" compact /></div>}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 max-w-3xl">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-3xl">
+          <div>
+            <label className="text-xs font-medium text-slate-600 block mb-1">Full name</label>
+            <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} maxLength={100}
+              placeholder="Jane Smith"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
           <div>
             <label className="text-xs font-medium text-slate-600 block mb-1">Job title</label>
             <input type="text" value={jobTitle} onChange={e => setJobTitle(e.target.value)} maxLength={80}
@@ -307,7 +316,11 @@ function UserManagementSection({ currentUserId }: { currentUserId: string }) {
   const users = data?.data ?? []
   const [saving, setSaving] = useState<string | null>(null)
   const [editId, setEditId] = useState<string | null>(null)
+  const [showInactive, setShowInactive] = useState(false)
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null)
   const byId = Object.fromEntries(users.map(u => [u.id, u])) as Record<string, UserProfile>
+  const inactiveCount = users.filter(u => u.is_active === false).length
+  const shown = showInactive ? users : users.filter(u => u.is_active !== false)
 
   async function changeRole(userId: string, role: Role) {
     setSaving(userId)
@@ -320,13 +333,29 @@ function UserManagementSection({ currentUserId }: { currentUserId: string }) {
   }
 
   async function toggleActive(u: UserProfile) {
-    setSaving(u.id)
-    await fetch(`/api/users/${u.id}`, {
+    const name = u.full_name || u.email
+    if (u.is_active && !window.confirm(
+      `Deactivate ${name}?\n\nThey can no longer sign in and their seat is freed. Anything waiting on them for approval moves to their manager, and their direct reports will report to their manager. Their name stays on past records, and you can reactivate them later.`,
+    )) return
+    setSaving(u.id); setNotice(null)
+    const res = await fetch(`/api/users/${u.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_active: !u.is_active }),
     })
+    const j = await res.json().catch(() => ({}))
+    setNotice(res.ok
+      ? { ok: true, text: j.message ?? `${name} ${u.is_active ? 'deactivated' : 'reactivated'}.` }
+      : { ok: false, text: j.error ?? 'Could not update this member' })
     setSaving(null); refetch()
+  }
+
+  async function resendInvite(u: UserProfile) {
+    setSaving(u.id); setNotice(null)
+    const res = await fetch(`/api/users/${u.id}/resend-invite`, { method: 'POST' })
+    const j = await res.json().catch(() => ({}))
+    setNotice(res.ok ? { ok: true, text: j.message ?? 'Invite re-sent' } : { ok: false, text: j.error ?? 'Could not resend the invite' })
+    setSaving(null)
   }
 
   return (
@@ -334,7 +363,16 @@ function UserManagementSection({ currentUserId }: { currentUserId: string }) {
       {error && <p className="text-red-500 text-sm">{error}</p>}
 
       {/* Invite */}
-      <InviteUserForm onSuccess={refetch} members={users} />
+      <InviteUserForm onSuccess={refetch} members={users.filter(m => m.is_active !== false)} />
+
+      {notice && (
+        <div className={`flex items-start gap-2 rounded-lg border px-4 py-3 text-sm ${
+          notice.ok ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-700'}`}>
+          {notice.ok ? <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />}
+          <p className="flex-1">{notice.text}</p>
+          <button onClick={() => setNotice(null)} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
+        </div>
+      )}
 
       {/* SOD notice */}
       <div className="bg-amber-50 border border-amber-100 rounded-lg px-4 py-3 text-xs text-amber-800 space-y-1">
@@ -359,7 +397,7 @@ function UserManagementSection({ currentUserId }: { currentUserId: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map(u => {
+                  {shown.map(u => {
                     const isSelf = u.id === currentUserId
                     const isBusy = saving === u.id
                     const rb = ROLE_CFG[u.role] ?? ROLE_CFG.viewer
@@ -378,6 +416,15 @@ function UserManagementSection({ currentUserId }: { currentUserId: string }) {
                               </p>
                               {u.job_title && <p className="text-[11px] text-slate-500">{u.job_title}</p>}
                               <p className="text-xs text-slate-400">{u.email}</p>
+                              {u.invite_pending && u.is_active && (
+                                <p className="text-[11px] mt-0.5">
+                                  <span className="text-amber-600">Invite pending</span>
+                                  <button onClick={() => resendInvite(u)} disabled={isBusy}
+                                    className="ml-1.5 text-indigo-600 hover:underline disabled:opacity-50">
+                                    Resend invite
+                                  </button>
+                                </p>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -445,6 +492,13 @@ function UserManagementSection({ currentUserId }: { currentUserId: string }) {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+          {inactiveCount > 0 && (
+            <div className="border-t border-slate-100 px-4 py-2.5 text-xs">
+              <button onClick={() => setShowInactive(v => !v)} className="text-indigo-600 hover:underline">
+                {showInactive ? 'Hide inactive members' : `Show inactive members (${inactiveCount})`}
+              </button>
             </div>
           )}
         </CardContent>

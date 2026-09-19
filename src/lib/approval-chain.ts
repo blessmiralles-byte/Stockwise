@@ -271,6 +271,55 @@ export async function cancelChain(sb: Svc, docType: DocType, docId: string) {
   await setCurrent(sb, docType, docId, null)
 }
 
+/**
+ * A member is leaving (deactivated): move every document waiting on them to
+ * the next person up THEIR reporting line (same exclusions as escalation).
+ * The old step is kept in the trail as "reassigned". Returns how many moved.
+ */
+export async function handOverApprovals(sb: Svc, orgId: string, leaverId: string): Promise<number> {
+  const leaver = await getMember(sb, orgId, leaverId)
+  const { data: pendingSteps } = await sb.from('approval_steps').select('*')
+    .eq('org_id', orgId).eq('approver_id', leaverId).eq('status', 'pending')
+
+  let moved = 0
+  for (const step of (pendingSteps ?? []) as any[]) {
+    const docType = step.doc_type as DocType
+    const { data: doc } = await sb.from(DOC_TABLE[docType]).select('*').eq('id', step.doc_id).maybeSingle()
+    if (!doc) continue
+    const submitterId: string | null = docType === 'requisition'
+      ? (doc as any).requested_by
+      : ((doc as any).submitted_by ?? (doc as any).created_by ?? null)
+    const ref = docType === 'requisition' ? (doc as any).req_number : (doc as any).po_number
+
+    const all = await steps(sb, docType, step.doc_id)
+    const exclude = new Set<string>([
+      ...(submitterId ? [submitterId] : []),
+      ...all.map(s => s.approver_id).filter(Boolean),
+      leaverId,
+    ])
+    const next = await nextApprover(sb, orgId, leaver?.reports_to ?? null, exclude)
+
+    await sb.from('approval_steps').update({
+      status: 'cancelled', acted_at: new Date().toISOString(),
+      note: `Reassigned — ${memberName(leaver)} was deactivated`,
+    }).eq('id', step.id)
+
+    if (next) {
+      await sb.from('approval_steps').insert({
+        org_id: orgId, doc_type: docType, doc_id: step.doc_id, step_no: step.step_no + 1,
+        approver_id: next.id, status: 'pending', amount: step.amount,
+      })
+      await setCurrent(sb, docType, step.doc_id, next.id)
+      await notifyApprover(orgId, docType, step.doc_id, ref, next.id, Number(step.amount ?? 0),
+        memberName(await getMember(sb, orgId, submitterId)))
+    } else {
+      await setCurrent(sb, docType, step.doc_id, null)
+    }
+    moved++
+  }
+  return moved
+}
+
 export interface TrailStep {
   step_no: number
   status: string
@@ -285,7 +334,6 @@ export interface TrailStep {
 
 /**
  * Approval trails for many documents in one query, keyed by document id.
- * Cancelled steps (voided by a resubmission) are left out.
  */
 export async function loadTrails(sb: Svc, orgId: string, docType: DocType, docIds: string[]): Promise<Map<string, TrailStep[]>> {
   const out = new Map<string, TrailStep[]>()
@@ -295,7 +343,8 @@ export async function loadTrails(sb: Svc, orgId: string, docType: DocType, docId
       approver:user_profiles!approver_id(id, full_name, email, job_title),
       acted_by:user_profiles!acted_by(id, full_name, email, job_title)`)
     .eq('doc_type', docType).eq('org_id', orgId).in('doc_id', docIds)
-    .neq('status', 'cancelled')
+    // Resubmission voids have no note and are hidden; reassignments are shown.
+    .or('status.neq.cancelled,note.not.is.null')
     .order('step_no', { ascending: true })
 
   const person = (p: any) => p ? { id: p.id, name: memberName(p), job_title: p.job_title ?? null } : null
