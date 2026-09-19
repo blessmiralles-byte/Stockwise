@@ -23,6 +23,7 @@ type Role = 'owner' | 'procurement' | 'operations' | 'receiver' | 'finance' | 'v
 type UserProfile = {
   id: string; full_name: string; email: string; role: Role
   is_active: boolean; created_at: string
+  job_title?: string | null
   reports_to?: string | null
   requisition_approval_limit?: number | null
   po_approval_limit?: number | null
@@ -82,6 +83,7 @@ function InviteUserForm({ onSuccess, members }: { onSuccess: () => void; members
   const [email,     setEmail]     = useState('')
   const [name,      setName]      = useState('')
   const [role,      setRole]      = useState<Role>('viewer')
+  const [jobTitle,  setJobTitle]  = useState('')
   const [reportsTo, setReportsTo] = useState('')
   const [reqLimit,  setReqLimit]  = useState('')
   const approvalsOn = usePlan().has('approvals')
@@ -97,6 +99,7 @@ function InviteUserForm({ onSuccess, members }: { onSuccess: () => void; members
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
         email: email.trim(), role, full_name: name.trim() || undefined,
+        job_title: jobTitle.trim() || undefined,
         reports_to: reportsTo || undefined,
         requisition_approval_limit: reqLimit === '' ? undefined : Number(reqLimit),
         po_approval_limit:          poLimit  === '' ? undefined : Number(poLimit),
@@ -106,7 +109,7 @@ function InviteUserForm({ onSuccess, members }: { onSuccess: () => void; members
     setLoading(false)
     if (res.ok) {
       setResult({ ok: true, msg: json.message ?? `Invitation sent to ${email}` })
-      setEmail(''); setName(''); setRole('viewer'); setReportsTo(''); setReqLimit(''); setPoLimit('')
+      setEmail(''); setName(''); setJobTitle(''); setRole('viewer'); setReportsTo(''); setReqLimit(''); setPoLimit('')
       onSuccess()
     } else {
       setResult({ ok: false, msg: json.error ?? 'Failed to send invite' })
@@ -165,6 +168,12 @@ function InviteUserForm({ onSuccess, members }: { onSuccess: () => void; members
           </select>
         </div>
         <div className="col-span-2">
+          <label className="text-xs font-medium text-slate-600 block mb-1">Job title (optional)</label>
+          <input type="text" value={jobTitle} onChange={e => setJobTitle(e.target.value)} maxLength={80}
+            placeholder="e.g. Buyer, Purchasing Officer, Site Supervisor"
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <div className="col-span-2">
           <label className="text-xs font-medium text-slate-600 block mb-1">Reports to</label>
           <select value={reportsTo} onChange={e => setReportsTo(e.target.value)}
             className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
@@ -189,8 +198,10 @@ function InviteUserForm({ onSuccess, members }: { onSuccess: () => void; members
       </div>
       {!approvalsOn && <UpgradePrompt feature="approvals" compact />}
       <p className="text-xs text-slate-400">
-        Approval limits are the maximum value this person can approve. Leave blank for no approval
-        authority (the owner always has unlimited authority).
+        Requisitions and purchase orders go to the submitter&apos;s manager first, then up the reporting
+        line until someone&apos;s limit covers the amount. Leave a limit blank for no approval authority
+        (the owner always has unlimited authority). Job title is shown in the approval trail; access
+        is set by role.
       </p>
 
       {result && (
@@ -225,6 +236,7 @@ function ApprovalsEditorRow({ user, members, onSaved, onCancel }: {
   onSaved: () => void
   onCancel: () => void
 }) {
+  const [jobTitle,  setJobTitle]  = useState(user.job_title ?? '')
   const [reportsTo, setReportsTo] = useState(user.reports_to ?? '')
   const [reqLimit,  setReqLimit]  = useState(user.requisition_approval_limit != null ? String(user.requisition_approval_limit) : '')
   const [poLimit,   setPoLimit]   = useState(user.po_approval_limit != null ? String(user.po_approval_limit) : '')
@@ -237,6 +249,7 @@ function ApprovalsEditorRow({ user, members, onSaved, onCancel }: {
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        job_title:                  jobTitle.trim() || null,
         reports_to:                 reportsTo || null,
         requisition_approval_limit: reqLimit === '' ? null : Number(reqLimit),
         po_approval_limit:          poLimit  === '' ? null : Number(poLimit),
@@ -250,7 +263,13 @@ function ApprovalsEditorRow({ user, members, onSaved, onCancel }: {
     <tr className="bg-indigo-50/40 border-b border-slate-100">
       <td colSpan={5} className="px-4 py-4">
         {!approvalsOn && <div className="mb-3 max-w-2xl"><UpgradePrompt feature="approvals" compact /></div>}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 max-w-3xl">
+          <div>
+            <label className="text-xs font-medium text-slate-600 block mb-1">Job title</label>
+            <input type="text" value={jobTitle} onChange={e => setJobTitle(e.target.value)} maxLength={80}
+            placeholder="e.g. Buyer"
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
           <div>
             <label className="text-xs font-medium text-slate-600 block mb-1">Reports to</label>
             <select value={reportsTo} onChange={e => setReportsTo(e.target.value)}
@@ -357,6 +376,7 @@ function UserManagementSection({ currentUserId }: { currentUserId: string }) {
                                 {u.full_name || <span className="text-slate-400 italic">No name</span>}
                                 {isSelf && <span className="ml-1 text-indigo-400">(you)</span>}
                               </p>
+                              {u.job_title && <p className="text-[11px] text-slate-500">{u.job_title}</p>}
                               <p className="text-xs text-slate-400">{u.email}</p>
                             </div>
                           </div>

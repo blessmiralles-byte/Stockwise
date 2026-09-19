@@ -14,7 +14,7 @@ export async function GET() {
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('user_profiles')
-    .select('id, full_name, email, role')
+    .select('id, full_name, email, role, job_title')
     .eq('org_id', auth.orgId)
     .eq('is_active', true)
     .order('full_name', { ascending: true })

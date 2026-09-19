@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useApi } from '@/lib/use-api'
 import { usePlan } from '@/lib/use-plan'
+import { ApprovalTrail, approveLabel } from '@/components/approvals/approval-trail'
 import { formatCurrency, formatDate, receivableCap } from '@/lib/utils'
 import { PurchaseOrder, Location } from '@/types'
 import { ArrowLeft, Truck, CheckCircle2, Send, X, FileText, AlertTriangle, Scale, Loader2, Plus, Trash2, Download, PackagePlus } from 'lucide-react'
@@ -762,21 +763,23 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
   const categories = catData?.data ?? []
 
   const [statusError, setStatusError] = useState('')
+  const [statusMsg,   setStatusMsg]   = useState('')
   const [statusBusy,  setStatusBusy]  = useState(false)
 
-  async function markStatus(status: string) {
-    setStatusError(''); setStatusBusy(true)
+  async function markStatus(status: string, note?: string) {
+    setStatusError(''); setStatusMsg(''); setStatusBusy(true)
     try {
       const res = await fetch(`/api/purchase-orders/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(note ? { status, note } : { status }),
       })
+      const j = await res.json().catch(() => ({}))
       if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
         setStatusError(j.error ?? 'Could not update the purchase order')
         return
       }
+      if (j.message) setStatusMsg(j.message)
       refetch()
     } finally {
       setStatusBusy(false)
@@ -987,15 +990,24 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
                     <Send className="w-3.5 h-3.5" /> Send to Vendor
                   </Button>
                 )}
-                {po.status === 'pending_approval' && (
+                {po.status === 'pending_approval' && (po as any).my_action && (
                   <>
                     <Button size="sm" onClick={() => markStatus('approved')} disabled={statusBusy} className="gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Approve
+                      <CheckCircle2 className="w-3.5 h-3.5" /> {approveLabel((po as any).my_action)}
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => markStatus('draft')} disabled={statusBusy} className="gap-1 text-red-600 hover:text-red-700">
+                    <Button variant="outline" size="sm" disabled={statusBusy} className="gap-1 text-red-600 hover:text-red-700"
+                      onClick={() => {
+                        const reason = window.prompt('Reason for rejecting (sent to the submitter):')
+                        if (reason !== null) markStatus('draft', reason.trim() || undefined)
+                      }}>
                       <X className="w-3.5 h-3.5" /> Reject
                     </Button>
                   </>
+                )}
+                {po.status === 'pending_approval' && (po as any).can_withdraw && (
+                  <Button variant="outline" size="sm" onClick={() => markStatus('draft')} disabled={statusBusy} className="gap-1">
+                    <X className="w-3.5 h-3.5" /> Withdraw
+                  </Button>
                 )}
                 {po.status === 'approved' && (
                   <Button size="sm" onClick={() => markStatus('sent')} disabled={statusBusy} className="gap-1">
@@ -1020,10 +1032,22 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" /> {statusError}
               </div>
             )}
+            {statusMsg && !statusError && (
+              <div className="mt-4 flex items-start gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-800">
+                <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" /> {statusMsg}
+              </div>
+            )}
             {po.status === 'pending_approval' && !statusError && (
               <div className="mt-4 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-700">
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                Awaiting approval — total {formatCurrency(total)}. An approver whose PO limit covers this amount must approve it before it can be sent.
+                Awaiting approval — total {formatCurrency(total)}. It goes through the submitter&apos;s reporting
+                line until someone whose PO limit covers the amount approves it.
+              </div>
+            )}
+            {!!(po as any).approval_trail?.length && (
+              <div className="mt-4">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Approval trail</p>
+                <ApprovalTrail steps={(po as any).approval_trail} />
               </div>
             )}
           </CardContent>

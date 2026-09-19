@@ -2,17 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
-import { logAudit } from '@/lib/audit'
 import { createNotification } from '@/lib/notify'
-import { sumLineValue, checkApprovalLimit } from '@/lib/approvals'
+import {
+  startChain, actOnChain, ChainError, loadTrails, loadMember, myAction,
+} from '@/lib/approval-chain'
+import { requisitionAmounts, applyRequisitionApproval } from '@/lib/requisition-fulfilment'
 
 const REQ_SELECT = `
   id, req_number, type, status, job_reference, job_code, notes, reject_reason, required_by,
-  approved_at, fulfilled_at, created_at,
+  approved_at, fulfilled_at, created_at, current_approver_id,
   location:locations(id, name, code),
   cost_center:cost_centers(id, code, name),
-  requested_by:user_profiles!requested_by(id, full_name, role),
-  approved_by:user_profiles!approved_by(id, full_name),
+  requested_by:user_profiles!requested_by(id, full_name, role, job_title),
+  approved_by:user_profiles!approved_by(id, full_name, job_title),
   items:requisition_items(
     id, item_type, quantity, unit_cost, notes, returned_at,
     asset:fixed_assets(id, asset_tag, name, status),
@@ -20,12 +22,7 @@ const REQ_SELECT = `
   )
 `
 
-function canApprove(role: string, reqType: string): boolean {
-  if (role === 'owner' || role === 'admin') return true
-  if (reqType === 'new_asset') return role === 'procurement'
-  // checkout + inventory → operations
-  return role === 'operations' || role === 'manager'
-}
+const SEE_ALL = ['owner', 'admin', 'operations', 'procurement', 'finance', 'manager']
 
 export async function GET(
   _req: NextRequest,
@@ -49,13 +46,26 @@ export async function GET(
 
   if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  // Non-managers can only view their own
-  const canSeeAll = ['owner', 'admin', 'operations', 'procurement', 'finance', 'manager'].includes(auth.role)
-  if (!canSeeAll && (data as any).requested_by?.id !== auth.userId) {
+  const trails = await loadTrails(supabase, auth.orgId, 'requisition', [id])
+  const trail  = trails.get(id) ?? []
+
+  // Visible to the requester, anyone in its approval chain, and managers.
+  const inChain = trail.some(s => s.approver?.id === auth.userId || s.acted_by?.id === auth.userId)
+  if (!SEE_ALL.includes(auth.role) && (data as any).requested_by?.id !== auth.userId && !inChain) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  return NextResponse.json({ data })
+  const amount = (await requisitionAmounts(supabase, auth.orgId, [data as any])).get(id) ?? 0
+  const viewer = await loadMember(supabase, auth.orgId, auth.userId)
+  return NextResponse.json({
+    data: {
+      ...data, amount, approval_trail: trail,
+      my_action: myAction({
+        trail, viewer, viewerRole: auth.role, docType: 'requisition', amount,
+        submitterId: (data as any).requested_by?.id ?? null,
+      }),
+    },
+  })
 }
 
 export async function PATCH(
@@ -89,167 +99,52 @@ export async function PATCH(
   }
 
   const now = new Date().toISOString()
-  const approvalWarnings: string[] = []
+  let warnings: string[] = []
+  let message: string | undefined
 
   switch (action) {
 
-    // ── Approve ────────────────────────────────────────────────────────────────
-    case 'approve': {
-      if (!canApprove(auth.role, r.type)) {
-        return NextResponse.json({ error: 'Access denied. Insufficient role to approve this requisition.' }, { status: 403 })
-      }
-      if (r.status !== 'pending') {
-        return NextResponse.json({ error: 'Only pending requisitions can be approved' }, { status: 400 })
-      }
-
-      // Approval-limit enforcement: the approver's requisition limit must cover
-      // the requisition's value, or it must be escalated up the reporting line.
-      const reqTotal = sumLineValue(r.items as any[])
-      const limitError = await checkApprovalLimit(supabase, {
-        orgId: auth.orgId, approverId: auth.userId, approverRole: auth.role,
-        kind: 'requisition', amount: reqTotal,
-      })
-      if (limitError) {
-        return NextResponse.json({ error: limitError }, { status: 403 })
-      }
-
-      // checkout → checked_out immediately (no separate approval step needed)
-      const newStatus = r.type === 'checkout' ? 'checked_out' : 'approved'
-
-      await supabase
-        .from('requisitions')
-        .update({ status: newStatus, approved_by: auth.userId, approved_at: now })
-        .eq('id', id)
-
-      // Inventory: auto-deduct stock on approval
-      if (r.type === 'inventory') {
-        for (const item of (r.items as any[])) {
-          if (item.item_type !== 'product' || !item.product_id) continue
-
-          const qty = Math.abs(Number(item.quantity))
-
-          // Resolve location: use the requisition's location, or auto-detect
-          // from the product's inventory balance (pick the location with stock).
-          // The auto-detect query already returns avg_cost, so only the explicit
-          // -location path needs a separate cost lookup.
-          let fromLocationId: string | null = r.location_id ?? null
-          let balanceCost = 0
-          if (!fromLocationId) {
-            const { data: balRow } = await supabase
-              .from('inventory_balances')
-              .select('location_id, quantity, avg_cost')
-              .eq('product_id', item.product_id)
-              .gt('quantity', 0)
-              .order('quantity', { ascending: false })
-              .limit(1)
-              .single()
-            if (balRow) {
-              fromLocationId = balRow.location_id
-              balanceCost    = Number(balRow.avg_cost ?? 0)
-            }
-          } else {
-            const { data: costRow } = await supabase
-              .from('inventory_balances')
-              .select('avg_cost')
-              .eq('product_id', item.product_id)
-              .eq('location_id', fromLocationId)
-              .single()
-            balanceCost = Number(costRow?.avg_cost ?? 0)
-          }
-
-          // Try atomic RPC first
-          const { error: rpcErr } = await supabase.rpc('record_inventory_movement', {
-            p_transaction_type: 'consumption',
-            p_product_id:       item.product_id,
-            p_quantity:         qty,
-            p_unit_cost:        balanceCost,
-            p_from_location_id: fromLocationId,
-            p_to_location_id:   null,
-            p_reference_no:     r.req_number,
-            p_notes:            `Requisition ${r.req_number}${r.job_reference ? ' — Job: ' + r.job_reference : ''}`,
-            p_customer_id:      null,
-            p_created_by:       auth.userId,
-            p_batch_no:         null,
-            p_expiration_date:  null,
-            p_job_order_id:     r.job_reference ?? null,
-            p_cost_center_id:   r.cost_center_id ?? null,
-            p_job_code:         r.job_code ?? null,
-            p_org_id:           auth.orgId,
-          })
-
-          if (rpcErr) {
-            // Only fall back to manual posting when the RPC isn't deployed yet.
-            // A real RPC rejection (insufficient stock, closed period) must NOT
-            // be force-posted — that would drive the balance negative or write
-            // into a closed period. Skip the item and surface a warning.
-            const isRpcMissing =
-              rpcErr.message?.toLowerCase().includes('function') ||
-              (rpcErr as any).code === 'PGRST202'
-            if (!isRpcMissing) {
-              console.error(`[requisition ${r.req_number}] consumption rejected:`, rpcErr.message)
-              approvalWarnings.push(rpcErr.message)
-              continue
-            }
-
-            await supabase.from('inventory_transactions').insert({
-              org_id:           auth.orgId,
-              transaction_type: 'consumption',
-              product_id:       item.product_id,
-              quantity:         qty,
-              unit_cost:        balanceCost,
-              // total_cost is a generated column (quantity * unit_cost) — never set it
-              from_location_id: fromLocationId,
-              reference_no:     r.req_number,
-              notes:            `Requisition ${r.req_number}`,
-              created_by:       auth.userId,
-              job_order_id:     r.job_reference ?? null,
-              cost_center_id:   r.cost_center_id ?? null,
-              job_code:         r.job_code ?? null,
-            })
-
-            // Deduct from balance
-            if (fromLocationId) {
-              const { data: bal } = await supabase
-                .from('inventory_balances')
-                .select('id, quantity')
-                .eq('product_id', item.product_id)
-                .eq('location_id', fromLocationId)
-                .single()
-              if (bal) {
-                await supabase
-                  .from('inventory_balances')
-                  .update({ quantity: bal.quantity - qty, last_updated: new Date().toISOString() })
-                  .eq('id', bal.id)
-              }
-            }
-          }
-        }
-
-        // Mark fulfilled only if every item was consumed cleanly; otherwise
-        // leave it 'approved' so an operator can resolve the shortfall.
-        if (approvalWarnings.length === 0) {
-          await supabase
-            .from('requisitions')
-            .update({ status: 'fulfilled', fulfilled_at: now })
-            .eq('id', id)
-        }
-      }
-
-      break
-    }
-
-    // ── Reject ─────────────────────────────────────────────────────────────────
+    // ── Approve / endorse, or reject — routed through the reporting line ─────
+    case 'approve':
     case 'reject': {
-      if (!canApprove(auth.role, r.type)) {
-        return NextResponse.json({ error: 'Access denied. Insufficient role to reject this requisition.' }, { status: 403 })
-      }
       if (r.status !== 'pending') {
-        return NextResponse.json({ error: 'Only pending requisitions can be rejected' }, { status: 400 })
+        return NextResponse.json({ error: 'Only pending requisitions can be approved or rejected' }, { status: 400 })
       }
-      await supabase
-        .from('requisitions')
-        .update({ status: 'rejected', reject_reason: reject_reason ?? null })
-        .eq('id', id)
+      const amount = (await requisitionAmounts(supabase, auth.orgId, [r])).get(id) ?? 0
+
+      // Requisitions raised before the approval chain existed have no steps
+      // yet — route them now so they follow the same rules.
+      const { count } = await supabase.from('approval_steps').select('id', { count: 'exact', head: true })
+        .eq('doc_type', 'requisition').eq('doc_id', id)
+      if (!count) {
+        await startChain(supabase, {
+          orgId: auth.orgId, docType: 'requisition', docId: id, ref: r.req_number,
+          submitterId: r.requested_by, amount,
+        })
+      }
+
+      try {
+        const result = await actOnChain(supabase, {
+          orgId: auth.orgId, docType: 'requisition', docId: id, ref: r.req_number,
+          submitterId: r.requested_by, amount,
+          actorId: auth.userId, actorRole: auth.role,
+          action, note: action === 'reject' ? (reject_reason ?? null) : (body.note ?? null),
+        })
+        if (result.outcome === 'approved') {
+          warnings = await applyRequisitionApproval(supabase, r, { orgId: auth.orgId, actorId: auth.userId })
+          message = 'Approved.'
+        } else if (result.outcome === 'rejected') {
+          await supabase.from('requisitions')
+            .update({ status: 'rejected', reject_reason: reject_reason ?? null })
+            .eq('id', id)
+          message = 'Rejected.'
+        } else {
+          message = `Endorsed — sent to ${result.approver.name} for approval.`
+        }
+      } catch (e) {
+        if (e instanceof ChainError) return NextResponse.json({ error: e.message }, { status: e.status })
+        throw e
+      }
       break
     }
 
@@ -283,45 +178,16 @@ export async function PATCH(
         .from('requisitions')
         .update({ status: 'fulfilled', fulfilled_at: now })
         .eq('id', id)
+      await createNotification({
+        userId: r.requested_by, orgId: auth.orgId, type: 'requisition.fulfill',
+        title: `Requisition ${r.req_number} fulfilled`, body: 'Procurement has acted on your request.',
+        data: { req_id: id }, actionUrl: '/requisitions',
+      })
       break
     }
 
     default:
       return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })
-  }
-
-  // In-app notifications for the requester
-  if (action === 'approve' || action === 'reject') {
-    const notifTitle = action === 'approve'
-      ? `✅ Requisition ${r.req_number} approved`
-      : `❌ Requisition ${r.req_number} rejected`
-    const notifBody = action === 'reject' && reject_reason
-      ? `Reason: ${reject_reason}`
-      : action === 'approve'
-        ? 'Your request has been approved and is being processed.'
-        : 'Your request was not approved.'
-    await createNotification({
-      userId:    r.requested_by,
-      orgId:     auth.orgId,
-      type:      `requisition.${action}`,
-      title:     notifTitle,
-      body:      notifBody,
-      data:      { req_id: id, req_number: r.req_number, type: r.type },
-      actionUrl: '/requisitions',
-    })
-  }
-
-  // M-4: Audit log for approve/reject actions
-  if (action === 'approve' || action === 'reject') {
-    await logAudit({
-      actorId:   auth.userId,
-      orgId:     auth.orgId,
-      action:    action === 'approve' ? 'requisition.approve' : 'requisition.reject',
-      tableName: 'requisitions',
-      recordId:  id,
-      oldValue:  { status: 'pending', req_number: r.req_number },
-      newValue:  { status: action === 'approve' ? 'approved' : 'rejected', reject_reason: reject_reason ?? null },
-    })
   }
 
   const { data: updated } = await supabase
@@ -332,6 +198,7 @@ export async function PATCH(
 
   return NextResponse.json({
     data: updated,
-    warnings: approvalWarnings.length ? approvalWarnings : undefined,
+    message,
+    warnings: warnings.length ? warnings : undefined,
   })
 }

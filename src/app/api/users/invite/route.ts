@@ -28,7 +28,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { email, role = 'viewer', full_name, reports_to, requisition_approval_limit, po_approval_limit } = body
+  const { email, role = 'viewer', full_name, job_title, reports_to, requisition_approval_limit, po_approval_limit } = body
+  const jobTitle = String(job_title ?? '').trim().slice(0, 80) || null
 
   // Normalize the delegation-of-authority fields (applied after the invite
   // creates the profile row).
@@ -170,10 +171,11 @@ export async function POST(req: NextRequest) {
 
   // The invite already created the auth user (and the trigger created its
   // profile), so we can stamp the reporting line + approval limits now.
-  if (userId && (reports_to || reqLimit != null || poLimit != null)) {
+  if (userId && (jobTitle || reports_to || reqLimit != null || poLimit != null)) {
     await supabase
       .from('user_profiles')
       .update({
+        job_title:                  jobTitle,
         reports_to:                 reports_to || null,
         requisition_approval_limit: reqLimit,
         po_approval_limit:          poLimit,

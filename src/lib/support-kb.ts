@@ -57,15 +57,33 @@ up for an organization is its Owner.
   items prompt for the required details before they can be added.
 
 ## Purchase orders, requisitions & approvals (Delegation of Authority)
-- Requisitions and purchase orders follow an approval flow:
-  **Submit for Approval → Approve → Send to Vendor**.
-- Each member can have a **reporting line** (who they report to) and
-  **approval limits** for requisitions and for purchase orders, set by the
-  owner in **Settings → Users**.
-- If a requisition or PO exceeds a member's approval limit, it escalates up the
-  reporting chain to someone with sufficient authority.
-- The purchase order page shows the visual status flow and the buttons available
-  at each stage (Submit, Approve, Reject, Send to Vendor).
+- Only **Procurement** (and the Owner) can create purchase orders. A PO flows
+  **Draft → Submit for Approval → Approved → Send to Vendor**; it can't be sent
+  until it's approved.
+- Each member has a **reporting line** (who they report to), a **job title**
+  (free text such as "Buyer" or "Purchasing Officer" — shown in the approval
+  trail; access is still set by role), and **approval limits** for requisitions
+  and for POs. The owner sets these in **Settings → Users** (click "edit" in the
+  Approvals column).
+- **How approvals route (reporting line):** a submitted requisition or PO goes
+  to the submitter's **direct manager first**. If the amount is within that
+  manager's limit, their approval is final. If not, their action is an
+  **endorsement** and it moves to *their* manager, and so on up the line until
+  someone's limit covers it. If the line runs out, it goes to the Owner.
+- Nobody can approve something they submitted, and each person appears once in
+  a chain. A blank limit means no approval authority (they can only endorse).
+- The **Owner** can approve at any step; that's recorded as an **owner
+  override**. An Owner's own requisitions/POs are approved on submit.
+- Every document shows its **approval trail** — who endorsed, approved or
+  rejected, when, and any note. Rejecting needs a reason and sends a PO back to
+  draft (a requisition becomes Rejected). The submitter can **withdraw** a PO
+  that's awaiting approval.
+- Approvers get an in-app notification when something is waiting on them; the
+  Requisitions page has an **Awaiting me** filter.
+- Requisition value is the priced amount, or for stock items the average cost
+  on hand. Borrowing tools (zero value) only needs the direct manager.
+- Approvals are a **Pro** feature. On Starter, POs go straight from draft to
+  Send to Vendor with no approval step.
 
 ## Locations & moving stock
 - Locations are modeled as a hierarchy: **Building/Site → Floor/Area →

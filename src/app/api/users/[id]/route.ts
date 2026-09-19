@@ -21,10 +21,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'You cannot deactivate your own account' }, { status: 400 })
   }
 
-  const allowed = ['role', 'is_active', 'full_name', 'reports_to', 'requisition_approval_limit', 'po_approval_limit']
+  const allowed = ['role', 'is_active', 'full_name', 'job_title', 'reports_to', 'requisition_approval_limit', 'po_approval_limit']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]
+  }
+
+  // Job title is free text ("Buyer", "Purchasing Officer"); blank clears it.
+  if ('job_title' in updates) {
+    const t = String(updates.job_title ?? '').trim().slice(0, 80)
+    updates.job_title = t || null
   }
 
   // A member can't report to themselves; blank clears the reporting line.

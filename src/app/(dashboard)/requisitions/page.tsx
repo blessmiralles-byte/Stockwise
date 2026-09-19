@@ -8,6 +8,7 @@ import {
   CalendarDays, FileText, MapPin, User, Tag, Briefcase,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ApprovalTrail, approveLabel, type TrailStep } from '@/components/approvals/approval-trail'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type ReqType   = 'checkout' | 'new_asset' | 'inventory'
@@ -41,9 +42,12 @@ interface Requisition {
   created_at: string
   location?: { id: string; name: string; code: string }
   cost_center?: { id: string; code: string; name: string }
-  requested_by?: { id: string; full_name: string; role: string }
+  requested_by?: { id: string; full_name: string; role: string; job_title?: string | null }
   approved_by?: { id: string; full_name: string }
   items: ReqItem[]
+  amount?: number
+  approval_trail?: TrailStep[]
+  my_action?: 'approve' | 'endorse' | 'override' | null
 }
 
 // ── Config ───────────────────────────────────────────────────────────────────
@@ -64,6 +68,7 @@ const STATUS_CFG: Record<ReqStatus, { label: string; color: string }> = {
 
 const STATUS_FILTERS = [
   { value: 'all',       label: 'All'        },
+  { value: 'awaiting',  label: 'Awaiting me' },
   { value: 'pending',   label: 'Pending'    },
   { value: 'active',    label: 'Active'     },
   { value: 'completed', label: 'Completed'  },
@@ -190,7 +195,7 @@ function NewRequestDialog({
 }: {
   open: boolean
   onClose: () => void
-  onCreated: () => void
+  onCreated: (message?: string) => void
   profile: any
 }) {
   const [step, setStep]             = useState<1 | 2 | 3 | 4>(1)
@@ -305,7 +310,7 @@ function NewRequestDialog({
       })
       const json = await res.json()
       if (!res.ok) { setError(json.error ?? 'Failed to submit'); return }
-      onCreated()
+      onCreated(json.message)
       close()
     } catch { setError('Network error — please try again.')
     } finally { setSubmitting(false) }
@@ -692,19 +697,20 @@ function NewRequestDialog({
 // ── Reject Dialog ─────────────────────────────────────────────────────────────
 function RejectDialog({
   req, onClose, onDone,
-}: { req: Requisition; onClose: () => void; onDone: () => void }) {
+}: { req: Requisition; onClose: () => void; onDone: (message?: string, error?: string) => void }) {
   const [reason, setReason]     = useState('')
   const [submitting, setSub]    = useState(false)
 
   const submit = async () => {
     setSub(true)
-    await fetch(`/api/requisitions/${req.id}`, {
+    const res = await fetch(`/api/requisitions/${req.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'reject', reject_reason: reason.trim() || undefined }),
     })
+    const json = await res.json().catch(() => ({}))
     setSub(false)
-    onDone()
+    onDone(json.message, res.ok ? undefined : (json.error ?? 'Failed to reject'))
     onClose()
   }
 
@@ -757,7 +763,8 @@ function ReqCard({
   const isOps       = isOwner || role === 'operations' || role === 'manager'
   const isProc      = isOwner || role === 'procurement'
 
-  const canApproveThis = req.type === 'new_asset' ? isProc : isOps
+  // Routed by reporting line: the server says whether this viewer can act.
+  const canApproveThis = !!req.my_action
   const canReturn      = req.status === 'checked_out' && (isRequester || isOps)
   const canFulfill     = req.type === 'new_asset' && req.status === 'approved' && isProc
 
@@ -810,6 +817,12 @@ function ReqCard({
           {req.requested_by && (
             <span className="text-xs text-slate-500 flex items-center gap-1">
               <User className="w-3 h-3" />{req.requested_by.full_name || 'Unknown'}
+              {req.requested_by.job_title && <span className="text-slate-400">· {req.requested_by.job_title}</span>}
+            </span>
+          )}
+          {!!req.amount && req.amount > 0 && (
+            <span className="text-xs text-slate-500">
+              ≈ ${req.amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
             </span>
           )}
           {req.cost_center && (
@@ -855,6 +868,13 @@ function ReqCard({
           </div>
         )}
 
+        {/* Approval trail */}
+        {!!req.approval_trail?.length && (
+          <div className="mb-3 rounded-lg bg-slate-50 px-3 py-2">
+            <ApprovalTrail steps={req.approval_trail} />
+          </div>
+        )}
+
         {/* Action buttons */}
         {(req.status === 'pending' && canApproveThis) && (
           <div className="flex gap-2 pt-2 border-t border-slate-100">
@@ -866,7 +886,7 @@ function ReqCard({
             <button onClick={() => act('approve')} disabled={!!busy}
               className="flex-1 px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-1.5">
               {busy === 'approve' ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-              Approve
+              {approveLabel(req.my_action)}
             </button>
           </div>
         )}
@@ -905,6 +925,7 @@ export default function RequisitionsPage() {
   const [showNew, setShowNew]     = useState(false)
   const [rejectTarget, setReject] = useState<Requisition | null>(null)
   const [mineOnly, setMineOnly]   = useState(false)
+  const [notice, setNotice]       = useState<{ ok: boolean; text: string } | null>(null)
 
   const fetchReqs = useCallback(async () => {
     const params = new URLSearchParams()
@@ -917,6 +938,7 @@ export default function RequisitionsPage() {
     if (statusFilter !== 'all') {
       if (statusFilter === 'active')    data = data.filter(r => ['approved', 'checked_out'].includes(r.status))
       else if (statusFilter === 'completed') data = data.filter(r => ['fulfilled', 'returned'].includes(r.status))
+      else if (statusFilter === 'awaiting')  data = data.filter(r => r.my_action === 'approve' || r.my_action === 'endorse')
       else data = data.filter(r => r.status === statusFilter)
     }
     setReqs(data)
@@ -935,16 +957,20 @@ export default function RequisitionsPage() {
       const req = reqs.find(r => r.id === id)
       if (req) { setReject(req); return }
     }
-    await fetch(`/api/requisitions/${id}`, {
+    const res  = await fetch(`/api/requisitions/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action }),
     })
+    const json = await res.json().catch(() => ({}))
+    setNotice(res.ok
+      ? (json.message ? { ok: true, text: json.message } : null)
+      : { ok: false, text: json.error ?? 'Something went wrong' })
     fetchReqs()
   }
 
-  // Counts for filter badges
-  const pendingCount = reqs.filter(r => r.status === 'pending').length
+  // Requisitions routed to this viewer (their manager step or an escalation)
+  const pendingCount = reqs.filter(r => r.my_action === 'approve' || r.my_action === 'endorse').length
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -962,13 +988,22 @@ export default function RequisitionsPage() {
       </div>
 
       {/* Pending banner for approvers */}
-      {canSeeAll && pendingCount > 0 && statusFilter === 'all' && !loading && (
+      {notice && (
+        <div className={cn('flex items-start gap-2 p-3 rounded-xl mb-4 text-sm border',
+          notice.ok ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-700')}>
+          {notice.ok ? <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />}
+          <p className="flex-1">{notice.text}</p>
+          <button onClick={() => setNotice(null)} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
+        </div>
+      )}
+
+      {pendingCount > 0 && statusFilter === 'all' && !loading && (
         <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl mb-4">
           <Clock className="w-4 h-4 text-amber-600 flex-shrink-0" />
           <p className="text-sm text-amber-800">
             <span className="font-semibold">{pendingCount} requisition{pendingCount !== 1 ? 's' : ''}</span> awaiting your approval
           </p>
-          <button onClick={() => setStatus('pending')}
+          <button onClick={() => setStatus('awaiting')}
             className="ml-auto text-xs font-semibold text-amber-700 hover:text-amber-900 underline">
             View
           </button>
@@ -1044,7 +1079,7 @@ export default function RequisitionsPage() {
       <NewRequestDialog
         open={showNew}
         onClose={() => setShowNew(false)}
-        onCreated={fetchReqs}
+        onCreated={(message) => { if (message) setNotice({ ok: true, text: message }); fetchReqs() }}
         profile={profile}
       />
 
@@ -1052,7 +1087,10 @@ export default function RequisitionsPage() {
         <RejectDialog
           req={rejectTarget}
           onClose={() => setReject(null)}
-          onDone={fetchReqs}
+          onDone={(message, error) => {
+            setNotice(error ? { ok: false, text: error } : message ? { ok: true, text: message } : null)
+            fetchReqs()
+          }}
         />
       )}
     </div>

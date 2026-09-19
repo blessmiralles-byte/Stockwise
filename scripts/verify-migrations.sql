@@ -110,7 +110,13 @@ select e.migration, e.tbl, e.col from (values
   ('user_profiles','org_id','migrate-multitenancy.sql'),
   ('user_profiles','po_approval_limit','migrate-approval-authority.sql'),
   ('user_profiles','reports_to','migrate-approval-authority.sql'),
-  ('user_profiles','requisition_approval_limit','migrate-approval-authority.sql')
+  ('user_profiles','requisition_approval_limit','migrate-approval-authority.sql'),
+  ('approval_steps','doc_id','migrate-approval-chain.sql'),
+  ('organizations','pricing_region','migrate-pricing-region.sql'),
+  ('purchase_orders','current_approver_id','migrate-approval-chain.sql'),
+  ('purchase_orders','submitted_by','migrate-approval-chain.sql'),
+  ('requisitions','current_approver_id','migrate-approval-chain.sql'),
+  ('user_profiles','job_title','migrate-approval-chain.sql')
 ) as e(tbl,col,migration)
 where not exists (select 1 from information_schema.columns c
   where c.table_schema='public' and c.table_name=e.tbl and c.column_name=e.col)
