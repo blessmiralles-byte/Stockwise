@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
 import { createNotification } from '@/lib/notify'
 import { orgHasFeature } from '@/lib/entitlements-server'
+import { assetCompliance, checkoutBlock } from '@/lib/asset-compliance'
 
 /**
  * POST /api/assets/:id/checkout
@@ -42,6 +43,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
   if (asset.current_checkout_id) {
     return NextResponse.json({ error: 'This tool is already checked out or awaiting approval' }, { status: 409 })
+  }
+
+  // Inspection / calibration guard: kit whose check is overdue (or whose
+  // certificate has run out) either warns or is refused, per org policy.
+  const [{ data: checks }, { data: orgRow }] = await Promise.all([
+    supabase.from('maintenance_schedules')
+      .select('kind, status, scheduled_date, certified_until')
+      .eq('org_id', auth.orgId).eq('asset_id', id),
+    supabase.from('organizations')
+      .select('block_checkout_when_overdue').eq('id', auth.orgId).maybeSingle(),
+  ])
+  const compliance = assetCompliance((checks ?? []) as any[])
+  const guard = checkoutBlock(compliance, { blockWhenOverdue: (orgRow as any)?.block_checkout_when_overdue })
+  if (guard.blocked) {
+    return NextResponse.json({ error: guard.reason, compliance }, { status: 409 })
   }
 
   // Check-out approval is a Pro feature; on Starter the tool's flag is kept but
@@ -114,5 +130,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   return NextResponse.json({
     data: { checkout_id: checkout.id, status: checkout.status },
     pending: needsApproval,
+    // Allowed out, but the crew should know its check is due.
+    warning: guard.reason ?? undefined,
   }, { status: 201 })
 }

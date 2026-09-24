@@ -19,7 +19,7 @@ export async function GET() {
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('organizations')
-    .select('id, name, slug, plan, plan_status, trial_ends_at, max_users, require_checkout_approval, require_cost_dimension, pricing_region, ls_subscription_id, created_at')
+    .select('id, name, slug, plan, plan_status, trial_ends_at, max_users, require_checkout_approval, require_cost_dimension, block_checkout_when_overdue, pricing_region, ls_subscription_id, created_at')
     .eq('id', auth.orgId)
     .single()
 
@@ -49,7 +49,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const allowed = ['name', 'require_checkout_approval', 'require_cost_dimension']
+  const allowed = ['name', 'require_checkout_approval', 'require_cost_dimension', 'block_checkout_when_overdue']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]
@@ -59,6 +59,9 @@ export async function PATCH(req: NextRequest) {
   }
   if ('require_cost_dimension' in updates) {
     updates.require_cost_dimension = !!updates.require_cost_dimension
+  }
+  if ('block_checkout_when_overdue' in updates) {
+    updates.block_checkout_when_overdue = !!updates.block_checkout_when_overdue
   }
 
   // Plan gates: these policies can't be switched ON without the feature.
@@ -121,7 +124,7 @@ export async function PATCH(req: NextRequest) {
     .from('organizations')
     .update(updates)
     .eq('id', auth.orgId)
-    .select('id, name, slug, plan, plan_status, trial_ends_at, max_users, require_checkout_approval, require_cost_dimension, ls_subscription_id, created_at')
+    .select('id, name, slug, plan, plan_status, trial_ends_at, max_users, require_checkout_approval, require_cost_dimension, block_checkout_when_overdue, ls_subscription_id, created_at')
     .single()
 
   if (error) {

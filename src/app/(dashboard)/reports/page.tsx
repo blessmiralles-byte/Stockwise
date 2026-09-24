@@ -2,7 +2,7 @@
 
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent } from '@/components/ui/card'
-import { BarChart2, TrendingUp, Package, ChevronRight, Briefcase, TrendingDown, ScrollText, BookOpen, Wrench, HardHat, Grid3x3 } from 'lucide-react'
+import { BarChart2, TrendingUp, Package, ChevronRight, Briefcase, TrendingDown, ScrollText, BookOpen, Wrench, HardHat, Grid3x3, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import { type Feature, FEATURES } from '@/lib/entitlements'
 import { usePlan } from '@/lib/use-plan'
@@ -45,6 +45,13 @@ const reports: { href: string; icon: any; color: string; title: string; desc: st
     color: 'bg-amber-50 text-amber-600',
     title: 'Tools Checked Out',
     desc: 'Every fixed asset / tool currently checked out — who holds it, the job, and whether it is overdue.',
+  },
+  {
+    href: '/reports/tool-compliance',
+    icon: ShieldCheck,
+    color: 'bg-teal-50 text-teal-600',
+    title: 'Tool Compliance',
+    desc: 'Inspection and calibration certificates — what is due, what has expired — plus the register of lost, stolen and damaged tools.',
   },
   {
     href: '/reports/tools-by-crew',

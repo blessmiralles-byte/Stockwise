@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { captureAttribution } from '@/lib/attribution'
 import {
   Package, BarChart3, Truck, ClipboardList, Wrench,
-  CheckCircle2, ArrowRight, Shield, Zap, Users, Star, Minus,
+  CheckCircle2, ArrowRight, Shield, Zap, Users, Star, Minus, ShieldCheck, PackageX,
   ChevronRight, Smartphone, TrendingDown, CalendarClock, History,
   Hammer, HardHat, HeartPulse, UtensilsCrossed, Building2, MapPin,
 } from 'lucide-react'
@@ -199,6 +199,16 @@ const ASSET_FEATURES = [
     desc:  'Assign or lend equipment to a person or job and always know who is holding what. Field staff check tools in and out from their phone.',
   },
   {
+    icon:  ShieldCheck,
+    title: 'Inspections & calibration',
+    desc:  'Safety and calibration checks on their own cycle, with the certificate number and expiry stored against the tool. See at a glance what is due, what has lapsed, and what expires this month — and stop uncertified kit leaving the store.',
+  },
+  {
+    icon:  PackageX,
+    title: 'Lost, stolen & damaged',
+    desc:  'Report a missing tool in seconds: who had it, where it was last seen, the police report number. It comes out of service immediately, owners are told, and the value you are carrying in losses is there in one figure.',
+  },
+  {
     icon:  History,
     title: 'Disposal & audit trail',
     desc:  'Retire, sell, or dispose of an asset with the correct accounting entries posted automatically — accumulated depreciation relieved, gain or loss recognised — and a complete history from purchase to disposal.',
@@ -227,12 +237,13 @@ function Assets() {
             <p className="text-slate-300 leading-relaxed mb-6">
               Your tools, vehicles, and equipment are assets on your books, not consumables.
               Stocked tracks them from purchase to disposal — with depreciation, maintenance,
-              and custody built in — so your fixed-asset register and your accountant stay in
-              sync without a separate system.
+              custody and safety certificates built in — so your fixed-asset register stays in
+              sync with your accountant, and you can prove a tool was in date the day it was used.
             </p>
             <ul className="space-y-2.5 mb-8">
               {[
                 'Barcode & asset-tag scanning from any phone',
+                'Inspection and calibration certificates that never quietly lapse',
                 'GAAP-aligned depreciation and disposal entries',
                 'One audit trail from acquisition to write-off',
               ].map(point => (

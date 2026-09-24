@@ -128,6 +128,32 @@ up for an organization is its Owner.
 - Reports include **all tools currently checked out** and **tools grouped by
   crew name**.
 
+## Inspections, calibration & certificates
+- A schedule can be a **Maintenance**, **Inspection** or **Calibration** job —
+  chosen under **Type** when scheduling. Inspections and calibration record a
+  **certificate number** and a **valid until** date when they're marked done.
+- All three can repeat (weekly, monthly, quarterly, every 6 months, annually)
+  and share the same reminders, overdue flags and sign-off.
+- **Reports → Tool Compliance** shows every tool with a check: what's overdue,
+  which certificates have expired or expire within 30 days, and the certificate
+  number for each. Downloadable as CSV for an auditor or client.
+- **Check-out guard:** a tool whose inspection is overdue, or whose certificate
+  has expired, shows a warning when someone tries to take it. Owners can make
+  that a hard block in **Settings → Organization → "Block check-out when a
+  safety check is overdue"** (off by default).
+
+## Lost, stolen & damaged tools
+- Report one from the **Assets** page (the small icon next to Check out):
+  choose **Lost**, **Stolen** or **Damaged**, with the date, where it was last
+  seen, an estimated value, and a police report number for a theft.
+- Reporting **closes the tool's check-out**, records who was holding it, takes
+  it out of service (lost/stolen tools can't be checked out; damaged ones go to
+  In Maintenance), and notifies the owners.
+- The register is in **Reports → Tool Compliance → Losses & damage**, with the
+  total value still unaccounted for. An owner or operations manager can mark a
+  report **Found it** (back in service) or **Write off**. Writing off doesn't
+  post accounting entries — dispose of the asset from its record for that.
+
 ## Scanner (field app)
 - The barcode scanner uses the rear camera and the device's native barcode
   detector, with torch and haptic feedback for faster, more reliable scans.

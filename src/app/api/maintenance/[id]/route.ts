@@ -21,7 +21,7 @@ export async function PATCH(
   }
 
   // Fields any authenticated user (incl. field workers) can update
-  const FIELD_ALLOWED  = ['status', 'completed_date', 'performed_by', 'notes']
+  const FIELD_ALLOWED  = ['status', 'completed_date', 'performed_by', 'notes', 'certificate_no', 'certified_until']
   // Fields restricted to operations / finance / owner
   const FINANCE_ROLES  = new Set(['owner', 'admin', 'operations', 'manager', 'finance'])
 
@@ -80,7 +80,7 @@ export async function PATCH(
   // mismatch surfaced as a misleading "not found" 404 instead of a real error.
   const { data: existing, error: fetchErr } = await supabase
     .from('maintenance_schedules')
-    .select('id, asset_id, title, description, scheduled_date, notify_days_before, recurrence_every, recurrence_unit, recurrence_parent_id')
+    .select('id, asset_id, title, description, scheduled_date, notify_days_before, recurrence_every, recurrence_unit, recurrence_parent_id, kind')
     .eq('id', id)
     .eq('org_id', auth.orgId)
     .maybeSingle()
@@ -151,6 +151,7 @@ export async function PATCH(
             status:               'scheduled',
             notify_days_before:   e.notify_days_before ?? 7,
             reported_by:          auth.userId,
+            kind:                 e.kind ?? 'maintenance',
             recurrence_every:     e.recurrence_every,
             recurrence_unit:      e.recurrence_unit,
             recurrence_parent_id: seriesId,

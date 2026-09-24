@@ -920,8 +920,12 @@ function OrgSettingsSection({ isAdmin }: { isAdmin: boolean }) {
   const requireApproval = approvalOverride ?? !!data?.data?.require_checkout_approval
 
   // Require a cost center or job code when consuming stock
+  // Refuse check-out of kit whose inspection is overdue or certificate expired
+  const [blockOverdueOverride, setBlockOverdueOverride] = useState<boolean | null>(null)
+
   const [costDimOverride, setCostDimOverride] = useState<boolean | null>(null)
   const requireCostDim = costDimOverride ?? !!data?.data?.require_cost_dimension
+  const blockOverdue   = blockOverdueOverride ?? !!data?.data?.block_checkout_when_overdue
 
   // Locked policies can still be switched OFF (e.g. after a downgrade), never ON.
   const { has } = usePlan()
@@ -935,7 +939,12 @@ function OrgSettingsSection({ isAdmin }: { isAdmin: boolean }) {
     const res  = await fetch('/api/org', {
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ name, require_checkout_approval: requireApproval, require_cost_dimension: requireCostDim }),
+      body:    JSON.stringify({
+        name,
+        require_checkout_approval: requireApproval,
+        require_cost_dimension:    requireCostDim,
+        block_checkout_when_overdue: blockOverdue,
+      }),
     })
     const json = await res.json()
     setSaving(false)
@@ -998,6 +1007,27 @@ function OrgSettingsSection({ isAdmin }: { isAdmin: boolean }) {
               className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${requireCostDim ? 'bg-indigo-600' : 'bg-slate-300'} ${!isAdmin || (costDimLocked && !requireCostDim) ? 'opacity-50' : ''}`}
             >
               <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${requireCostDim ? 'translate-x-5' : ''}`} />
+            </button>
+          </div>
+        )}
+
+        {data?.data && (
+          <div className="flex items-start justify-between gap-4 rounded-lg border border-slate-200 p-3">
+            <div>
+              <p className="text-sm font-medium text-slate-700">Block check-out when a safety check is overdue</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                When on, a tool whose inspection or calibration is overdue — or whose certificate has
+                expired — can&apos;t be checked out until the check is done. When off, the crew sees a
+                warning but can still take it. Remember to save.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={!isAdmin}
+              onClick={() => setBlockOverdueOverride(!blockOverdue)}
+              className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${blockOverdue ? 'bg-indigo-600' : 'bg-slate-300'} ${!isAdmin ? 'opacity-50' : ''}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${blockOverdue ? 'translate-x-5' : ''}`} />
             </button>
           </div>
         )}

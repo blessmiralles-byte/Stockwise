@@ -14,7 +14,7 @@ import {
   Search, Plus, ScanBarcode, Building2, MoreVertical, User, MapPin,
   X, AlertCircle, Loader2, Shield, TrendingDown, Wrench, ChevronRight,
   Calendar, Info, CheckCircle2, Users, Pencil, Trash2, Printer, Tag,
-  Archive, DollarSign, RefreshCw, LogOut, LogIn, Clock, Lock,
+  Archive, DollarSign, RefreshCw, LogOut, LogIn, Clock, Lock, PackageX,
 } from 'lucide-react'
 import Link from 'next/link'
 import { PrintLabelsDialog, type LabelAsset } from '@/components/print-labels'
@@ -1221,6 +1221,109 @@ function CheckoutDialog({ asset, onClose, onDone }: { asset: any; onClose: () =>
   )
 }
 
+// ── Report lost / stolen / damaged ────────────────────────────────────────────
+// Reporting closes the tool's check-out and takes it out of service, so nobody
+// tries to take it out again. Owners are notified; the register lives in
+// Reports → Tool Compliance.
+function IncidentDialog({ asset, onClose, onDone }: { asset: any; onClose: () => void; onDone: (msg: string) => void }) {
+  const [kind, setKind]         = useState<'lost' | 'stolen' | 'damaged'>('lost')
+  const [occurred, setOccurred] = useState(new Date().toISOString().slice(0, 10))
+  const [lastSeen, setLastSeen] = useState(asset.checked_out_job ?? '')
+  const [desc, setDesc]         = useState('')
+  const [police, setPolice]     = useState('')
+  const [loss, setLoss]         = useState(asset.current_value != null ? String(asset.current_value) : '')
+  const [saving, setSaving]     = useState(false)
+  const [error, setError]       = useState('')
+
+  const submit = async () => {
+    setSaving(true); setError('')
+    try {
+      const res = await fetch('/api/assets/incidents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          asset_id: asset.id, kind, occurred_on: occurred,
+          last_seen: lastSeen.trim() || undefined,
+          description: desc.trim() || undefined,
+          police_report_no: kind === 'stolen' ? (police.trim() || undefined) : undefined,
+          estimated_loss: loss === '' ? undefined : Number(loss),
+        }),
+      })
+      const j = await res.json()
+      if (!res.ok) { setError(j.error ?? 'Could not record the report'); return }
+      onDone(j.message ?? 'Reported.')
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+            <PackageX className="w-4 h-4 text-red-600" /> Report — {asset.name}
+          </h2>
+          <Button variant="ghost" size="icon" onClick={onClose}><X className="w-4 h-4" /></Button>
+        </div>
+
+        {asset.checked_out_to && (
+          <p className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2">
+            Currently with <span className="font-medium text-slate-700">{asset.checked_out_to}</span> — this
+            check-out will be closed.
+          </p>
+        )}
+
+        <div className="grid grid-cols-3 gap-2">
+          {(['lost', 'stolen', 'damaged'] as const).map(k => (
+            <button key={k} type="button" onClick={() => setKind(k)}
+              className={cn('rounded-lg border px-2 py-2 text-xs font-semibold capitalize transition-colors',
+                kind === k ? 'border-red-500 bg-red-50 text-red-700' : 'border-slate-200 text-slate-600 hover:border-slate-300')}>
+              {k}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">When</label>
+            <Input type="date" value={occurred} onChange={e => setOccurred(e.target.value)} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Estimated value</label>
+            <Input type="number" min="0" step="0.01" value={loss} onChange={e => setLoss(e.target.value)} />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">Last seen</label>
+          <Input value={lastSeen} onChange={e => setLastSeen(e.target.value)} placeholder="Site, van, job…" />
+        </div>
+
+        {kind === 'stolen' && (
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Police report no.</label>
+            <Input value={police} onChange={e => setPolice(e.target.value)} placeholder="If reported" />
+          </div>
+        )}
+
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">What happened</label>
+          <Input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Optional" />
+        </div>
+
+        {error && <p className="text-xs text-red-600">{error}</p>}
+
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit} disabled={saving} className="gap-2 bg-red-600 hover:bg-red-700">
+            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Report {kind}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Check-in Dialog ───────────────────────────────────────────────────────────
 function CheckinDialog({ asset, onClose, onDone }: { asset: any; onClose: () => void; onDone: (msg: string) => void }) {
   const { data: locData } = useApi<{ data: any[] }>('/api/locations?all=true')
@@ -1328,6 +1431,7 @@ export default function AssetsPage() {
   const [printAssets,    setPrintAssets]    = useState<LabelAsset[] | null>(null)
   const [disposeTarget,  setDisposeTarget]  = useState<{ asset: any; mode: 'retire' | 'sell' } | null>(null)
   const [checkoutTarget, setCheckoutTarget] = useState<any>(null)
+  const [incidentTarget, setIncidentTarget] = useState<any>(null)
   const [checkinTarget,  setCheckinTarget]  = useState<any>(null)
   const [toast,          setToast]          = useState('')
 
@@ -1531,6 +1635,13 @@ export default function AssetsPage() {
                               <LogOut className="w-3.5 h-3.5" /> Check out
                             </Button>
                           )}
+                          <button
+                            onClick={() => setIncidentTarget(asset)}
+                            title="Report lost, stolen or damaged"
+                            className="text-slate-400 hover:text-red-600 transition-colors flex-shrink-0"
+                          >
+                            <PackageX className="w-4 h-4" />
+                          </button>
                         </div>
                       )
                     })()}
@@ -1583,6 +1694,14 @@ export default function AssetsPage() {
           mode={disposeTarget.mode}
           onClose={() => setDisposeTarget(null)}
           onSaved={() => { setDisposeTarget(null); refetch() }}
+        />
+      )}
+
+      {incidentTarget && (
+        <IncidentDialog
+          asset={incidentTarget}
+          onClose={() => setIncidentTarget(null)}
+          onDone={(msg) => { setIncidentTarget(null); setToast(msg); refetch(); setTimeout(() => setToast(''), 4000) }}
         />
       )}
 

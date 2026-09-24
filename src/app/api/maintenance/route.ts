@@ -3,6 +3,7 @@ import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
 import { isRecurrence } from '@/lib/maintenance-recurrence'
+import { isScheduleKind, producesCertificate } from '@/lib/asset-compliance'
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth()
@@ -11,13 +12,15 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl
   const status   = searchParams.get('status')
   const assetId  = searchParams.get('asset_id')
+  const kind     = searchParams.get('kind')      // maintenance | inspection | calibration
 
   const supabase = createServiceClient()
 
   let query = supabase
     .from('maintenance_schedules')
     .select(`
-      id, title, description, scheduled_date, completed_date, completed_at,
+      id, kind, certificate_no, certified_until,
+      title, description, scheduled_date, completed_date, completed_at,
       status, notify_days_before, cost, performed_by, notes, created_at,
       recurrence_every, recurrence_unit,
       asset:fixed_assets(id, asset_tag, name, status),
@@ -28,6 +31,7 @@ export async function GET(req: NextRequest) {
 
   if (status)  query = query.eq('status', status)
   if (assetId) query = query.eq('asset_id', assetId)
+  if (kind)    query = query.eq('kind', kind)
 
   const { data, error } = await query
   if (error) {
@@ -50,8 +54,15 @@ export async function POST(req: NextRequest) {
 
   const {
     asset_id, title, description, scheduled_date, notify_days_before, status,
-    recurrence_every, recurrence_unit,
+    recurrence_every, recurrence_unit, kind, certificate_no, certified_until,
   } = body
+
+  if (kind != null && !isScheduleKind(kind)) {
+    return NextResponse.json(
+      { error: 'kind must be maintenance, inspection or calibration' },
+      { status: 422 },
+    )
+  }
 
   if (!asset_id)  return NextResponse.json({ error: 'asset_id is required' }, { status: 400 })
   if (!title?.trim()) return NextResponse.json({ error: 'title is required' }, { status: 400 })
@@ -90,6 +101,12 @@ export async function POST(req: NextRequest) {
     status: status ?? (scheduled_date ? 'scheduled' : 'overdue'),
     notify_days_before: notify_days_before ?? 1,
     reported_by: auth.userId,
+    kind: kind ?? 'maintenance',
+  }
+  // Inspections and calibration carry the certificate they produced.
+  if (producesCertificate(row.kind)) {
+    if (certificate_no)  row.certificate_no  = String(certificate_no).trim() || null
+    if (certified_until) row.certified_until = certified_until
   }
   // Preventive maintenance: repeat every N days/weeks/months/years. The next
   // occurrence is created when this one is completed. Only sent when actually

@@ -82,7 +82,7 @@ export async function PATCH(
   }
 
   if ('status' in update) {
-    const validStatuses = ['active', 'maintenance', 'inactive', 'disposed', 'retired', 'sold']
+    const validStatuses = ['active', 'maintenance', 'inactive', 'lost', 'stolen', 'disposed', 'retired', 'sold']
     if (!validStatuses.includes(update.status)) {
       return NextResponse.json(
         { error: 'Invalid status. Use: active, maintenance, inactive, disposed, retired, or sold' },

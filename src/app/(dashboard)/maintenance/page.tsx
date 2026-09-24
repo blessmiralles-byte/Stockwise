@@ -13,9 +13,10 @@ import { UpgradePrompt } from '@/components/billing/upgrade-prompt'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import {
   Search, Plus, Wrench, Bell, CheckCircle2, Clock,
-  AlertCircle, Calendar, Loader2, X, Repeat, UserCheck,
+  AlertCircle, Calendar, Loader2, X, Repeat, UserCheck, ShieldCheck,
 } from 'lucide-react'
 import { RECURRENCE_PRESETS, describeRecurrence } from '@/lib/maintenance-recurrence'
+import { SCHEDULE_KINDS, KIND_LABEL, producesCertificate, certificateState, type ScheduleKind } from '@/lib/asset-compliance'
 
 const statusConfig: Record<string, { label: string; variant: any; icon: any; color: string }> = {
   scheduled: { label: 'Scheduled', variant: 'default',     icon: Clock,        color: 'text-indigo-600 bg-indigo-50' },
@@ -28,6 +29,7 @@ function ScheduleDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
   const { data: assetsData } = useApi<{ data: any[] }>('/api/assets')
   const assets = (assetsData?.data ?? []).filter((a: any) => a.status !== 'disposed')
 
+  const [kind,           setKind]           = useState<ScheduleKind>('maintenance')
   const [assetId,        setAssetId]        = useState('')
   const [title,          setTitle]          = useState('')
   const [description,    setDescription]    = useState('')
@@ -38,11 +40,16 @@ function ScheduleDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
   const [saving,         setSaving]         = useState(false)
   const [error,          setError]          = useState('')
 
-  const TASK_PRESETS = [
-    'Oil change', 'Filter replacement', 'Brake inspection',
-    'Tyre rotation', 'Lubrication', 'Battery check',
-    'Belt/hose inspection', 'Annual service', 'Safety inspection',
-  ]
+  // Suggestions follow the kind of check being scheduled.
+  const PRESETS_BY_KIND: Record<ScheduleKind, string[]> = {
+    maintenance: ['Oil change', 'Filter replacement', 'Brake inspection', 'Tyre rotation',
+                  'Lubrication', 'Battery check', 'Belt/hose inspection', 'Annual service'],
+    inspection:  ['Annual safety inspection', 'Harness / lanyard inspection', 'Ladder inspection',
+                  'PAT test', 'Lifting gear (LOLER) examination', 'Pressure vessel inspection'],
+    calibration: ['Torque wrench calibration', 'Test meter calibration', 'Gas detector calibration',
+                  'Scale calibration', 'Laser level calibration'],
+  }
+  const TASK_PRESETS = PRESETS_BY_KIND[kind]
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -57,6 +64,7 @@ function ScheduleDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           asset_id:           assetId,
+          kind,
           title:              title.trim(),
           description:        description.trim() || undefined,
           scheduled_date:     scheduledDate,
@@ -182,6 +190,25 @@ function ScheduleDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
             </div>
           </div>
 
+          {/* What kind of check */}
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Type</label>
+            <div className="grid grid-cols-3 gap-2">
+              {SCHEDULE_KINDS.map(k => (
+                <button
+                  key={k.value}
+                  type="button"
+                  onClick={() => setKind(k.value)}
+                  className={`rounded-lg border px-2 py-2 text-left transition-colors ${
+                    kind === k.value ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-slate-300'}`}
+                >
+                  <span className="block text-xs font-semibold text-slate-800">{k.label}</span>
+                  <span className="block text-[10px] text-slate-500 leading-tight mt-0.5">{k.blurb}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Repeat (preventive maintenance) */}
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1 flex items-center gap-1">
@@ -236,6 +263,9 @@ function MarkDoneDialog({
   onSaved: (nextOccurrence: string | null) => void
 }) {
   const [performedBy, setPerformedBy] = useState('')
+  const [certNo,      setCertNo]      = useState('')
+  const [certUntil,   setCertUntil]   = useState('')
+  const needsCert = producesCertificate(schedule.kind)
   const [notes,       setNotes]       = useState('')
   const [cost,        setCost]        = useState('')
   const [saving,      setSaving]      = useState(false)
@@ -252,6 +282,8 @@ function MarkDoneDialog({
           status:         'completed',
           completed_date: new Date().toISOString().split('T')[0],
           performed_by:   performedBy.trim() || undefined,
+          certificate_no:  needsCert ? (certNo.trim() || undefined)  : undefined,
+          certified_until: needsCert ? (certUntil     || undefined)  : undefined,
           notes:          notes.trim()       || undefined,
           cost:           cost               ? Number(cost) : undefined,
         }),
@@ -285,6 +317,19 @@ function MarkDoneDialog({
             </label>
             <Input value={performedBy} onChange={e => setPerformedBy(e.target.value)} placeholder="Technician, crew, or vendor…" />
           </div>
+
+          {needsCert && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Certificate no.</label>
+                <Input value={certNo} onChange={e => setCertNo(e.target.value)} placeholder="e.g. CAL-2026-014" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Valid until</label>
+                <Input type="date" value={certUntil} onChange={e => setCertUntil(e.target.value)} />
+              </div>
+            </div>
+          )}
 
           {/* Sign-off is recorded from the session, not typed */}
           <div className="flex items-start gap-2 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2.5 text-xs text-slate-500">
@@ -333,6 +378,7 @@ function MarkDoneDialog({
 export default function MaintenancePage() {
   const [search,       setSearch]       = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [kindFilter,   setKindFilter]   = useState('all')
   // Set after completing a recurring task, to confirm the next one was created.
   const [nextScheduled, setNextScheduled] = useState<string | null>(null)
   const [showSchedule, setShowSchedule] = useState(false)
@@ -348,11 +394,12 @@ export default function MaintenancePage() {
   }))
 
   const filtered = withDays.filter((s: any) => {
+    const matchKind = kindFilter === 'all' || (s.kind ?? 'maintenance') === kindFilter
     const matchSearch =
       (s.asset?.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
       (s.title ?? '').toLowerCase().includes(search.toLowerCase())
     const matchStatus = statusFilter === 'all' || s.status === statusFilter
-    return matchSearch && matchStatus
+    return matchSearch && matchStatus && matchKind
   })
 
   const countByStatus = (st: string) => schedules.filter((s: any) => s.status === st).length
@@ -409,6 +456,14 @@ export default function MaintenancePage() {
               />
             </div>
             <div className="flex gap-1">
+              {(['all', 'maintenance', 'inspection', 'calibration'] as const).map(k => (
+                <Button key={k} size="sm" variant={kindFilter === k ? 'default' : 'outline'}
+                  onClick={() => setKindFilter(k)} className="text-xs">
+                  {k === 'all' ? 'All types' : KIND_LABEL[k]}
+                </Button>
+              ))}
+            </div>
+            <div className="flex gap-1">
               {['all', 'scheduled', 'overdue', 'completed'].map(s => (
                 <Button key={s} size="sm" variant={statusFilter === s ? 'default' : 'outline'}
                   onClick={() => setStatusFilter(s)} className="capitalize text-xs">
@@ -418,7 +473,7 @@ export default function MaintenancePage() {
             </div>
           </div>
           <Button className="gap-2" onClick={() => setShowSchedule(true)}>
-            <Plus className="w-4 h-4" /> Schedule Maintenance
+            <Plus className="w-4 h-4" /> Schedule
           </Button>
         </div>
 
@@ -487,6 +542,23 @@ export default function MaintenancePage() {
                               <Bell className="w-3 h-3" />
                               Notify {schedule.notify_days_before}d before
                             </span>
+                            {schedule.kind && schedule.kind !== 'maintenance' && (
+                              <span className="flex items-center gap-1 font-medium text-indigo-600">
+                                <ShieldCheck className="w-3 h-3" />
+                                {KIND_LABEL[schedule.kind as 'inspection']}
+                              </span>
+                            )}
+                            {schedule.certified_until && (
+                              <span className={
+                                certificateState(schedule.certified_until) === 'expired' ? 'flex items-center gap-1 font-medium text-red-600'
+                                : certificateState(schedule.certified_until) === 'expiring' ? 'flex items-center gap-1 font-medium text-amber-600'
+                                : 'flex items-center gap-1 text-slate-500'
+                              }>
+                                Cert {schedule.certificate_no ? schedule.certificate_no + ' · ' : ''}
+                                {certificateState(schedule.certified_until) === 'expired' ? 'expired ' : 'valid to '}
+                                {formatDate(schedule.certified_until)}
+                              </span>
+                            )}
                             {schedule.recurrence_every > 0 && schedule.recurrence_unit && (
                               <span className="flex items-center gap-1 text-indigo-600 font-medium">
                                 <Repeat className="w-3 h-3" />
