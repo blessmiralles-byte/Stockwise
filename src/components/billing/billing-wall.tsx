@@ -26,10 +26,14 @@ export function BillingWall({
   const [error, setError] = useState('')
   const [interval, setInterval] = useState<'monthly' | 'annual'>('monthly')
 
-  const title = reason === 'cancelled' ? 'Your subscription was cancelled' : 'Your free trial has ended'
-  const sub   = reason === 'cancelled'
-    ? 'Reactivate a plan to get back into your account. Your data is safe and waiting.'
-    : 'Choose a plan to keep using Stocked. Your data is safe and waiting.'
+  const title =
+    reason === 'cancelled'  ? 'Your subscription was cancelled' :
+    reason === 'trial_used' ? 'You’ve already used your free trial' :
+    'Your free trial has ended'
+  const sub =
+    reason === 'cancelled'  ? 'Reactivate a plan to get back into your account. Your data is safe and waiting.' :
+    reason === 'trial_used' ? 'The free trial is one per customer, and this email has had one. Choose a plan to start using Stocked — or email support@stocked.tech if you think this is a mistake.' :
+    'Choose a plan to keep using Stocked. Your data is safe and waiting.'
 
   async function checkout(plan: PaidPlanKey) {
     setBusy(plan); setError('')

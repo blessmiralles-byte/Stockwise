@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { billingState } from '@/lib/billing'
 import { resolveOrgPricingRegion } from '@/lib/pricing-region-server'
+import { enforceTrialClaim } from '@/lib/trial-claims'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   // Access gate: an org whose trial has ended or whose subscription was
@@ -25,17 +26,21 @@ export default async function DashboardLayout({ children }: { children: React.Re
     if (profile?.org_id) {
       const { data: org } = await service
         .from('organizations')
-        .select('plan, plan_status, trial_ends_at, ls_subscription_id, pricing_region')
+        .select('id, plan, plan_status, trial_ends_at, ls_subscription_id, pricing_region, trial_checked_at, trial_reused')
         .eq('id', profile.org_id)
         .single()
 
       if (org) {
         plan = org.plan
+
+        // One free trial per person: a repeat signup (same email, new account
+        // after deleting the old one) starts with its trial already expired.
+        const checked = await enforceTrialClaim(service, org as any)
         // Locks the org's pricing region on its first dashboard load (right
         // after signup); a no-op read afterwards.
         const region = await resolveOrgPricingRegion(profile.org_id, (org as any).pricing_region)
 
-        const state = billingState(org)
+        const state = billingState(checked as any)
         if (state.locked) {
           const canManage = ['owner', 'admin'].includes(profile.role ?? '')
           return (

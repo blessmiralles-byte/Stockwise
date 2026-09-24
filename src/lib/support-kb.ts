@@ -20,6 +20,11 @@ up for an organization is its Owner.
   email; when they accept they join the same organization with the role the
   owner assigned (owner, admin, manager, or staff/field).
 - New organizations start on a **14-day free trial — no credit card required**.
+  The trial is **one per customer**: if an account was deleted and the same
+  person signs up again, the new account goes straight to the plan-choice
+  screen instead of getting another trial. Address variations that reach the
+  same inbox (plus-tags, and dots in Gmail addresses) count as the same person.
+  Anyone who believes this is a mistake should email support@stocked.tech.
 - The **Getting Started** page walks a new owner through first setup: adding
   vendors, products, locations, and inviting the team.
 - To change your organization name, go to **Settings → Organization**.

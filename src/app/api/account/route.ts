@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
+import { claimTrialEmail } from '@/lib/trial-claims'
 
 /**
  * DELETE /api/account
@@ -21,7 +22,7 @@ export async function DELETE() {
 
   const { data: me } = await supabase
     .from('user_profiles')
-    .select('id, role, org_id')
+    .select('id, role, org_id, email')
     .eq('id', auth.userId)
     .single()
 
@@ -33,6 +34,11 @@ export async function DELETE() {
 
   try {
     if (isOwner && me.org_id) {
+      // The free trial is one per person: record this owner's email before the
+      // account disappears, so deleting and signing up again doesn't hand out
+      // another one. Only a hash is stored.
+      if (me.email) await claimTrialEmail(supabase, me.email, me.org_id)
+
       // Collect every member before we remove the org.
       const { data: members } = await supabase
         .from('user_profiles')

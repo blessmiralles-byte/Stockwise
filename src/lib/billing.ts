@@ -8,9 +8,11 @@ export interface OrgBilling {
   plan:          string        // 'trial' | 'starter' | 'pro' | 'enterprise'
   plan_status:   string        // 'active' | 'past_due' | 'cancelled'
   trial_ends_at: string | null
+  /** true = this signup's email had already used its free trial */
+  trial_reused?: boolean | null
 }
 
-export type BillingReason = 'trial_expired' | 'cancelled' | null
+export type BillingReason = 'trial_expired' | 'trial_used' | 'cancelled' | null
 
 export interface BillingState {
   locked:        boolean       // block the app until they pay
@@ -29,7 +31,9 @@ export function billingState(org: OrgBilling): BillingState {
   const cancelled    = org.plan_status === 'cancelled'
   const pastDue      = org.plan_status === 'past_due'
 
-  const reason: BillingReason = trialExpired ? 'trial_expired' : cancelled ? 'cancelled' : null
+  const reason: BillingReason = trialExpired
+    ? (org.trial_reused ? 'trial_used' : 'trial_expired')
+    : cancelled ? 'cancelled' : null
 
   return {
     locked:        trialExpired || cancelled,
