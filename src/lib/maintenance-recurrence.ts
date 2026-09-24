@@ -24,7 +24,9 @@ export const RECURRENCE_PRESETS: { label: string; every: number; unit: Recurrenc
 ]
 
 export function isRecurrence(every: any, unit: any): boolean {
-  return Number(every) > 0 && RECURRENCE_UNITS.includes(unit)
+  // Whole intervals only — "every 1.5 months" has no sensible next date.
+  const n = Number(every)
+  return Number.isInteger(n) && n > 0 && RECURRENCE_UNITS.includes(unit)
 }
 
 /** Human label, e.g. "Every 3 months". */

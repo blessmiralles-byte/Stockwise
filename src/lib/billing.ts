@@ -27,7 +27,9 @@ export function billingState(org: OrgBilling): BillingState {
   const onTrial   = org.plan === 'trial'
   const trialEnds = org.trial_ends_at ? new Date(org.trial_ends_at).getTime() : null
 
-  const trialExpired = onTrial && trialEnds != null && trialEnds < now
+  // A reused trial is over the moment it is detected — don't wait on the clock,
+  // which is set to "now" and would otherwise leave a sliver of free access.
+  const trialExpired = onTrial && (!!org.trial_reused || (trialEnds != null && trialEnds <= now))
   const cancelled    = org.plan_status === 'cancelled'
   const pastDue      = org.plan_status === 'past_due'
 
