@@ -117,6 +117,8 @@ select e.migration, e.tbl, e.col from (values
   ('organizations','trial_reused','migrate-trial-claims.sql'),
   ('trial_claims','email_hash','migrate-trial-claims.sql'),
   ('purchase_orders','current_approver_id','migrate-approval-chain.sql'),
+  ('purchase_orders','requisition_id','migrate-requisition-po-link.sql'),
+  ('purchase_order_lines','requisition_item_id','migrate-requisition-po-link.sql'),
   ('purchase_orders','submitted_by','migrate-approval-chain.sql'),
   ('requisitions','current_approver_id','migrate-approval-chain.sql'),
   ('user_profiles','job_title','migrate-approval-chain.sql')

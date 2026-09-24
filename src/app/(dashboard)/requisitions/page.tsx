@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   ArrowRightLeft, PackagePlus, Boxes, Plus, X, Check,
   ChevronRight, Loader2, Search, AlertCircle, Clock,
@@ -742,14 +743,190 @@ function RejectDialog({
   )
 }
 
+// ── Create PO from requisition ─────────────────────────────────────────────────
+// Purchase order lines need a catalogue product, but a "new asset" request is
+// free text — so procurement maps each requested line to a product here, with
+// the requested quantity and estimated price carried over as the starting point.
+function CreatePODialog({
+  req, onClose, onCreated,
+}: { req: Requisition; onClose: () => void; onCreated: (poId: string, message: string) => void }) {
+  const router = useRouter()
+  const [lines, setLines] = useState(() => req.items.map(i => ({
+    requisition_item_id: i.id,
+    label:      itemLabel(i),
+    product:    i.product ?? null,
+    quantity:   String(i.quantity ?? 1),
+    unit_cost:  i.unit_cost != null ? String(i.unit_cost) : '',
+    requested_cost: i.unit_cost ?? null,
+    include:    true,
+  })))
+  const [vendors, setVendors]   = useState<any[]>([])
+  const [vendorId, setVendorId] = useState('')
+  const [expected, setExpected] = useState('')
+  const [busy, setBusy]         = useState(false)
+  const [error, setError]       = useState('')
+
+  useEffect(() => {
+    fetch('/api/suppliers').then(r => r.json()).then(j => setVendors(j.data ?? [])).catch(() => {})
+  }, [])
+
+  const setLine = (idx: number, patch: any) =>
+    setLines(ls => ls.map((l, i) => (i === idx ? { ...l, ...patch } : l)))
+
+  const chosen = lines.filter(l => l.include)
+  const total  = chosen.reduce((sum, l) => sum + Number(l.quantity || 0) * Number(l.unit_cost || 0), 0)
+  const requestedTotal = chosen.reduce((sum, l) => sum + Number(l.quantity || 0) * Number(l.requested_cost ?? 0), 0)
+
+  const submit = async () => {
+    if (chosen.length === 0)            { setError('Include at least one line'); return }
+    if (chosen.some(l => !l.product))   { setError('Pick a product for every included line'); return }
+    if (chosen.some(l => !(Number(l.quantity) > 0))) { setError('Every line needs a quantity above zero'); return }
+    setBusy(true); setError('')
+    try {
+      const res = await fetch('/api/purchase-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requisition_id: req.id,
+          supplier_id:    vendorId || undefined,
+          expected_date:  expected || undefined,
+          notes:          `Raised from requisition ${req.req_number}`,
+          lines: chosen.map(l => ({
+            product_id:          l.product!.id,
+            quantity_ordered:    Number(l.quantity),
+            unit_cost:           Number(l.unit_cost || 0),
+            requisition_item_id: l.requisition_item_id,
+          })),
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) { setError(json.error ?? 'Could not create the purchase order'); return }
+      onCreated(json.data.id, `Draft purchase order created from ${req.req_number}.`)
+      router.push(`/purchase-orders/${json.data.id}`)
+    } catch {
+      setError('Network error — please try again.')
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <div>
+            <h3 className="text-base font-semibold text-slate-900">Create Purchase Order</h3>
+            <p className="text-xs text-slate-400 mt-0.5">From {req.req_number} · requested by {req.requested_by?.full_name ?? 'a colleague'}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          <p className="text-xs text-slate-500">
+            Match each requested item to a product, then set the price you negotiated. Approvers see
+            this against the requested price, so any increase is visible before the order goes out.
+          </p>
+
+          {lines.map((l, idx) => (
+            <div key={l.requisition_item_id} className={cn('rounded-xl border p-3 space-y-2', l.include ? 'border-slate-200' : 'border-slate-100 opacity-50')}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-slate-900">{l.label}</p>
+                  <p className="text-xs text-slate-400">
+                    Requested: {l.quantity} {l.requested_cost != null ? `@ ${Number(l.requested_cost).toLocaleString()}` : '· no estimated price'}
+                  </p>
+                </div>
+                <label className="flex items-center gap-1.5 text-xs text-slate-500">
+                  <input type="checkbox" checked={l.include} onChange={e => setLine(idx, { include: e.target.checked })} />
+                  Include
+                </label>
+              </div>
+
+              {l.include && (
+                <>
+                  {l.product ? (
+                    <div className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2">
+                      <span className="text-sm text-slate-700">{l.product.name} <span className="text-xs text-slate-400 font-mono">{l.product.sku}</span></span>
+                      <button onClick={() => setLine(idx, { product: null })} className="text-xs text-indigo-600 hover:underline">change</button>
+                    </div>
+                  ) : (
+                    <ProductSearch onSelect={p => setLine(idx, { product: p, unit_cost: l.unit_cost || (p.avg_cost != null ? String(p.avg_cost) : '') })} />
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs font-medium text-slate-600 block mb-1">Quantity</label>
+                      <input type="number" min="1" value={l.quantity} onChange={e => setLine(idx, { quantity: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-slate-600 block mb-1">Unit price</label>
+                      <input type="number" min="0" step="0.01" value={l.unit_cost} onChange={e => setLine(idx, { unit_cost: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-slate-600 block mb-1">Vendor</label>
+              <select value={vendorId} onChange={e => setVendorId(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="">— Choose later —</option>
+                {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600 block mb-1">Expected date</label>
+              <input type="date" value={expected} onChange={e => setExpected(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm flex items-center justify-between">
+            <span className="text-slate-500">Order total</span>
+            <span className="font-semibold text-slate-900">
+              ${total.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              {requestedTotal > 0 && total !== requestedTotal && (
+                <span className={cn('ml-2 text-xs font-medium', total > requestedTotal ? 'text-red-600' : 'text-green-600')}>
+                  {total > requestedTotal ? '+' : ''}{(((total - requestedTotal) / requestedTotal) * 100).toFixed(1)}% vs requested
+                </span>
+              )}
+            </span>
+          </div>
+
+          {error && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />{error}
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-3 px-6 py-4 border-t border-slate-100">
+          <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50">
+            Cancel
+          </button>
+          <button onClick={submit} disabled={busy}
+            className="flex-1 px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2">
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <PackagePlus className="w-4 h-4" />}
+            Create draft PO
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Requisition Card ──────────────────────────────────────────────────────────
 function ReqCard({
-  req, userId, role, onAction,
+  req, userId, role, onAction, onCreatePO,
 }: {
   req: Requisition
   userId: string
   role: string
   onAction: (id: string, action: string) => Promise<void>
+  onCreatePO: (req: Requisition) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [busy, setBusy]         = useState<string | null>(null)
@@ -767,6 +944,7 @@ function ReqCard({
   const canApproveThis = !!req.my_action
   const canReturn      = req.status === 'checked_out' && (isRequester || isOps)
   const canFulfill     = req.type === 'new_asset' && req.status === 'approved' && isProc
+  const canRaisePO     = req.status === 'approved' && isProc && req.type !== 'checkout'
 
   const act = async (action: string) => {
     setBusy(action)
@@ -901,12 +1079,22 @@ function ReqCard({
           </div>
         )}
 
+        {canRaisePO && (
+          <div className="pt-2 border-t border-slate-100">
+            <button onClick={() => onCreatePO(req)}
+              className="w-full px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-1.5">
+              <PackagePlus className="w-3.5 h-3.5" />
+              Create Purchase Order
+            </button>
+          </div>
+        )}
+
         {canFulfill && (
           <div className="pt-2 border-t border-slate-100">
             <button onClick={() => act('fulfill')} disabled={!!busy}
               className="w-full px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-1.5">
               {busy === 'fulfill' ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-              Mark as Fulfilled (PO Created)
+              Mark as Fulfilled (ordered outside Stocked)
             </button>
           </div>
         )}
@@ -924,6 +1112,7 @@ export default function RequisitionsPage() {
   const [typeFilter, setTypeF]    = useState<string>('all')
   const [showNew, setShowNew]     = useState(false)
   const [rejectTarget, setReject] = useState<Requisition | null>(null)
+  const [poTarget, setPoTarget]   = useState<Requisition | null>(null)
   const [mineOnly, setMineOnly]   = useState(false)
   const [notice, setNotice]       = useState<{ ok: boolean; text: string } | null>(null)
 
@@ -1070,6 +1259,7 @@ export default function RequisitionsPage() {
               userId={profile?.id ?? ''}
               role={profile?.role ?? 'viewer'}
               onAction={handleAction}
+              onCreatePO={setPoTarget}
             />
           ))}
         </div>
@@ -1082,6 +1272,14 @@ export default function RequisitionsPage() {
         onCreated={(message) => { if (message) setNotice({ ok: true, text: message }); fetchReqs() }}
         profile={profile}
       />
+
+      {poTarget && (
+        <CreatePODialog
+          req={poTarget}
+          onClose={() => setPoTarget(null)}
+          onCreated={(_poId, message) => { setPoTarget(null); setNotice({ ok: true, text: message }); fetchReqs() }}
+        />
+      )}
 
       {rejectTarget && (
         <RejectDialog

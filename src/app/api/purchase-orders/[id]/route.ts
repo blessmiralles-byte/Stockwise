@@ -21,6 +21,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       *,
       supplier:suppliers(*),
       submitter:user_profiles!submitted_by(id, full_name, email, job_title),
+      requisition:requisitions!requisition_id(
+        id, req_number, created_at,
+        requested_by:user_profiles!requested_by(id, full_name, job_title),
+        items:requisition_items(id, item_type, quantity, unit_cost, notes)
+      ),
       lines:purchase_order_lines(
         *,
         product:products(id, sku, name, unit_of_measure, category:categories(name))

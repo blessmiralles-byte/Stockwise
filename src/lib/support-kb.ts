@@ -73,6 +73,17 @@ up for an organization is its Owner.
   items prompt for the required details before they can be added.
 
 ## Purchase orders, requisitions & approvals (Delegation of Authority)
+- **From a requisition to a purchase order:** on an approved requisition,
+  procurement clicks **Create Purchase Order**. Each requested line is matched
+  to a product (a "new asset" request is free text, so pick or create the
+  product), with the requested quantity and estimated price carried over as the
+  starting point; lines can be excluded. This creates a **draft PO** linked to
+  the request, and marks the requisition fulfilled. The PO page then shows
+  **Requested vs ordered** — the requested price next to the negotiated price,
+  per line and in total, with the percentage change — so approvers see any
+  price increase before they approve. A rise of more than 10% is flagged.
+  A requisition can only have one open PO. "Mark as Fulfilled" is still there
+  for anything ordered outside Stocked.
 - Only **Procurement** (and the Owner) can create purchase orders. A PO flows
   **Draft → Submit for Approval → Approved → Send to Vendor**; it can't be sent
   until it's approved.

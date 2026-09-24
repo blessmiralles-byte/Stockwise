@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { useApi } from '@/lib/use-api'
 import { usePlan } from '@/lib/use-plan'
 import { ApprovalTrail, approveLabel } from '@/components/approvals/approval-trail'
+import { RequestedVsOrdered } from '@/components/purchase-orders/requested-vs-ordered'
 import { formatCurrency, formatDate, receivableCap } from '@/lib/utils'
 import { PurchaseOrder, Location } from '@/types'
 import { ArrowLeft, Truck, CheckCircle2, Send, X, FileText, AlertTriangle, Scale, Loader2, Plus, Trash2, Download, PackagePlus } from 'lucide-react'
@@ -1052,6 +1053,9 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
             )}
           </CardContent>
         </Card>
+
+        {/* What was requested, when this PO came from a requisition */}
+        <RequestedVsOrdered po={po} />
 
         {/* Three-way match */}
         <ThreeWayMatch po={po} onUpdated={refetch} />
