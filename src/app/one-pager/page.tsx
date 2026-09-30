@@ -54,16 +54,16 @@ const FEATURE_SECTIONS = [
     ],
   },
   {
-    heading: 'Tool Tracking & Fixed Assets',
+    heading: 'Fixed Assets & Tool Tracking',
     icon: Wrench,
     color: 'amber',
     items: [
-      'Check tools out to a person, van, or job — with due dates and overdue alerts',
-      'Inspection & calibration certificates kept with the tool, flagged before they lapse',
-      'Report a tool lost, stolen, or damaged from site; it leaves service immediately',
       'Full asset register: serial numbers, location, custodian, and book value',
       'Straight-line and declining-balance depreciation — runs automatically',
+      'Roll-forward report: opening → additions → disposals → closing value',
       'Maintenance schedules with email reminders before due dates',
+      'Check tools out to a person, van, or job — with due dates and overdue alerts',
+      'Inspection & calibration certificates, flagged before they lapse; report a tool lost or stolen from site',
     ],
   },
   {

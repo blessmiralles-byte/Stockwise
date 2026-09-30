@@ -27,7 +27,7 @@ function Nav() {
 
         <div className="hidden sm:flex items-center gap-6 text-sm text-indigo-300">
           <a href="#features"   className="hover:text-white transition-colors">Features</a>
-          <a href="#assets"     className="hover:text-white transition-colors">Tools &amp; Assets</a>
+          <a href="#assets"     className="hover:text-white transition-colors">Assets &amp; Tools</a>
           <a href="#industries" className="hover:text-white transition-colors">Industries</a>
           <a href="#pricing"    className="hover:text-white transition-colors">Pricing</a>
         </div>
@@ -135,14 +135,14 @@ const FEATURES = [
     desc:  'Field staff update stock and check out equipment directly from their phone — on site, not back at the office. Scan any barcode to pull up live inventory, assets, or a purchase order instantly.',
   },
   {
-    icon:  Wrench,
-    title: 'Tool Tracking & Custody',
-    desc:  'Check tools out to a person, van, or job and always know who has what and when it is due back. Overdue kit is flagged, inspection and calibration certificates are kept with the tool, and a lost or stolen item is reported from site in seconds.',
-  },
-  {
     icon:  Building2,
     title: 'Fixed Assets & Depreciation',
-    desc:  'The same tools sit on your books as assets: purchase cost, book value, automated depreciation, maintenance history, and the correct entries when you sell, scrap, or write one off.',
+    desc:  'Every tool, vehicle, and machine on your books: purchase cost, book value, automated depreciation, maintenance history, and the correct entries when you sell, scrap, or write one off.',
+  },
+  {
+    icon:  Wrench,
+    title: 'Tool Tracking & Custody',
+    desc:  'Check the same tools out to a person, van, or job and always know who has what and when it is due back. Overdue kit is flagged, inspection and calibration certificates are kept with the tool, and a lost or stolen item is reported from site in seconds.',
   },
   {
     icon:  Shield,
@@ -239,23 +239,23 @@ function Assets() {
           <div>
             <div className="inline-flex items-center gap-2 bg-indigo-500/15 border border-indigo-400/30 text-indigo-300 text-xs font-semibold px-3 py-1.5 rounded-full mb-5">
               <Wrench className="w-3.5 h-3.5" />
-              Tool Tracking & Fixed Assets
+              Fixed Assets & Tool Tracking
             </div>
             <h2 className="text-3xl font-bold mb-4 leading-tight">
-              Every tool accounted for — on site and on your books
+              It&apos;s a fixed-asset register too — not just inventory
             </h2>
             <p className="text-slate-300 leading-relaxed mb-6">
               Your tools, vehicles, and equipment are assets on your books, not consumables.
               Stocked tracks them from purchase to disposal — with depreciation, maintenance,
               custody and safety certificates built in — so your fixed-asset register stays in
-              sync with your accountant, and you can prove a tool was in date the day it was used.
+              sync with your accountant, and you always know where each tool is.
             </p>
             <ul className="space-y-2.5 mb-8">
               {[
-                'Barcode & asset-tag scanning from any phone',
-                'Inspection and calibration certificates that never quietly lapse',
                 'GAAP-aligned depreciation and disposal entries',
                 'One audit trail from acquisition to write-off',
+                'Barcode & asset-tag scanning from any phone',
+                'Custody, due dates, and certificates that never quietly lapse',
               ].map(point => (
                 <li key={point} className="flex items-start gap-2.5 text-sm text-slate-200">
                   <CheckCircle2 className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
