@@ -54,16 +54,16 @@ const FEATURE_SECTIONS = [
     ],
   },
   {
-    heading: 'Fixed Assets & Equipment',
+    heading: 'Tool Tracking & Fixed Assets',
     icon: Wrench,
     color: 'amber',
     items: [
-      'Full asset register: photos, serial numbers, location & assigned user',
-      'Track tools, vehicles, and equipment deployed to job sites',
+      'Check tools out to a person, van, or job — with due dates and overdue alerts',
+      'Inspection & calibration certificates kept with the tool, flagged before they lapse',
+      'Report a tool lost, stolen, or damaged from site; it leaves service immediately',
+      'Full asset register: serial numbers, location, custodian, and book value',
       'Straight-line and declining-balance depreciation — runs automatically',
       'Maintenance schedules with email reminders before due dates',
-      'Asset movement log: know exactly who has what and where',
-      'Roll-forward report: opening → additions → disposals → closing value',
     ],
   },
   {

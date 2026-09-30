@@ -27,7 +27,7 @@ function Nav() {
 
         <div className="hidden sm:flex items-center gap-6 text-sm text-indigo-300">
           <a href="#features"   className="hover:text-white transition-colors">Features</a>
-          <a href="#assets"     className="hover:text-white transition-colors">Assets</a>
+          <a href="#assets"     className="hover:text-white transition-colors">Tools &amp; Assets</a>
           <a href="#industries" className="hover:text-white transition-colors">Industries</a>
           <a href="#pricing"    className="hover:text-white transition-colors">Pricing</a>
         </div>
@@ -97,7 +97,7 @@ function TrustBar() {
           {[
             { icon: ClipboardList, label: 'Request → approve → deduct', sub: 'Materials booked to the job, not lost' },
             { icon: Smartphone,    label: 'Field-ready',         sub: 'Scan and update stock from any job site' },
-            { icon: Shield,        label: 'Counts with sign-off', sub: 'Stock counts logged with who was present' },
+            { icon: Wrench,        label: 'Tools accounted for', sub: 'Who holds it, when it is due, is it in date' },
             { icon: Users,         label: '6 team roles',        sub: 'Orderers can\'t approve their own receipts' },
           ].map(item => (
             <div key={item.label} className="space-y-1">
@@ -136,8 +136,18 @@ const FEATURES = [
   },
   {
     icon:  Wrench,
-    title: 'Fixed Assets & Equipment',
-    desc:  'Track every tool, vehicle, and piece of equipment — where it is, who has it, and what it\'s worth. Automated depreciation, maintenance schedules, and a full audit trail from purchase to disposal.',
+    title: 'Tool Tracking & Custody',
+    desc:  'Check tools out to a person, van, or job and always know who has what and when it is due back. Overdue kit is flagged, inspection and calibration certificates are kept with the tool, and a lost or stolen item is reported from site in seconds.',
+  },
+  {
+    icon:  Building2,
+    title: 'Fixed Assets & Depreciation',
+    desc:  'The same tools sit on your books as assets: purchase cost, book value, automated depreciation, maintenance history, and the correct entries when you sell, scrap, or write one off.',
+  },
+  {
+    icon:  Shield,
+    title: 'Approvals & Delegation of Authority',
+    desc:  'Set who reports to whom and how much each person can approve. A request goes to their manager first and climbs the line until someone has the authority to sign it off — with the full trail on the document. Nobody approves their own spend.',
   },
   {
     icon:  BarChart3,
@@ -229,10 +239,10 @@ function Assets() {
           <div>
             <div className="inline-flex items-center gap-2 bg-indigo-500/15 border border-indigo-400/30 text-indigo-300 text-xs font-semibold px-3 py-1.5 rounded-full mb-5">
               <Wrench className="w-3.5 h-3.5" />
-              Fixed Asset Management
+              Tool Tracking & Fixed Assets
             </div>
             <h2 className="text-3xl font-bold mb-4 leading-tight">
-              It&apos;s a fixed-asset register too — not just inventory
+              Every tool accounted for — on site and on your books
             </h2>
             <p className="text-slate-300 leading-relaxed mb-6">
               Your tools, vehicles, and equipment are assets on your books, not consumables.
