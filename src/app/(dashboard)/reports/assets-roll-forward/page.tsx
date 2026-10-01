@@ -2,8 +2,9 @@
 
 import { useState, useCallback } from 'react'
 import { Topbar } from '@/components/layout/topbar'
+import { ExportButtons } from '@/components/reports/export-buttons'
 import {
-  Loader2, AlertCircle, Download, BarChart3,
+  Loader2, AlertCircle, BarChart3,
   ChevronDown, ChevronRight, Info, Printer,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -231,25 +232,26 @@ export default function AssetsRollForwardPage() {
     }
   }, [from, to])
 
-  const downloadCsv = () => {
-    if (!data) return
-    const rows: string[][] = [
+  // Numbers stay numeric so the workbook totals and charts correctly.
+  const buildSheets = () => {
+    if (!data) return []
+    const rows: (string | number)[][] = [
       ['Category', 'Line Item', 'Cost Account', 'Accum. Depreciation (Contra)', 'Net Book Value'],
     ]
     const addSection = (cat: CategoryRow, label: string) => {
-      rows.push([label, 'Beginning Balance',           String(cat.beginning_cost),       String(-cat.beginning_accum_depr), String(cat.beginning_nbv)])
-      rows.push([label, '+ Additions',                 String(cat.additions_cost),        '0',                              String(cat.additions_cost)])
-      rows.push([label, '- Depreciation',              '0',                               String(-cat.period_depreciation),  String(-cat.period_depreciation)])
-      rows.push([label, '- Disposals',                 String(-cat.disposals_cost),       String(cat.accum_depr_disposals),  String(-(cat.disposals_cost - cat.accum_depr_disposals))])
-      rows.push([label, 'Ending Balance',              String(cat.ending_cost),           String(-cat.ending_accum_depr),    String(cat.ending_nbv)])
+      rows.push([label, 'Beginning Balance', cat.beginning_cost,        -cat.beginning_accum_depr, cat.beginning_nbv])
+      rows.push([label, '+ Additions',       cat.additions_cost,        0,                         cat.additions_cost])
+      rows.push([label, '- Depreciation',    0,                         -cat.period_depreciation,  -cat.period_depreciation])
+      rows.push([label, '- Disposals',       -cat.disposals_cost,       cat.accum_depr_disposals,  -(cat.disposals_cost - cat.accum_depr_disposals)])
+      rows.push([label, 'Ending Balance',    cat.ending_cost,           -cat.ending_accum_depr,    cat.ending_nbv])
     }
     data.categories.forEach(c => addSection(c, c.name))
     addSection({ ...data.total, id: 'TOTAL', name: 'TOTAL' } as CategoryRow, 'TOTAL')
-    const csv = rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-    const a   = document.createElement('a'); a.href = url
-    a.download = `fixed-assets-roll-forward-${from}-to-${to}.csv`
-    a.click(); URL.revokeObjectURL(url)
+    return [{
+      name: 'Roll-forward',
+      rows,
+      notes: [`Fixed assets roll-forward, ${from} to ${to}`],
+    }]
   }
 
   return (
@@ -326,11 +328,7 @@ export default function AssetsRollForwardPage() {
                   <Printer className="w-3.5 h-3.5" />
                   Print
                 </button>
-                <button onClick={downloadCsv}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
-                  <Download className="w-3.5 h-3.5" />
-                  Export CSV
-                </button>
+                <ExportButtons filename={`Fixed assets roll-forward ${from} to ${to}`} build={buildSheets} disabled={!data} />
               </div>
             </div>
 

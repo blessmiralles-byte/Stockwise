@@ -2,9 +2,10 @@
 
 import { useState, useCallback } from 'react'
 import { Topbar } from '@/components/layout/topbar'
+import { ExportButtons } from '@/components/reports/export-buttons'
 import { Button } from '@/components/ui/button'
 import {
-  Loader2, Download, RefreshCw, AlertCircle, Grid3x3, Briefcase, Tag, BarChart3,
+  Loader2, RefreshCw, AlertCircle, Grid3x3, Briefcase, Tag, BarChart3,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -58,7 +59,46 @@ export default function CostAnalysisPage() {
     }
   }, [from, to])
 
-  const download = () => { window.location.href = `/api/reports/cost-analysis?from=${from}&to=${to}&format=csv` }
+  // One workbook, three tabs — the matrix plus each single-axis breakdown,
+  // so nobody has to run the report three times.
+  const buildSheets = () => {
+    if (!data) return []
+    const note = `Cost analysis ${data.period.from} to ${data.period.to} — ${data.transaction_count} transactions`
+
+    const matrix: (string | number)[][] = [
+      ['Cost center', ...data.job_codes.map(j => j.label), 'Total'],
+      ...data.cost_centers.map(cc => [
+        cc.label,
+        ...data.job_codes.map(j => data.cells[cc.key]?.[j.key] ?? 0),
+        cc.total,
+      ]),
+      ['Total', ...data.job_codes.map(j => j.total), data.grand_total],
+    ]
+
+    const byJob: (string | number)[][] = [
+      ['Job code', 'Amount', 'Share %'],
+      ...data.job_codes.map(j => [
+        j.label, j.total,
+        data.grand_total ? Number(((j.total / data.grand_total) * 100).toFixed(1)) : 0,
+      ]),
+      ['Total', data.grand_total, 100],
+    ]
+
+    const byCc: (string | number)[][] = [
+      ['Cost center', 'Amount', 'Share %'],
+      ...data.cost_centers.map(cc => [
+        cc.label, cc.total,
+        data.grand_total ? Number(((cc.total / data.grand_total) * 100).toFixed(1)) : 0,
+      ]),
+      ['Total', data.grand_total, 100],
+    ]
+
+    return [
+      { name: 'Matrix',         rows: matrix, notes: [note] },
+      { name: 'By job',         rows: byJob,  notes: [note] },
+      { name: 'By cost center', rows: byCc,   notes: [note] },
+    ]
+  }
 
   const cell = (ccKey: string, jobKey: string) => data?.cells[ccKey]?.[jobKey] ?? 0
   const hasData = data && data.transaction_count > 0
@@ -111,9 +151,12 @@ export default function CostAnalysisPage() {
               {loading ? <><Loader2 className="w-4 h-4 animate-spin" />Loading…</> : <><RefreshCw className="w-4 h-4" />Run Report</>}
             </Button>
             {hasData && (
-              <Button variant="outline" onClick={download} className="gap-2">
-                <Download className="w-4 h-4" />Download CSV
-              </Button>
+              <ExportButtons
+                filename={`Cost analysis ${from} to ${to}`}
+                build={buildSheets}
+                disabled={!data}
+                csvSheetIndex={view === 'by_job' ? 1 : view === 'by_cc' ? 2 : 0}
+              />
             )}
           </div>
         </div>

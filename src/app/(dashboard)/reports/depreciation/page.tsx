@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { Topbar } from '@/components/layout/topbar'
+import { ExportButtons } from '@/components/reports/export-buttons'
 import {
   Loader2, AlertCircle, CheckCircle2, Play, Eye,
   TrendingDown, AlertTriangle, Printer,
@@ -71,6 +72,38 @@ export default function DepreciationPage() {
     }
   }, [from, to])
 
+  // Posted lines and anything skipped, so the reason an asset was left out
+  // travels with the run.
+  const buildSheets = () => {
+    if (!result) return []
+    const sheets = [{
+      name: 'Depreciation',
+      rows: [
+        ['Asset tag', 'Asset', 'Method', 'Book value before', 'Depreciation', 'Book value after'],
+        ...result.lines.map(l => [
+          l.asset_tag, l.name, l.method,
+          Number(l.book_value_before), Number(l.depreciation_amount), Number(l.book_value_after),
+        ]),
+        ['', 'TOTAL', '', '', Number(result.total_depreciation), ''],
+      ],
+      notes: [
+        `Depreciation ${result.period.period_start} to ${result.period.period_end} (${result.period.days} days)`,
+        result.dry_run ? 'PREVIEW ONLY — not posted' : `Posted — ${result.assets_posted ?? result.lines.length} assets`,
+      ],
+    }]
+    if (result.skipped.length) {
+      sheets.push({
+        name: 'Skipped',
+        rows: [
+          ['Asset tag', 'Asset', 'Method', 'Reason'],
+          ...result.skipped.map(s => [s.asset_tag, s.name, s.method, s.skipped_reason ?? '']),
+        ],
+        notes: ['Assets not depreciated in this run'],
+      })
+    }
+    return sheets
+  }
+
   return (
     <div>
       <Topbar title="Depreciation Run" />
@@ -137,6 +170,13 @@ export default function DepreciationPage() {
 
         {result && !loading && (
           <div className="space-y-5">
+            <div className="no-print flex justify-end">
+              <ExportButtons
+                filename={`Depreciation ${result.period.period_start} to ${result.period.period_end}`}
+                build={buildSheets}
+                disabled={!result.lines.length && !result.skipped.length}
+              />
+            </div>
             {/* Print-only header */}
             <div className="print-only pb-4 border-b border-slate-200">
               <h1 className="text-xl font-bold text-slate-900">

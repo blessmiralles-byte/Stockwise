@@ -2,10 +2,11 @@
 
 import { useState, useMemo } from 'react'
 import { Topbar } from '@/components/layout/topbar'
+import { ExportButtons } from '@/components/reports/export-buttons'
 import { Card, CardContent } from '@/components/ui/card'
 import { useApi } from '@/lib/use-api'
 import { formatDate } from '@/lib/utils'
-import { Search, User, Wrench, AlertTriangle, Download } from 'lucide-react'
+import { Search, User, Wrench, AlertTriangle } from 'lucide-react'
 
 interface Checkout {
   id:              string
@@ -52,7 +53,7 @@ export default function ToolsByCrewReport() {
   )
   const overdueCount = matched.filter(isOverdue).length
 
-  const exportCsv = () => {
+  const buildSheets = () => {
     const header = ['Assigned To', 'Employee No', 'Tool', 'Asset Tag', 'Job', 'Checked Out', 'Due', 'Status']
     const body = matched.map(c => [
       c.holder_name ?? '',
@@ -64,15 +65,11 @@ export default function ToolsByCrewReport() {
       c.due_at ? formatDate(c.due_at) : '',
       isOverdue(c) ? 'OVERDUE' : 'Out',
     ])
-    const csv = [header, ...body]
-      .map(r => r.map(f => `"${String(f).replace(/"/g, '""')}"`).join(','))
-      .join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `tools-for-${name.trim().replace(/\s+/g, '-').toLowerCase() || 'crew'}-${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    return [{
+      name: 'Tools out',
+      rows: [header, ...body],
+      notes: [`Tools assigned to ${name.trim() || 'crew'} — ${matched.length} out, ${overdueCount} overdue`],
+    }]
   }
 
   return (
@@ -143,14 +140,11 @@ export default function ToolsByCrewReport() {
                 </div>
               )}
               <div className="flex-1" />
-              {matched.length > 0 && (
-                <button
-                  onClick={exportCsv}
-                  className="inline-flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
-                >
-                  <Download className="w-4 h-4" /> Export CSV
-                </button>
-              )}
+              <ExportButtons
+                filename={`Tools for ${name.trim() || 'crew'}`}
+                build={buildSheets}
+                disabled={matched.length === 0}
+              />
             </div>
 
             <Card>

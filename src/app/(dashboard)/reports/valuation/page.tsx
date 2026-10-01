@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Topbar } from '@/components/layout/topbar'
+import { ExportButtons } from '@/components/reports/export-buttons'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -55,6 +56,22 @@ export default function ValuationReportPage() {
     (l.product?.sku  ?? '').toLowerCase().includes(search.toLowerCase())
   )
 
+  const buildSheets = () => {
+    if (!filtered.length) return []
+    return [{
+      name: 'Valuation',
+      rows: [
+        ['Product', 'SKU', 'Category', 'Opening value', 'Purchases', 'Issues', 'Closing value', 'Closing qty', 'Unit'],
+        ...filtered.map((l: any) => [
+          l.product?.name ?? '', l.product?.sku ?? '', l.product?.category?.name ?? '',
+          Number(l.opening_value ?? 0), Number(l.purchases_value ?? 0), Number(l.issues_value ?? 0),
+          Number(l.closing_value ?? 0), Number(l.closing_qty ?? 0), l.product?.unit_of_measure ?? '',
+        ]),
+      ],
+      notes: [`Inventory valuation ${from} to ${to}`],
+    }]
+  }
+
   return (
     <div>
       <Topbar title="Inventory Valuation" />
@@ -75,6 +92,7 @@ export default function ValuationReportPage() {
               <Button onClick={runReport} disabled={loading}>
                 {loading ? 'Loading…' : 'Run Report'}
               </Button>
+              <ExportButtons filename={`Inventory valuation ${from} to ${to}`} build={buildSheets} disabled={!filtered.length} />
             </div>
           </CardContent>
         </Card>

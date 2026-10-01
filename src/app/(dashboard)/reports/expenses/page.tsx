@@ -2,8 +2,9 @@
 
 import { useState, useCallback } from 'react'
 import { Topbar } from '@/components/layout/topbar'
+import { ExportButtons } from '@/components/reports/export-buttons'
 import {
-  Loader2, Download, ChevronDown, ChevronRight,
+  Loader2, ChevronDown, ChevronRight,
   Briefcase, Tag, AlertCircle, BarChart3, Printer,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -151,9 +152,9 @@ export default function ExpensesReportPage() {
     }
   }, [from, to, groupBy])
 
-  const downloadCsv = () => {
-    if (!data) return
-    const rows: string[][] = [
+  const buildSheets = () => {
+    if (!data) return []
+    const rows: (string | number)[][] = [
       ['Group', 'Product', 'SKU', 'Category', 'Qty', 'Transactions', 'Amount'],
     ]
     for (const g of data.groups) {
@@ -163,19 +164,17 @@ export default function ExpensesReportPage() {
           p.product?.name ?? '',
           p.product?.sku ?? '',
           p.product?.category?.name ?? '',
-          String(p.quantity),
-          String(p.transactions),
-          String(p.total_cost),
+          Number(p.quantity),
+          Number(p.transactions),
+          Number(p.total_cost),
         ])
       }
     }
-    const csv = rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-    const a   = document.createElement('a')
-    a.href    = url
-    a.download = `expenses-${from}-to-${to}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    return [{
+      name: groupBy === 'job_code' ? 'By job' : 'By cost center',
+      rows,
+      notes: [`Expenses ${from} to ${to}, grouped by ${groupBy === 'job_code' ? 'job code' : 'cost center'}`],
+    }]
   }
 
   return (
@@ -278,11 +277,7 @@ export default function ExpensesReportPage() {
                   <Printer className="w-3.5 h-3.5" />
                   Print
                 </button>
-                <button onClick={downloadCsv}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
-                  <Download className="w-3.5 h-3.5" />
-                  Export CSV
-                </button>
+                <ExportButtons filename={`Expenses ${from} to ${to}`} build={buildSheets} disabled={!data} />
               </div>
             </div>
 

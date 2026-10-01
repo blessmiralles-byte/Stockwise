@@ -2,10 +2,11 @@
 
 import { useState, useMemo } from 'react'
 import { Topbar } from '@/components/layout/topbar'
+import { ExportButtons } from '@/components/reports/export-buttons'
 import { Card, CardContent } from '@/components/ui/card'
 import { useApi } from '@/lib/use-api'
 import { formatDate } from '@/lib/utils'
-import { Search, Download, Wrench, AlertTriangle, PackageCheck } from 'lucide-react'
+import { Search, Wrench, AlertTriangle, PackageCheck } from 'lucide-react'
 
 interface Checkout {
   id:              string
@@ -40,7 +41,7 @@ export default function ToolsOutReport() {
 
   const overdueCount = all.filter(isOverdue).length
 
-  const exportCsv = () => {
+  const buildSheets = () => {
     const header = ['Tool', 'Asset Tag', 'Assigned To', 'Employee No', 'Job', 'Checked Out', 'Due', 'Status']
     const body = rows.map(c => [
       c.asset?.name ?? '',
@@ -52,15 +53,11 @@ export default function ToolsOutReport() {
       c.due_at ? formatDate(c.due_at) : '',
       isOverdue(c) ? 'OVERDUE' : 'Out',
     ])
-    const csv = [header, ...body]
-      .map(r => r.map(f => `"${String(f).replace(/"/g, '""')}"`).join(','))
-      .join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `tools-checked-out-${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    return [{
+      name: 'Tools out',
+      rows: [header, ...body],
+      notes: [`Tools checked out — ${rows.length} in custody, ${overdueCount} overdue`],
+    }]
   }
 
   return (
@@ -78,13 +75,11 @@ export default function ToolsOutReport() {
             </div>
           )}
           <div className="flex-1" />
-          <button
-            onClick={exportCsv}
+          <ExportButtons
+            filename="Tools checked out"
+            build={buildSheets}
             disabled={rows.length === 0}
-            className="inline-flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-          >
-            <Download className="w-4 h-4" /> Export CSV
-          </button>
+          />
         </div>
 
         {/* Search */}

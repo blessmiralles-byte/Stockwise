@@ -2,9 +2,10 @@
 
 import { useState, useCallback } from 'react'
 import { Topbar } from '@/components/layout/topbar'
+import { ExportButtons } from '@/components/reports/export-buttons'
 import {
   Loader2, AlertCircle, ChevronLeft, ChevronRight,
-  Shield, Search, Download,
+  Shield, Search,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -142,8 +143,8 @@ export default function AuditLogPage() {
     }
   }, [from, to, action])
 
-  const downloadCsv = () => {
-    if (!data.length) return
+  const buildSheets = () => {
+    if (!data.length) return []
     const rows = [
       ['Timestamp', 'Actor', 'Role', 'Action', 'Table', 'Record ID'],
       ...data.map((e: any) => [
@@ -155,11 +156,11 @@ export default function AuditLogPage() {
         e.record_id ?? '',
       ])
     ]
-    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-    const a   = document.createElement('a'); a.href = url
-    a.download = `audit-log-${from}-to-${to}.csv`
-    a.click(); URL.revokeObjectURL(url)
+    return [{
+      name: 'Audit log',
+      rows,
+      notes: [`Audit log ${from} to ${to}${action ? ` — ${action} only` : ''}`],
+    }]
   }
 
   return (
@@ -206,13 +207,11 @@ export default function AuditLogPage() {
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                 Search
               </button>
-              {data.length > 0 && (
-                <button onClick={downloadCsv}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
-                  <Download className="w-4 h-4" />
-                  CSV
-                </button>
-              )}
+              <ExportButtons
+                filename={`Audit log ${from} to ${to}`}
+                build={buildSheets}
+                disabled={data.length === 0}
+              />
             </div>
           </div>
         </div>

@@ -198,6 +198,12 @@ up for an organization is its Owner.
   posts the periodic depreciation, and reports show the asset roll-forward.
 
 ## Reports
+- Every report has **Excel** and **CSV** buttons. Excel (.xlsx) keeps numbers as
+  numbers so they total and sort properly, sizes the columns, and puts filter
+  dropdowns on the header row; reports with more than one view (Cost Analysis,
+  Tool Compliance, Depreciation) come as one workbook with a tab for each.
+  CSV is the one to use when importing into another system.
+
 Available under **Reports**:
 - **Inventory valuation** — current stock value.
 - **Expenses** — consumption/sales spend grouped by cost center OR job code.

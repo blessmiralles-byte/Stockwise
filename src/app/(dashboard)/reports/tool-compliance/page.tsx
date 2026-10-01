@@ -4,12 +4,13 @@ import { useState, useMemo } from 'react'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent } from '@/components/ui/card'
 import { useApi } from '@/lib/use-api'
+import { ExportButtons } from '@/components/reports/export-buttons'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import {
   assetCompliance, certificateState, KIND_LABEL, CERT_WARNING_DAYS, type ScheduleLike,
 } from '@/lib/asset-compliance'
 import {
-  AlertTriangle, CheckCircle2, Clock, Loader2, ShieldCheck, Search, PackageX, Download,
+  AlertTriangle, CheckCircle2, Clock, Loader2, ShieldCheck, Search, PackageX,
 } from 'lucide-react'
 
 type Tab = 'checks' | 'incidents'
@@ -42,20 +43,6 @@ const STATUS_STYLE: Record<string, string> = {
   open:        'bg-red-100 text-red-700',
   recovered:   'bg-green-100 text-green-700',
   written_off: 'bg-slate-200 text-slate-600',
-}
-
-function csv(rows: (string | number | null | undefined)[][]) {
-  return rows.map(r => r.map(c => {
-    const v = c == null ? '' : String(c)
-    return /[",\n]/.test(v) ? `"${v.replaceAll('"', '""')}"` : v
-  }).join(',')).join('\n')
-}
-
-function download(name: string, body: string) {
-  const url = URL.createObjectURL(new Blob([body], { type: 'text/csv;charset=utf-8;' }))
-  const a = document.createElement('a')
-  a.href = url; a.download = name; a.click()
-  URL.revokeObjectURL(url)
 }
 
 export default function ToolCompliancePage() {
@@ -110,21 +97,33 @@ export default function ToolCompliancePage() {
       .reduce((sum, i) => sum + Number(i.estimated_loss ?? 0), 0),
   }
 
-  const exportChecks = () => download('inspections-certificates.csv', csv([
-    ['Asset tag', 'Tool', 'Check', 'Next due', 'Certificate', 'Valid until', 'State'],
-    ...shownTools.flatMap(t => t.items.map(i => [
-      t.asset.asset_tag, t.asset.name, KIND_LABEL[(i.kind as 'inspection') ?? 'inspection'],
-      i.scheduled_date, i.certificate_no, i.certified_until, certificateState(i.certified_until),
-    ])),
-  ]))
-
-  const exportIncidents = () => download('tool-losses.csv', csv([
-    ['Date', 'Asset tag', 'Tool', 'Type', 'Status', 'Held by', 'Last seen', 'Police report', 'Estimated loss', 'Notes'],
-    ...shownIncidents.map(i => [
-      i.occurred_on, i.asset?.asset_tag, i.asset?.name, INCIDENT_LABEL[i.kind], i.status,
-      i.held_by, i.last_seen, i.police_report_no, i.estimated_loss, i.description,
-    ]),
-  ]))
+  // Both tabs go into one workbook; the CSV follows whichever tab is open.
+  const buildSheets = () => [
+    {
+      name: 'Certificates',
+      rows: [
+        ['Asset tag', 'Tool', 'Check', 'Next due', 'Certificate', 'Valid until', 'State'],
+        ...shownTools.flatMap(t => t.items.map(i => [
+          t.asset.asset_tag, t.asset.name, KIND_LABEL[(i.kind as 'inspection') ?? 'inspection'],
+          i.scheduled_date, i.certificate_no, i.certified_until, certificateState(i.certified_until),
+        ])),
+      ],
+      notes: [`Inspections & certificates — ${counts.overdue} overdue, ${counts.expired} expired, ${counts.expiring} expiring within ${CERT_WARNING_DAYS} days`],
+    },
+    {
+      name: 'Losses',
+      rows: [
+        ['Date', 'Asset tag', 'Tool', 'Type', 'Status', 'Held by', 'Last seen', 'Police report', 'Estimated loss', 'Notes'],
+        ...shownIncidents.map(i => [
+          i.occurred_on, i.asset?.asset_tag, i.asset?.name, INCIDENT_LABEL[i.kind], i.status,
+          i.held_by, i.last_seen, i.police_report_no,
+          i.estimated_loss == null ? '' : Number(i.estimated_loss),
+          i.description,
+        ]),
+      ],
+      notes: [`Lost, stolen & damaged — ${counts.open} open, ${formatCurrency(counts.lossValue)} unaccounted for`],
+    },
+  ]
 
   const resolve = async (incident: Incident, status: 'recovered' | 'written_off') => {
     const note = window.prompt(
@@ -184,10 +183,11 @@ export default function ToolCompliancePage() {
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tools…"
               className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
-          <button onClick={tab === 'checks' ? exportChecks : exportIncidents}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-            <Download className="w-3.5 h-3.5" /> CSV
-          </button>
+          <ExportButtons
+            filename="Tool compliance"
+            build={buildSheets}
+            csvSheetIndex={tab === 'checks' ? 0 : 1}
+          />
         </div>
 
         {loading ? (

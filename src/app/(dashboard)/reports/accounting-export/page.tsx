@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Topbar } from '@/components/layout/topbar'
+import { downloadExcel } from '@/lib/export-sheet'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils'
 import {
@@ -88,6 +89,24 @@ export default function AccountingExportPage() {
     if (!res.ok) { setError(json.error ?? 'Failed to load journal'); return }
     setEntries(json.data ?? [])
     setSummary({ total: json.total_debit ?? 0, count: json.count ?? 0 })
+  }
+
+  // Excel is for reviewing and sending on; the CSV stays the import format
+  // whose headers match the QuickBooks / Xero templates.
+  const downloadXlsx = async () => {
+    if (!entries.length) return
+    await downloadExcel(`Journal ${from} to ${to}`, [{
+      name: 'Journal',
+      rows: [
+        ['Date', 'Reference', 'Type', 'Description', 'Debit account', 'Credit account', 'Amount', 'Product', 'Category', 'Notes'],
+        ...entries.map(e => [
+          e.date, e.reference, e.type, e.description,
+          e.debit_account, e.credit_account, Number(e.amount),
+          e.product, e.category, e.notes,
+        ]),
+      ],
+      notes: JOURNAL_SCOPE,
+    }])
   }
 
   const download = () => {
@@ -228,6 +247,11 @@ export default function AccountingExportPage() {
                 : <><RefreshCw className="w-4 h-4" />Run Report</>
               }
             </Button>
+            {entries.length > 0 && (
+              <Button variant="outline" onClick={downloadXlsx} className="gap-2">
+                <Download className="w-4 h-4" />Download Excel
+              </Button>
+            )}
             {entries.length > 0 && (
               <Button variant="outline" onClick={download} className="gap-2">
                 {downloaded
