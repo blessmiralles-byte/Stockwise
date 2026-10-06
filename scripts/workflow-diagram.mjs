@@ -145,22 +145,37 @@ function sectionLabel(doc, x, y, text) {
 
 // ── Page 1: materials ─────────────────────────────────────────────────────────
 function pageMaterials(doc) {
-  pageFrame(doc, 'How materials flow', 'From a crew request to a costed job - and the accounting that follows.', 1)
+  pageFrame(doc, 'How materials flow', 'A crew request or a reorder point starts it; it ends as a costed job and a journal entry.', 1)
   legend(doc, 74, ['crew', 'approve', 'procure', 'finance', 'system'])
 
-  const R1 = 112, R2 = 266, R3 = 420
+  // Two entry points converge on procurement: a person asks, or stock asks.
+  const RA = 104, RB = 178, RPO = 141, R2 = 282, R3 = 424
   const col = i => 32 + i * 158
 
-  sectionLabel(doc, 32, R1 - 16, 'Request and approve')
-  const a1 = box(doc, { x: col(0), y: R1, actor: 'crew',    title: 'Crew requests materials', sub: 'Phone, with job + cost center' })
-  const a2 = box(doc, { x: col(1), y: R1, actor: 'approve', title: 'Direct manager endorses', sub: 'Always sees it first', badge: 'Pro' })
-  const a3 = box(doc, { x: col(2), y: R1, actor: 'approve', title: 'Climbs the reporting line', sub: 'Until a limit covers it' })
-  const a4 = box(doc, { x: col(3), y: R1, actor: 'procure', title: 'Procurement raises a PO', sub: 'Prices carried over' })
-  const a5 = box(doc, { x: col(4), y: R1, actor: 'approve', title: 'PO approved', sub: 'Price change is shown' })
+  sectionLabel(doc, 32, RA - 16, 'Two ways an order starts')
+
+  // A — someone asks for materials
+  const a1 = box(doc, { x: col(0), y: RA, actor: 'crew',    title: 'Crew requests materials', sub: 'Phone, with job + cost center' })
+  const a2 = box(doc, { x: col(1), y: RA, actor: 'approve', title: 'Direct manager endorses', sub: 'Always sees it first', badge: 'Pro' })
+  const a3 = box(doc, { x: col(2), y: RA, actor: 'approve', title: 'Climbs the reporting line', sub: 'Until a limit covers it' })
 
   arrow(doc, a1.right, { x: a2.left.x - 6, y: a2.left.y })
   arrow(doc, a2.right, { x: a3.left.x - 6, y: a3.left.y }, { label: 'over limit' })
-  arrow(doc, a3.right, { x: a4.left.x - 6, y: a4.left.y }, { label: 'approved' })
+
+  // B — stock asks, on its own
+  const r1 = box(doc, { x: col(0), y: RB, actor: 'system', title: 'Stock hits its reorder point', sub: 'Items marked "keep in stock"' })
+  const r2 = box(doc, { x: col(1), y: RB, actor: 'system', title: 'Procurement alerted', sub: 'Daily email + Reorder list' })
+  const r3 = box(doc, { x: col(2), y: RB, actor: 'procure', title: 'Draft PO per vendor', sub: 'Suggested quantities' })
+
+  arrow(doc, r1.right, { x: r2.left.x - 6, y: r2.left.y })
+  arrow(doc, r2.right, { x: r3.left.x - 6, y: r3.left.y }, { label: 'one click' })
+
+  // Both paths meet at the purchase order
+  const a4 = box(doc, { x: col(3), y: RPO, actor: 'procure', title: 'Purchase order priced', sub: 'Vendor, quantities, prices' })
+  const a5 = box(doc, { x: col(4), y: RPO, actor: 'approve', title: 'PO approved', sub: 'Price change is shown' })
+
+  elbow(doc, a3.right, { x: a4.left.x - 6, y: a4.left.y }, { via: 'x', color: '#94A3B8' })
+  elbow(doc, r3.right, { x: a4.left.x - 6, y: a4.left.y }, { via: 'x', color: '#94A3B8' })
   arrow(doc, a4.right, { x: a5.left.x - 6, y: a5.left.y })
 
   sectionLabel(doc, 32, R2 - 16, 'Order, receive and issue')
