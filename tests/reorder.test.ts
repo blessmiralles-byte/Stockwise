@@ -36,6 +36,32 @@ describe('what counts as low', () => {
     expect(low).toHaveLength(0)
   })
 
+  it('flags a stocked item that has run out, even with no level set', () => {
+    const low = belowReorderPoint([line('stocked', 0, { keep_in_stock: true, reorder_point: 0 })])
+    expect(low.map(l => l.product_id)).toEqual(['stocked'])
+  })
+
+  it('leaves a stocked item alone while it still has some', () => {
+    const low = belowReorderPoint([line('stocked', 5, { keep_in_stock: true, reorder_point: 0 })])
+    expect(low).toHaveLength(0)
+  })
+
+  it('flags a stocked item at its level', () => {
+    const low = belowReorderPoint([line('stocked', 10, { keep_in_stock: true, reorder_point: 10 })])
+    expect(low).toHaveLength(1)
+  })
+
+  // Products created before the checkbox existed carry only a reorder point.
+  it('still honours a reorder point when the flag is not set', () => {
+    const low = belowReorderPoint([line('legacy', 2, { keep_in_stock: false, reorder_point: 10 })])
+    expect(low.map(l => l.product_id)).toEqual(['legacy'])
+  })
+
+  it('never flags an item that is not stocked, however low it runs', () => {
+    const low = belowReorderPoint([line('oneoff', 0, { keep_in_stock: false, reorder_point: 0 })])
+    expect(low).toHaveLength(0)
+  })
+
   it('puts out-of-stock first, then the furthest below', () => {
     const low = belowReorderPoint([line('low', 8), line('empty', 0), line('lower', 2)])
     expect(low.map(l => l.product_id)).toEqual(['empty', 'lower', 'low'])

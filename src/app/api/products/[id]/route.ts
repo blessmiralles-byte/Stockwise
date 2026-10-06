@@ -19,7 +19,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const allowed = ['name', 'category_id', 'unit_of_measure', 'cost_method', 'reorder_point', 'track_expiry', 'needs_review', 'barcode', 'is_active']
+  const allowed = ['name', 'category_id', 'unit_of_measure', 'cost_method', 'reorder_point', 'keep_in_stock', 'track_expiry', 'needs_review', 'barcode', 'is_active']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) if (key in body) updates[key] = body[key]
 
@@ -31,6 +31,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if ('cost_method' in updates && !['average', 'fifo'].includes(String(updates.cost_method))) {
     return NextResponse.json({ error: 'cost_method must be average or fifo' }, { status: 422 })
   }
+  if ('keep_in_stock' in updates) updates.keep_in_stock = !!updates.keep_in_stock
+
   if ('reorder_point' in updates) {
     const r = Number(updates.reorder_point)
     if (!Number.isInteger(r) || r < 0) {

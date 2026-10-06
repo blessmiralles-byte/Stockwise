@@ -863,7 +863,7 @@ function ProductsTab() {
   const { data, loading, refetch } = useApi<{ data: any[] }>('/api/products?limit=200')
   const products = data?.data ?? []
 
-  const blank = { name: '', sku: '', barcode: '', unit_of_measure: 'pcs', reorder_point: '', description: '' }
+  const blank = { name: '', sku: '', barcode: '', unit_of_measure: 'pcs', reorder_point: '', description: '', keep_in_stock: false }
   const [showForm, setShowForm] = useState(false)
   const [editId,   setEditId]   = useState<string | null>(null)
   const [form,     setForm]     = useState(blank)
@@ -876,7 +876,7 @@ function ProductsTab() {
   const openAdd  = () => { setEditId(null); setForm(blank); setError(''); setScanning(false); setShowForm(true) }
   const openEdit = (p: any) => {
     setEditId(p.id)
-    setForm({ name: p.name ?? '', sku: p.sku ?? '', barcode: p.barcode ?? '', unit_of_measure: p.unit_of_measure ?? 'pcs', reorder_point: String(p.reorder_point ?? ''), description: p.description ?? '' })
+    setForm({ name: p.name ?? '', sku: p.sku ?? '', barcode: p.barcode ?? '', unit_of_measure: p.unit_of_measure ?? 'pcs', reorder_point: String(p.reorder_point ?? ''), description: p.description ?? '', keep_in_stock: p.keep_in_stock ?? (p.reorder_point ?? 0) > 0 })
     setError(''); setScanning(false); setShowForm(true)
   }
   const cancel = () => { setShowForm(false); setEditId(null); setError(''); setScanning(false) }
@@ -894,6 +894,7 @@ function ProductsTab() {
         barcode:         form.barcode.trim()      || null,
         unit_of_measure: form.unit_of_measure,
         reorder_point:   form.reorder_point ? Number(form.reorder_point) : 0,
+        keep_in_stock:   form.keep_in_stock,
         description:     form.description.trim()  || null,
       }),
     })
@@ -908,7 +909,7 @@ function ProductsTab() {
       <SectionHeader title="Products / Inventory" description="Bulk-import your product catalog or add items one at a time." />
       <div className="flex gap-2">
         <Button size="sm" className="gap-1.5" onClick={openAdd}><Plus className="w-3.5 h-3.5" /> Add Product</Button>
-        <ImportPanel config={{ entity: 'products', label: 'Products', required: ['name'], columns: ['name', 'sku', 'barcode', 'unit_of_measure', 'reorder_point', 'description'] }} onImported={refetch} />
+        <ImportPanel config={{ entity: 'products', label: 'Products', required: ['name'], columns: ['name', 'sku', 'barcode', 'unit_of_measure', 'reorder_point', 'keep_in_stock', 'description'] }} onImported={refetch} />
       </div>
       {showForm && (
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
@@ -958,9 +959,36 @@ function ProductsTab() {
                 {['pcs', 'kg', 'g', 'lbs', 'oz', 'liters', 'ml', 'meters', 'ft', 'box', 'pack', 'roll', 'set', 'pair'].map(u => <option key={u} value={u}>{u}</option>)}
               </select>
             </div>
-            <div>
-              <label className="text-xs font-medium text-slate-600 block mb-1">Reorder Point</label>
-              <Input type="number" value={form.reorder_point} onChange={f('reorder_point')} placeholder="10" />
+            <div className="col-span-2 rounded-lg border border-slate-200 p-3">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.keep_in_stock}
+                  onChange={e => setForm(prev => ({ ...prev, keep_in_stock: e.target.checked }))}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="text-sm font-medium text-slate-800">Keep this item in stock</span>
+                  <span className="block text-xs text-slate-500 mt-0.5">
+                    Something you always want on the shelf. Procurement is alerted when it runs low,
+                    and it appears on the Reorder list. Leave unticked for one-off buys.
+                  </span>
+                </span>
+              </label>
+              {form.keep_in_stock && (
+                <div className="mt-3 pl-7">
+                  <label className="text-xs font-medium text-slate-600 block mb-1">
+                    Reorder point
+                    <span className="font-normal text-slate-400"> - alert at or below this quantity</span>
+                  </label>
+                  <Input type="number" min="0" value={form.reorder_point} onChange={f('reorder_point')} placeholder="10" className="w-40" />
+                  {!form.reorder_point && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      Without a level it is only flagged once it hits zero.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
             <div className="col-span-2">
               <label className="text-xs font-medium text-slate-600 block mb-1">Description</label>
@@ -992,7 +1020,11 @@ function ProductsTab() {
                   <div className="flex items-center gap-2 mt-0.5">
                     {p.sku && <p className="text-xs text-slate-500 font-mono">{p.sku}</p>}
                     {p.unit_of_measure && <p className="text-xs text-slate-400">· {p.unit_of_measure}</p>}
-                    {p.reorder_point > 0 && <p className="text-xs text-slate-400">· reorder @ {p.reorder_point}</p>}
+                    {(p.keep_in_stock ?? p.reorder_point > 0) && (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700">
+                        STOCKED{p.reorder_point > 0 ? ` @ ${p.reorder_point}` : ''}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">

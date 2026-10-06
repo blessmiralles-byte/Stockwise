@@ -123,6 +123,7 @@ select e.migration, e.tbl, e.col from (values
   ('purchase_orders','current_approver_id','migrate-approval-chain.sql'),
   ('purchase_orders','requisition_id','migrate-requisition-po-link.sql'),
   ('reorder_alerts','product_id','migrate-reorder-alerts.sql'),
+  ('products','keep_in_stock','migrate-keep-in-stock.sql'),
   ('purchase_order_lines','requisition_item_id','migrate-requisition-po-link.sql'),
   ('purchase_orders','submitted_by','migrate-approval-chain.sql'),
   ('requisitions','current_approver_id','migrate-approval-chain.sql'),

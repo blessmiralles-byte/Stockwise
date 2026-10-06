@@ -55,6 +55,9 @@ function transformProduct(row: Record<string, any>) {
     barcode:         r.barcode ? String(r.barcode).trim().slice(0, 100) : null,
     unit_of_measure: r.unit ?? r.unit_of_measure ?? r.uom ?? 'pcs',
     reorder_point:   parseNumber(r.reorder_point ?? r.reorder ?? 0),
+    // yes/true/1/x all mean "keep this in stock"; a reorder point implies it.
+    keep_in_stock:   /^(y|yes|true|1|x)$/i.test(String(r.keep_in_stock ?? r.stocked ?? '').trim())
+                     || parseNumber(r.reorder_point ?? r.reorder ?? 0) > 0,
     description:     r.description ? String(r.description).slice(0, 500) : null,
     is_active:       true,
   }

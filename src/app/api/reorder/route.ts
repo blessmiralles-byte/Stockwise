@@ -17,7 +17,7 @@ import { belowReorderPoint, groupByVendor, type StockLine, type ReorderCandidate
 const BALANCE_SELECT = `
   product_id, quantity,
   product:products(
-    id, name, sku, unit_of_measure, reorder_point, supplier_id, lead_time_days,
+    id, name, sku, unit_of_measure, reorder_point, keep_in_stock, supplier_id, lead_time_days,
     supplier:suppliers(id, name, lead_time_days)
   )
 `

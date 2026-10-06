@@ -17,6 +17,8 @@ export interface StockLine {
     name?: string | null
     sku?: string | null
     unit_of_measure?: string | null
+    /** Marked "keep this item in stock" on the product. */
+    keep_in_stock?: boolean | null
     reorder_point?: number | null
     reorder_qty?: number | null
     supplier_id?: string | null
@@ -70,14 +72,21 @@ export function suggestedQty(quantity: number, reorderPoint: number, reorderQty?
 }
 
 /**
- * Products at or below their reorder point. A reorder point of zero means the
- * product isn't managed this way, so it is never flagged.
+ * Which products need buying.
+ *
+ * A product counts as stocked when it is marked "keep in stock", or (for data
+ * created before that flag existed) when it carries a reorder point. A stocked
+ * item is flagged at or below its reorder point — and at zero even when no
+ * level has been set yet, because a stocked item at zero always needs ordering.
+ * Items that aren't stocked are never flagged, however low they run.
  */
 export function belowReorderPoint(lines: StockLine[]): ReorderCandidate[] {
   const out: ReorderCandidate[] = []
   for (const [productId, { qty, product }] of stockByProduct(lines)) {
-    const point = Number(product?.reorder_point ?? 0)
-    if (!(point > 0) || qty > point) continue
+    const point   = Number(product?.reorder_point ?? 0)
+    const stocked = product?.keep_in_stock === true || point > 0
+    if (!stocked) continue
+    if (qty > point && qty > 0) continue
     out.push({
       product_id:    productId,
       name:          product?.name ?? 'Unnamed product',

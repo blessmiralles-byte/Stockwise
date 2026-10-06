@@ -159,8 +159,13 @@ up for an organization is its Owner.
   detector, with torch and haptic feedback for faster, more reliable scans.
 
 ## Reordering (low stock → purchase order)
-- Each product can carry a **reorder point** (Setup → Products). When stock on
-  hand across all locations drops to or below it, Stocked acts on it:
+- In **Setup → Products**, tick **"Keep this item in stock"** for anything you
+  always want on the shelf, and give it a **reorder point** (the quantity to
+  alert at). Items left unticked are one-off buys and are never flagged, however
+  low they run. A stocked item with no level set is flagged once it hits zero.
+  The products list shows a **STOCKED** badge, and the import spreadsheet takes
+  a keep_in_stock column (yes/no).
+- When a stocked item drops to or below its reorder point, Stocked acts on it:
   - the morning it crosses, **procurement, owners and admins get an email**
     listing what is low, what is on hand, and a suggested order quantity;
   - an in-app notification goes to the same people;
@@ -177,8 +182,6 @@ up for an organization is its Owner.
   grouped onto one draft to assign.
 - Suggested quantity brings stock back to twice the reorder point (covering the
   lead time plus a buffer), unless the product has its own reorder quantity.
-- A reorder point of **0 means the product isn't managed this way** and is never
-  flagged.
 
 ## Forecasting & reordering
 - The **Forecasting** page projects demand from your actual usage — it looks at

@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabase
     .from('products')
-    .select('id, sku, barcode, name, unit_of_measure, cost_method, attributes, track_expiry, reorder_point, needs_review, category:categories(id, name)')
+    .select('id, sku, barcode, name, unit_of_measure, cost_method, attributes, track_expiry, reorder_point, keep_in_stock, needs_review, category:categories(id, name)')
     .eq('org_id', auth.orgId)
     .eq('is_active', true)
     .order('name')
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { barcode, name, category_id, unit_of_measure, cost_method, reorder_point, attributes, track_expiry } = body
+  const { barcode, name, category_id, unit_of_measure, cost_method, reorder_point, attributes, track_expiry, keep_in_stock } = body
   let { sku } = body
 
   if (!name?.trim()) {
@@ -79,6 +79,8 @@ export async function POST(req: NextRequest) {
       unit_of_measure: unit_of_measure ?? 'pc',
       cost_method:     cost_method ?? 'average',
       reorder_point:   reorder_point ?? 0,
+      // Stocked items are the ones procurement gets alerted about.
+      keep_in_stock:   keep_in_stock === true || (reorder_point ?? 0) > 0,
       attributes:      attributes ?? {},
       track_expiry:    track_expiry ?? false,
       is_active:       true,

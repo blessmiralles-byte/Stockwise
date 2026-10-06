@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
 const BALANCE_SELECT = `
   org_id, product_id, quantity,
   product:products(
-    id, name, sku, unit_of_measure, reorder_point, supplier_id, lead_time_days,
+    id, name, sku, unit_of_measure, reorder_point, keep_in_stock, supplier_id, lead_time_days,
     supplier:suppliers(id, name, lead_time_days)
   )
 `

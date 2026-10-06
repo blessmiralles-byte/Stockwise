@@ -167,7 +167,7 @@ export default function ReorderPage() {
             <CheckCircle2 className="w-8 h-8 text-green-500 mx-auto mb-3" />
             <p className="text-sm font-medium text-slate-700">Nothing to reorder</p>
             <p className="text-xs text-slate-400 mt-1">
-              Every product with a reorder point is above it. Set reorder points in Setup → Products.
+              Every item you keep in stock is above its reorder point. Tick "Keep this item in stock" on a product in Setup → Products to watch it here.
             </p>
           </CardContent></Card>
         ) : (
