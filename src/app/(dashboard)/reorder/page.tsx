@@ -9,7 +9,7 @@ import { useApi } from '@/lib/use-api'
 import { cn } from '@/lib/utils'
 import { ExportButtons } from '@/components/reports/export-buttons'
 import {
-  AlertTriangle, PackageX, Loader2, ShoppingCart, Search, CheckCircle2, Truck,
+  AlertTriangle, PackageX, Loader2, ShoppingCart, Search, CheckCircle2, Truck, RefreshCw,
 } from 'lucide-react'
 
 interface ReorderItem {
@@ -36,6 +36,26 @@ export default function ReorderPage() {
   const [search, setSearch] = useState('')
   const [busy, setBusy]     = useState(false)
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null)
+  const [checking, setChecking] = useState(false)
+
+  // The nightly run does this automatically; this is the "don't wait until
+  // tomorrow" button — same check, scoped to this organization.
+  const checkNow = async () => {
+    setChecking(true); setNotice(null)
+    try {
+      const res = await fetch('/api/notifications/reorder', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) { setNotice({ ok: false, text: json.error ?? 'Could not run the check' }); return }
+      const opened = json.alerts_opened ?? 0
+      setNotice({
+        ok: true,
+        text: opened > 0
+          ? `${opened} item${opened > 1 ? 's' : ''} newly below reorder point — procurement has been emailed.`
+          : 'Checked. Nothing new has crossed its reorder point since the last run.',
+      })
+      refetch()
+    } finally { setChecking(false) }
+  }
 
   const q = search.trim().toLowerCase()
   const shown = q
@@ -128,6 +148,10 @@ export default function ReorderPage() {
               className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
           <ExportButtons filename="Items to reorder" build={buildSheets} disabled={!items.length} />
+          <Button variant="outline" onClick={checkNow} disabled={checking} className="gap-2">
+            {checking ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            Check now
+          </Button>
           <Button onClick={createPOs} disabled={busy || picked.size === 0} className="gap-2">
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShoppingCart className="w-4 h-4" />}
             {picked.size === 0
