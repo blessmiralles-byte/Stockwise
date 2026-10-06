@@ -158,6 +158,28 @@ up for an organization is its Owner.
 - The barcode scanner uses the rear camera and the device's native barcode
   detector, with torch and haptic feedback for faster, more reliable scans.
 
+## Reordering (low stock → purchase order)
+- Each product can carry a **reorder point** (Setup → Products). When stock on
+  hand across all locations drops to or below it, Stocked acts on it:
+  - the morning it crosses, **procurement, owners and admins get an email**
+    listing what is low, what is on hand, and a suggested order quantity;
+  - an in-app notification goes to the same people;
+  - the **Dashboard** shows "N items below reorder point — raise a PO", and the
+    Low Stock tile links through;
+  - the **Reorder** page (sidebar) lists everything below its line.
+- Each item is reported **once** when it crosses, not every morning. It goes
+  quiet while a draft PO covers it, and can alert again after stock recovers
+  and later dips.
+- On the Reorder page, tick what you want and press **Create draft POs**:
+  Stocked raises **one draft purchase order per preferred vendor**, with the
+  suggested quantity on each line. Prices are left at zero deliberately —
+  procurement sets them before submitting. Items with no preferred vendor are
+  grouped onto one draft to assign.
+- Suggested quantity brings stock back to twice the reorder point (covering the
+  lead time plus a buffer), unless the product has its own reorder quantity.
+- A reorder point of **0 means the product isn't managed this way** and is never
+  flagged.
+
 ## Forecasting & reordering
 - The **Forecasting** page projects demand from your actual usage — it looks at
   consumption and sale transactions to estimate how fast each product moves.

@@ -249,3 +249,92 @@ export async function sendMaintenanceAlert({
     html,
   })
 }
+
+// ── Reorder digest ────────────────────────────────────────────────────────────
+export interface ReorderItem {
+  name:          string
+  sku:           string | null
+  quantity:      number
+  reorder_point: number
+  suggested_qty: number
+  unit:          string | null
+  vendor_name:   string | null
+}
+
+/**
+ * Daily digest of stock that has crossed its reorder point. Only newly crossed
+ * items are included — the alert table keeps an item from appearing every
+ * morning until somebody acts on it.
+ */
+export async function sendReorderAlert({
+  to,
+  businessName,
+  items,
+}: {
+  to: string | string[]
+  businessName: string
+  items: ReorderItem[]
+}) {
+  const outOfStock = items.filter(i => i.quantity <= 0)
+  const subject = outOfStock.length
+    ? `${outOfStock.length} item${outOfStock.length > 1 ? 's' : ''} out of stock, ${items.length} to reorder — ${businessName}`
+    : `${items.length} item${items.length > 1 ? 's' : ''} below reorder point — ${businessName}`
+
+  const row = (i: ReorderItem) => `
+    <tr>
+      <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;">
+        <div style="font-weight:600;color:#111;">${i.name}</div>
+        <div style="font-size:12px;color:#6b7280;">${[i.sku, i.vendor_name].filter(Boolean).join(' · ') || '&nbsp;'}</div>
+      </td>
+      <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:${i.quantity <= 0 ? '#b91c1c' : '#111'};font-weight:${i.quantity <= 0 ? 700 : 400};">
+        ${i.quantity.toLocaleString()}${i.unit ? ' ' + i.unit : ''}
+      </td>
+      <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#6b7280;">${i.reorder_point.toLocaleString()}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;color:#4f46e5;">${i.suggested_qty.toLocaleString()}</td>
+    </tr>`
+
+  const html = `
+    <!DOCTYPE html>
+    <html><head><meta charset="utf-8"></head>
+    <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f9fafb;margin:0;padding:20px;color:#111;">
+      <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+        <div style="background:#4f46e5;color:#fff;padding:24px 32px;">
+          <h1 style="margin:0;font-size:20px;">Time to reorder</h1>
+          <p style="margin:4px 0 0;font-size:14px;opacity:.85;">${businessName}</p>
+        </div>
+        <div style="padding:24px 32px;">
+          <p style="margin:0 0 16px;font-size:14px;color:#374151;">
+            ${items.length} item${items.length > 1 ? 's have' : ' has'} dropped to or below the reorder point${outOfStock.length ? `, and ${outOfStock.length} ${outOfStock.length > 1 ? 'are' : 'is'} out of stock` : ''}.
+          </p>
+          <table style="width:100%;border-collapse:collapse;font-size:14px;">
+            <thead>
+              <tr style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;">
+                <th style="text-align:left;padding:0 12px 8px;">Item</th>
+                <th style="text-align:right;padding:0 12px 8px;">On hand</th>
+                <th style="text-align:right;padding:0 12px 8px;">Reorder at</th>
+                <th style="text-align:right;padding:0 12px 8px;">Suggested</th>
+              </tr>
+            </thead>
+            <tbody>${items.map(row).join('')}</tbody>
+          </table>
+          <a href="${process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/reorder"
+             style="display:inline-block;margin-top:20px;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:14px;">
+            Review and raise purchase orders →
+          </a>
+          <p style="margin:16px 0 0;font-size:12px;color:#6b7280;">
+            Draft orders are grouped by preferred vendor — price them before sending.
+          </p>
+        </div>
+        <div style="padding:16px 32px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280;">
+          Sent by Stocked · You receive this because you handle procurement for ${businessName}.
+        </div>
+      </div>
+    </body></html>`
+
+  return resend.emails.send({
+    from: process.env.RESEND_FROM_EMAIL ?? 'Stocked <notifications@stocked.tech>',
+    to,
+    subject,
+    html,
+  })
+}

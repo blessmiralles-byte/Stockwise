@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Package, ArrowLeftRight,
   MapPin, Wrench, Settings, ChevronLeft, ChevronRight,
   BarChart3, Building2, TrendingUp,
-  Truck, ShoppingCart, ScanBarcode, Cpu, ClipboardList,
+  Truck, ShoppingCart, ScanBarcode, Cpu, ClipboardList, PackageSearch,
   Shield, Sliders,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -20,6 +20,7 @@ const navItems: { href: string; icon: any; label: string; feature?: Feature }[] 
   { href: '/transactions',    icon: ArrowLeftRight,  label: 'Transactions'    },
   { href: '/forecasting',     icon: TrendingUp,      label: 'Forecasting',     feature: 'forecasting' },
   { href: '/vendors',         icon: Building2,       label: 'Vendors'         },
+  { href: '/reorder',         icon: PackageSearch,   label: 'Reorder'         },
   { href: '/purchase-orders', icon: ShoppingCart,    label: 'Purchase Orders' },
   { href: '/requisitions',    icon: ClipboardList,   label: 'Requisitions',    feature: 'approvals' },
   { href: '/stock-counts',    icon: Truck,           label: 'Stock Counts'    },

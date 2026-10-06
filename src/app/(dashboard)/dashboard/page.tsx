@@ -45,12 +45,13 @@ export default function DashboardPage() {
     {
       label: 'Low Stock', value: data.low_stock_count,
       icon: AlertTriangle, color: 'bg-yellow-50 text-yellow-600',
-      change: 'Below reorder point',
+      change: 'Below reorder point', href: '/reorder',
     },
   ] : []
 
   // Action items that need attention
   const alerts = data ? [
+    data.low_stock_count       > 0 && { icon: ShoppingCart,  color: 'text-amber-700 bg-amber-50', label: `${data.low_stock_count} item${data.low_stock_count !== 1 ? 's' : ''} below reorder point - raise a PO`, href: '/reorder' },
     data.pending_req_count     > 0 && { icon: ClipboardList, color: 'text-indigo-600 bg-indigo-50', label: `${data.pending_req_count} requisition${data.pending_req_count !== 1 ? 's' : ''} pending approval`, href: '/requisitions?status=pending' },
     data.overdue_maint_count   > 0 && { icon: Wrench,        color: 'text-red-600 bg-red-50',     label: `${data.overdue_maint_count} maintenance task${data.overdue_maint_count !== 1 ? 's' : ''} overdue`,         href: '/maintenance' },
     data.expiring_warranty_count > 0 && { icon: ShieldAlert, color: 'text-amber-600 bg-amber-50', label: `${data.expiring_warranty_count} warranty${data.expiring_warranty_count !== 1 ? 'ies' : ''} expiring in 60 days`, href: '/assets' },
@@ -139,22 +140,28 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           {loading
             ? Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)
-            : stats.map((stat) => (
-              <Card key={stat.label}>
-                <CardContent className="p-5">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-sm text-slate-500 mb-1">{stat.label}</p>
-                      <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
-                      <p className="text-xs text-slate-400 mt-1">{stat.change}</p>
+            : stats.map((stat) => {
+              const tile = (
+                <Card className={(stat as any).href ? 'hover:shadow-md transition-shadow cursor-pointer h-full' : undefined}>
+                  <CardContent className="p-5">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-sm text-slate-500 mb-1">{stat.label}</p>
+                        <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
+                        <p className="text-xs text-slate-400 mt-1">{stat.change}</p>
+                      </div>
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${stat.color}`}>
+                        <stat.icon className="w-5 h-5" />
+                      </div>
                     </div>
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${stat.color}`}>
-                      <stat.icon className="w-5 h-5" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              )
+              // Tiles that lead somewhere useful are links; the rest stay plain.
+              return (stat as any).href
+                ? <Link key={stat.label} href={(stat as any).href}>{tile}</Link>
+                : <div key={stat.label}>{tile}</div>
+            })}
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

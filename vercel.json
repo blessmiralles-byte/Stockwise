@@ -4,6 +4,10 @@
     {
       "path": "/api/notifications/maintenance",
       "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/notifications/reorder",
+      "schedule": "30 1 * * *"
     }
   ]
 }
