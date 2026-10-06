@@ -31,7 +31,7 @@ export async function GET() {
     { count: assetCount    },
     { count: txnCount      },
   ] = await Promise.all([
-    supabase.from('organizations').select('name').eq('id', auth.orgId).single(),
+    supabase.from('organizations').select('name, sample_data, require_checkout_approval').eq('id', auth.orgId).single(),
     supabase.from('locations')             .select('*', { count: 'exact', head: true }).eq('org_id', auth.orgId),
     supabase.from('categories')            .select('*', { count: 'exact', head: true }).eq('org_id', auth.orgId),
     supabase.from('products')              .select('*', { count: 'exact', head: true }).eq('org_id', auth.orgId).eq('is_active', true),
@@ -39,6 +39,14 @@ export async function GET() {
     supabase.from('user_profiles')         .select('*', { count: 'exact', head: true }).eq('org_id', auth.orgId),
     supabase.from('fixed_assets')          .select('*', { count: 'exact', head: true }).eq('org_id', auth.orgId),
     supabase.from('inventory_transactions').select('*', { count: 'exact', head: true }).eq('org_id', auth.orgId),
+  ])
+
+  // Newer features worth pointing at once the basics are in place.
+  const [{ count: stockedCount }, { count: reportsToCount }] = await Promise.all([
+    supabase.from('products').select('*', { count: 'exact', head: true })
+      .eq('org_id', auth.orgId).eq('keep_in_stock', true),
+    supabase.from('user_profiles').select('*', { count: 'exact', head: true })
+      .eq('org_id', auth.orgId).not('reports_to', 'is', null),
   ])
 
   const named = !!org?.name && org.name.trim() !== '' && org.name.trim() !== 'My Company'
@@ -58,7 +66,7 @@ export async function GET() {
     {
       id:          'location',
       label:       'Add storage locations',
-      description: 'Where you keep stock and assets — warehouses, storerooms, vehicles, or job sites.',
+      description: 'Everywhere stock sits - warehouse, storeroom, each van. Knowing which van has the part is half the value.',
       done:        (locationCount ?? 0) > 0,
       href:        '/setup?tab=locations',
       cta:         'Add locations',
@@ -78,7 +86,7 @@ export async function GET() {
     {
       id:          'supplier',
       label:       'Add vendors',
-      description: 'The vendors you buy from — needed to raise purchase orders and receive stock.',
+      description: 'Who you buy from, with their lead times. Set a preferred vendor on each product and reorder drafts group themselves by supplier.',
       done:        (supplierCount ?? 0) > 0,
       href:        '/setup?tab=vendors',
       cta:         'Add vendors',
@@ -88,7 +96,7 @@ export async function GET() {
     {
       id:          'product',
       label:       'Import your products',
-      description: 'Bulk-import your catalog from CSV/Excel, or add items one at a time.',
+      description: 'Bring in your catalogue from a spreadsheet - name, SKU and unit are enough to start. Tick "keep in stock" on the ones you always hold.',
       done:        (productCount ?? 0) > 0,
       href:        '/setup?tab=products',
       cta:         'Add products',
@@ -98,7 +106,7 @@ export async function GET() {
     {
       id:          'stock',
       label:       'Record opening stock',
-      description: 'Enter what you currently have on hand so balances and valuation start accurate.',
+      description: 'Count what you have on hand today. From here the balances stay right on their own, because every receipt and issue updates them.',
       done:        (txnCount ?? 0) > 0,
       href:        '/transactions/new',
       cta:         'Record stock',
@@ -118,12 +126,32 @@ export async function GET() {
     {
       id:          'team',
       label:       'Invite your team',
-      description: 'Add coworkers and assign roles so they can log stock and receive purchase orders.',
+      description: 'Your crew logs materials from their phone; roles decide what each person can do. The person who orders cannot approve the receipt.',
       done:        (userCount ?? 0) > 1,
       href:        '/settings?tab=users',
       cta:         'Invite team',
       optional:    true,
       estMin:      2,
+    },
+    {
+      id:          'reorder',
+      label:       'Set reorder points',
+      description: 'Tick "keep this item in stock" and give it a level. Procurement is emailed when stock drops, and can raise the purchase order in a click.',
+      done:        (stockedCount ?? 0) > 0,
+      href:        '/setup?tab=products',
+      cta:         'Set levels',
+      optional:    true,
+      estMin:      4,
+    },
+    {
+      id:          'approvals',
+      label:       'Set who approves what',
+      description: 'Give each person a manager and a spending limit. Requests climb the line until someone has the authority to sign them off.',
+      done:        (reportsToCount ?? 0) > 0,
+      href:        '/settings?tab=users',
+      cta:         'Set approvals',
+      optional:    true,
+      estMin:      4,
     },
   ]
 
@@ -133,6 +161,7 @@ export async function GET() {
 
   return NextResponse.json({
     steps,
+    sampleLoaded: !!(org as any)?.sample_data,
     completedCount,
     totalSteps:     steps.length,
     requiredDone,
