@@ -126,6 +126,7 @@ select e.migration, e.tbl, e.col from (values
   ('products','keep_in_stock','migrate-keep-in-stock.sql'),
   ('organizations','sample_data','migrate-sample-data.sql'),
   ('organizations','lifecycle_emails','migrate-trial-emails.sql'),
+  ('organizations','retention_emails','migrate-retention.sql'),
   ('purchase_order_lines','requisition_item_id','migrate-requisition-po-link.sql'),
   ('purchase_orders','submitted_by','migrate-approval-chain.sql'),
   ('requisitions','current_approver_id','migrate-approval-chain.sql'),

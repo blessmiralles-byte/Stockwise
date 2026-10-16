@@ -289,6 +289,15 @@ Available under **Reports**:
 - When a trial ends or a subscription is cancelled, the account shows a paywall;
   data is preserved and access returns as soon as the owner reactivates.
 
+## How long data is kept
+- An **active account** keeps its data indefinitely.
+- A **paused account** - a trial that ended, or a subscription that lapsed -
+  keeps everything for **90 days**, then it is deleted. The owner is emailed at
+  60 days and again around 83 days first, and reactivating at any point stops
+  the clock. Paid, active accounts are never removed.
+- **Deleting your own account** removes the data within 30 days.
+- Download a complete copy any time from **Settings → Your data** (see below).
+
 ## Downloading your data
 - **Settings → Your data → Download my data** (owner or admin) builds one Excel
   workbook with a tab for each part of the account: products, stock on hand,

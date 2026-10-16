@@ -12,6 +12,10 @@
     {
       "path": "/api/notifications/trial",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/notifications/retention",
+      "schedule": "30 2 * * *"
     }
   ]
 }

@@ -402,3 +402,60 @@ export async function sendTrialEmail({
     html,
   })
 }
+
+// ── Retention warnings ────────────────────────────────────────────────────────
+import { retentionCopy, type RetentionAction } from '@/lib/retention'
+
+/**
+ * "Your data will be removed" — sent twice before an abandoned account is
+ * deleted, each one offering both ways out: come back, or take a copy.
+ */
+export async function sendRetentionWarning({
+  to, action, businessName, daysLeft,
+}: {
+  to: string | string[]
+  action: Exclude<RetentionAction, 'purge' | null>
+  businessName: string
+  daysLeft: number
+}) {
+  const copy = retentionCopy(action, { businessName, daysLeft })
+  const base = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.stocked.tech'
+  const final = action === 'warn_final'
+
+  const html = `
+    <!DOCTYPE html>
+    <html><head><meta charset="utf-8"></head>
+    <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f9fafb;margin:0;padding:20px;color:#111;">
+      <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+        <div style="background:${final ? '#b91c1c' : '#4f46e5'};color:#fff;padding:24px 32px;">
+          <h1 style="margin:0;font-size:20px;">${copy.heading}</h1>
+          <p style="margin:4px 0 0;font-size:14px;opacity:.85;">Stocked</p>
+        </div>
+        <div style="padding:24px 32px;">
+          <p style="margin:0 0 20px;font-size:14px;color:#374151;line-height:1.7;">${copy.lead}</p>
+          <a href="${base}/settings?tab=billing"
+             style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:14px;margin-right:8px;">
+            Keep my account →
+          </a>
+          <a href="${base}/settings?tab=general"
+             style="display:inline-block;border:1px solid #d1d5db;color:#374151;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:14px;">
+            Download my data
+          </a>
+          <p style="margin:20px 0 0;font-size:13px;color:#6b7280;line-height:1.7;">
+            Need more time, or want it gone sooner? Reply to this email and a person will sort it out.
+          </p>
+        </div>
+        <div style="padding:16px 32px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280;">
+          Sent because ${businessName}'s Stocked account has been paused. Paid accounts are never removed.
+        </div>
+      </div>
+    </body></html>`
+
+  return resend.emails.send({
+    from: process.env.RESEND_FROM_EMAIL ?? 'Stocked <notifications@stocked.tech>',
+    to,
+    replyTo: 'support@stocked.tech',
+    subject: copy.subject,
+    html,
+  })
+}

@@ -123,10 +123,25 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-lg font-semibold text-slate-800 mb-3">5. Data retention</h2>
             <p className="text-slate-600">
-              We retain your account data for as long as your account is active. If you delete your
-              account, we will delete your personal data within 30 days, except where we are
-              required to retain it for legal, tax, or fraud-prevention purposes. Aggregated,
-              anonymised analytics data may be retained indefinitely.
+              We keep your account data for as long as your account is active.
+            </p>
+            <p className="text-slate-600 mt-3">
+              <strong>If you delete your account</strong>, we delete your personal data within 30
+              days.
+            </p>
+            <p className="text-slate-600 mt-3">
+              <strong>If your account is paused</strong> — a trial that ended, or a subscription
+              that lapsed — we keep your data for <strong>90 days</strong> so you can pick up where
+              you left off, then delete it. We email the account owner at 60 days and again at
+              around 83 days before anything is removed, and you can download a complete copy of
+              your data at any time from Settings → Your data. Reactivating at any point stops the
+              clock.
+            </p>
+            <p className="text-slate-600 mt-3">
+              We keep data for longer only where the law requires it (tax, accounting or
+              fraud-prevention records). Aggregated, anonymised analytics may be retained
+              indefinitely, and a one-way hash of the email address that used a free trial is kept
+              so the same person cannot claim repeated trials.
             </p>
           </section>
 

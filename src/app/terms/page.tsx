@@ -186,8 +186,11 @@ export default function TermsPage() {
             <p className="text-slate-600">
               Either party may terminate the agreement at any time. We may suspend or terminate
               your account immediately for material breach of these Terms, non-payment, or
-              suspected fraudulent activity. Upon termination, your right to use the Service
-              ceases and we will delete your Customer Data within 30 days (subject to legal holds).
+              suspected fraudulent activity. Upon termination your right to use the Service ceases.
+              If you delete your account, we delete your Customer Data within 30 days. If your
+              account is simply paused — an expired trial or a lapsed subscription — we keep your
+              Customer Data for 90 days, having emailed you twice beforehand, and you may export a
+              complete copy at any time from Settings → Your data. Both are subject to legal holds.
             </p>
           </section>
 
