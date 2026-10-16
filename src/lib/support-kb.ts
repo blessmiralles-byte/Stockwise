@@ -289,6 +289,19 @@ Available under **Reports**:
 - When a trial ends or a subscription is cancelled, the account shows a paywall;
   data is preserved and access returns as soon as the owner reactivates.
 
+## Downloading your data
+- **Settings → Your data → Download my data** (owner or admin) builds one Excel
+  workbook with a tab for each part of the account: products, stock on hand,
+  stock movements, locations, vendors, purchase orders and lines, requisitions,
+  the approval trail, fixed assets, tool custody, losses, maintenance, stock
+  counts, cost centers, job codes, people, reorder alerts, the team list and the
+  audit log. A summary tab lists the row counts.
+- The tabs are linked by id (a stock movement names its product_id), so the file
+  can be imported into another system.
+- It contains no passwords, tokens or billing identifiers. Very large tables are
+  capped at 20,000 rows and the summary says so - email support@stocked.tech for
+  the rest.
+
 ## Account deletion
 - An owner deleting their account removes the organization and all its members.
 - A member deleting their own account removes only themselves.

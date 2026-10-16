@@ -11,7 +11,7 @@ import { useApi } from '@/lib/use-api'
 import { usePlan } from '@/lib/use-plan'
 import { UpgradePrompt, PlanBadge } from '@/components/billing/upgrade-prompt'
 import { Settings, Bell, Shield, Key, Send, CheckCircle2, AlertCircle, Loader2,
-  ToggleLeft, ToggleRight, Briefcase, CalendarRange, Plus, X, Lock, Unlock,
+  ToggleLeft, ToggleRight, Briefcase, CalendarRange, Plus, X, Lock, Unlock, Download,
   UserPlus, Building2, CreditCard, Zap, ExternalLink, Star, Trash2 } from 'lucide-react'
 import { PLAN_CONFIG, PAID_PLANS, isPaidPlan, isPricingRegion, monthlyPrice, annualPrice, type PlanKey, type PricingRegion } from '@/lib/plan-config'
 import { createClient } from '@/lib/supabase/client'
@@ -1438,12 +1438,63 @@ function SettingsInner() {
         </Section>
 
         {/* Danger zone — delete account */}
+        <ExportAccountSection role={profile?.role} />
+
         <DeleteAccountSection role={profile?.role} />
 
         </div>}  {/* end general tab */}
 
       </div>
     </div>
+  )
+}
+
+// ── Your data: download everything ────────────────────────────────────────────
+// Sits directly above the delete section on purpose: anyone about to remove
+// their account should be one click from keeping a copy first.
+function ExportAccountSection({ role }: { role?: string }) {
+  const canExport = role === 'owner' || role === 'admin'
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const download = async () => {
+    setBusy(true); setError('')
+    try {
+      const res = await fetch('/api/account/export')
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        setError(j.error ?? 'Could not build the export')
+        return
+      }
+      const blob = await res.blob()
+      const name = res.headers.get('content-disposition')?.match(/filename="(.+?)"/)?.[1]
+        ?? 'stocked-export.xlsx'
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = name; a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setError('Network error - please try again.')
+    } finally { setBusy(false) }
+  }
+
+  if (!canExport) return null
+
+  return (
+    <Section icon={Download} title="Your data" description="Download everything in this account as a spreadsheet">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <p className="text-sm text-slate-500 max-w-xl">
+          One Excel file with a tab for each part of your account - products, stock, movements,
+          purchase orders, assets, maintenance, the audit log and the rest. Yours to keep, whether
+          you are moving to another system, backing up, or just want a copy.
+        </p>
+        <Button onClick={download} disabled={busy} variant="outline" className="gap-2">
+          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          {busy ? 'Building your file…' : 'Download my data'}
+        </Button>
+      </div>
+      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+    </Section>
   )
 }
 
