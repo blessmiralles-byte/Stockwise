@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { publicLimiter } from '@/lib/rate-limit'
 import { requestPricingRegion } from '@/lib/pricing-region-server'
 import { isPricingRegion } from '@/lib/plan-config'
 
@@ -14,6 +15,11 @@ import { isPricingRegion } from '@/lib/plan-config'
  * checkout won't charge.
  */
 export async function GET(req: NextRequest) {
+  // Public and unauthenticated — the only handle we have is the caller's IP.
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anonymous'
+  const { ok } = await publicLimiter(ip)
+  if (!ok) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+
   const override = req.nextUrl.searchParams.get('region')
   const isProd   = process.env.VERCEL_ENV === 'production'
 

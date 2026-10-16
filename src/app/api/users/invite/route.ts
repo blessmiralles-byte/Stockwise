@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
 import { sendInviteEmail } from '@/lib/email'
+import { inviteLimiter } from '@/lib/rate-limit'
 
 /**
  * POST /api/users/invite
@@ -18,6 +19,13 @@ import { sendInviteEmail } from '@/lib/email'
 export async function POST(req: NextRequest) {
   const auth = await requireAnyRole('owner')
   if (auth.error) return auth.error
+
+  // Invites send mail to addresses we don't control; cap them so a compromised
+  // account can't be used as a mailer.
+  const { ok } = await inviteLimiter(auth.userId)
+  if (!ok) {
+    return NextResponse.json({ error: 'Too many invites just now — wait a minute and try again.' }, { status: 429 })
+  }
 
   if (!auth.orgId) {
     return NextResponse.json({ error: 'No organization found' }, { status: 400 })

@@ -338,3 +338,67 @@ export async function sendReorderAlert({
     html,
   })
 }
+
+// ── Trial lifecycle ───────────────────────────────────────────────────────────
+import { trialEmailCopy, type TrialEmailKind } from '@/lib/trial-lifecycle'
+
+/**
+ * One of the four trial emails (welcome, mid-trial nudge, last day, ended).
+ * Wording lives in lib/trial-lifecycle.ts so it can be tested; this is the
+ * wrapper that puts it in an envelope.
+ */
+export async function sendTrialEmail({
+  to, kind, businessName, daysLeft, monthly, setup,
+}: {
+  to: string | string[]
+  kind: TrialEmailKind
+  businessName: string
+  daysLeft?: number
+  monthly?: number
+  setup?: { products: number; transactions: number; users: number }
+}) {
+  const copy = trialEmailCopy(kind, { businessName, daysLeft, monthly, setup })
+  const base = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.stocked.tech'
+
+  // The welcome mail is the one place a short list of next steps earns its keep.
+  const checklist = kind === 'welcome' ? `
+    <ol style="margin:0 0 20px;padding-left:20px;font-size:14px;color:#374151;line-height:1.9;">
+      <li>Add your storage locations — warehouse, storeroom, each van.</li>
+      <li>Import your products from a spreadsheet.</li>
+      <li>Record what is on hand today; the balances keep themselves right after that.</li>
+    </ol>` : ''
+
+  const html = `
+    <!DOCTYPE html>
+    <html><head><meta charset="utf-8"></head>
+    <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f9fafb;margin:0;padding:20px;color:#111;">
+      <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+        <div style="background:#4f46e5;color:#fff;padding:24px 32px;">
+          <h1 style="margin:0;font-size:20px;">${copy.heading}</h1>
+          <p style="margin:4px 0 0;font-size:14px;opacity:.85;">Stocked</p>
+        </div>
+        <div style="padding:24px 32px;">
+          <p style="margin:0 0 16px;font-size:14px;color:#374151;line-height:1.7;">${copy.lead}</p>
+          ${checklist}
+          <a href="${base}${copy.ctaPath}"
+             style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:14px;">
+            ${copy.cta} →
+          </a>
+          <p style="margin:20px 0 0;font-size:13px;color:#6b7280;line-height:1.7;">
+            Stuck on anything? Reply to this email — it reaches a person.
+          </p>
+        </div>
+        <div style="padding:16px 32px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280;">
+          You are receiving this because you started a Stocked trial for ${businessName}.
+        </div>
+      </div>
+    </body></html>`
+
+  return resend.emails.send({
+    from: process.env.RESEND_FROM_EMAIL ?? 'Stocked <notifications@stocked.tech>',
+    to,
+    replyTo: 'support@stocked.tech',
+    subject: copy.subject,
+    html,
+  })
+}

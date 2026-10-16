@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { requireAuth } from '@/lib/api-auth'
+import { chatLimiter } from '@/lib/rate-limit'
 import { SUPPORT_KB } from '@/lib/support-kb'
 import { getExtraSupportKB } from '@/lib/support-kb-store'
 
@@ -49,6 +50,16 @@ function buildSystem(extraKB: string): string {
 export async function POST(req: NextRequest) {
   const auth = await requireAuth()
   if (auth.error) return auth.error
+
+  // Each message is a paid model call; a runaway client shouldn't be able to
+  // spend the budget in a loop.
+  const { ok } = await chatLimiter(auth.userId)
+  if (!ok) {
+    return NextResponse.json(
+      { error: 'You are sending messages very quickly — give it a minute, or email support@stocked.tech.' },
+      { status: 429 },
+    )
+  }
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json(

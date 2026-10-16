@@ -120,3 +120,12 @@ export const importLimiter = rateLimit({ windowMs: 60_000, max: 20 })
 
 /** General API limiter (120 req/min) */
 export const apiLimiter    = rateLimit({ windowMs: 60_000, max: 120 })
+
+/** Support chat — every message is a paid model call (15/min per user) */
+export const chatLimiter   = rateLimit({ windowMs: 60_000, max: 15 })
+
+/** Invites — sends mail to addresses we don't control (10/min per user) */
+export const inviteLimiter = rateLimit({ windowMs: 60_000, max: 10 })
+
+/** Unauthenticated endpoints, keyed by IP (60/min) */
+export const publicLimiter = rateLimit({ windowMs: 60_000, max: 60 })
