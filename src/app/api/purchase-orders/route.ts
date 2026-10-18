@@ -28,6 +28,10 @@ export async function GET(req: NextRequest) {
 
   if (status) query = query.eq('status', status)
   if (supplierId) query = query.eq('supplier_id', supplierId)
+  // "What is waiting on me?" — used by the phone app's task list.
+  if (searchParams.get('awaiting') === 'me') {
+    query = query.eq('current_approver_id', auth.userId).eq('status', 'pending_approval')
+  }
 
   const { data, error } = await query
   if (error) {
