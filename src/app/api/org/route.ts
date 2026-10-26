@@ -20,7 +20,7 @@ export async function GET() {
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('organizations')
-    .select('id, name, slug, plan, plan_status, trial_ends_at, max_users, require_checkout_approval, require_cost_dimension, block_checkout_when_overdue, pricing_region, currency, ls_subscription_id, created_at')
+    .select('id, name, slug, plan, plan_status, trial_ends_at, max_users, require_checkout_approval, require_cost_dimension, block_checkout_when_overdue, restrict_checkout_to_self, checkout_approval_over, pricing_region, currency, ls_subscription_id, created_at')
     .eq('id', auth.orgId)
     .single()
 
@@ -50,7 +50,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const allowed = ['name', 'require_checkout_approval', 'require_cost_dimension', 'block_checkout_when_overdue', 'currency']
+  const allowed = ['name', 'require_checkout_approval', 'require_cost_dimension', 'block_checkout_when_overdue', 'restrict_checkout_to_self', 'checkout_approval_over', 'currency']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]
@@ -63,6 +63,21 @@ export async function PATCH(req: NextRequest) {
   }
   if ('block_checkout_when_overdue' in updates) {
     updates.block_checkout_when_overdue = !!updates.block_checkout_when_overdue
+  }
+  if ('restrict_checkout_to_self' in updates) {
+    updates.restrict_checkout_to_self = !!updates.restrict_checkout_to_self
+  }
+  if ('checkout_approval_over' in updates) {
+    const v = updates.checkout_approval_over
+    if (v === null || v === '' || v === undefined) {
+      updates.checkout_approval_over = null
+    } else {
+      const n = Number(v)
+      if (!Number.isFinite(n) || n < 0) {
+        return NextResponse.json({ error: 'The approval threshold must be a non-negative amount' }, { status: 422 })
+      }
+      updates.checkout_approval_over = n
+    }
   }
   if ('currency' in updates) {
     // A label, not a conversion: amounts already recorded are not restated.
@@ -132,7 +147,7 @@ export async function PATCH(req: NextRequest) {
     .from('organizations')
     .update(updates)
     .eq('id', auth.orgId)
-    .select('id, name, slug, plan, plan_status, trial_ends_at, max_users, require_checkout_approval, require_cost_dimension, block_checkout_when_overdue, currency, ls_subscription_id, created_at')
+    .select('id, name, slug, plan, plan_status, trial_ends_at, max_users, require_checkout_approval, require_cost_dimension, block_checkout_when_overdue, restrict_checkout_to_self, checkout_approval_over, currency, ls_subscription_id, created_at')
     .single()
 
   if (error) {

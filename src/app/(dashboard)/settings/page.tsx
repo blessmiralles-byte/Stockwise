@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useApi } from '@/lib/use-api'
 import { usePlan } from '@/lib/use-plan'
-import { CURRENCIES, formatMoney } from '@/lib/currency'
+import { CURRENCIES, formatMoney, currencySymbol } from '@/lib/currency'
 import { UpgradePrompt, PlanBadge } from '@/components/billing/upgrade-prompt'
 import { Settings, Bell, Shield, Key, Send, CheckCircle2, AlertCircle, Loader2,
   ToggleLeft, ToggleRight, Briefcase, CalendarRange, Plus, X, Lock, Unlock, Download,
@@ -927,10 +927,16 @@ function OrgSettingsSection({ isAdmin }: { isAdmin: boolean }) {
   // Display currency: a label for amounts already recorded, never a conversion.
   const [currencyOverride, setCurrencyOverride] = useState<string | null>(null)
 
+  // Who may issue a tool to someone else, and above what value one needs approval
+  const [selfOnlyOverride, setSelfOnlyOverride] = useState<boolean | null>(null)
+  const [approvalOverOverride, setApprovalOverOverride] = useState<string | null>(null)
+
   const [costDimOverride, setCostDimOverride] = useState<boolean | null>(null)
   const requireCostDim = costDimOverride ?? !!data?.data?.require_cost_dimension
   const blockOverdue   = blockOverdueOverride ?? !!data?.data?.block_checkout_when_overdue
   const currency       = currencyOverride ?? data?.data?.currency ?? 'USD'
+  const selfOnly       = selfOnlyOverride ?? !!data?.data?.restrict_checkout_to_self
+  const approvalOver   = approvalOverOverride ?? (data?.data?.checkout_approval_over != null ? String(data.data.checkout_approval_over) : '')
 
   // Locked policies can still be switched OFF (e.g. after a downgrade), never ON.
   const { has } = usePlan()
@@ -949,6 +955,8 @@ function OrgSettingsSection({ isAdmin }: { isAdmin: boolean }) {
         require_checkout_approval: requireApproval,
         require_cost_dimension:    requireCostDim,
         block_checkout_when_overdue: blockOverdue,
+        restrict_checkout_to_self:   selfOnly,
+        checkout_approval_over:      approvalOver === '' ? null : Number(approvalOver),
         currency,
       }),
     })
@@ -1020,6 +1028,51 @@ function OrgSettingsSection({ isAdmin }: { isAdmin: boolean }) {
             >
               <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${requireApproval ? 'translate-x-5' : ''}`} />
             </button>
+          </div>
+        )}
+
+        {data?.data && (
+          <div className="flex items-start justify-between gap-4 rounded-lg border border-slate-200 p-3">
+            <div>
+              <p className="text-sm font-medium text-slate-700">Crew can only take tools for themselves</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                When on, a crew member checking out a tool is recorded as holding it themselves.
+                Owners, supervisors, buyers and the storekeeper can still issue a tool to anyone.
+                Remember to save.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={!isAdmin}
+              onClick={() => setSelfOnlyOverride(!selfOnly)}
+              className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${selfOnly ? 'bg-indigo-600' : 'bg-slate-300'} ${!isAdmin ? 'opacity-50' : ''}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${selfOnly ? 'translate-x-5' : ''}`} />
+            </button>
+          </div>
+        )}
+
+        {data?.data && (
+          <div className="rounded-lg border border-slate-200 p-3">
+            <label className="text-sm font-medium text-slate-700 block">Approval needed above</label>
+            <p className="text-xs text-slate-400 mt-0.5 mb-2">
+              Any tool worth more than this needs approving before it leaves, whether or not the
+              tool itself is marked that way — so nobody has to remember to tick the box on every
+              expensive item. Leave blank for no threshold. Uses the tool&apos;s book value.
+            </p>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-500">{currencySymbol(currency)}</span>
+              <Input
+                type="number"
+                min="0"
+                step="1"
+                value={approvalOver}
+                onChange={e => setApprovalOverOverride(e.target.value)}
+                disabled={!isAdmin}
+                placeholder="No threshold"
+                className="w-40"
+              />
+            </div>
           </div>
         )}
 

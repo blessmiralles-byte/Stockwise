@@ -1,7 +1,7 @@
 'use client'
 
 import { useMoney } from '@/lib/use-currency'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CardSkeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/lib/use-api'
+import { canIssueToOthers, approvalNeeded } from '@/lib/checkout-rules'
 import { formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import {
@@ -1137,7 +1138,19 @@ const CUSTODY_TONE: Record<Custody['tone'], string> = {
 // ── Check-out Dialog ──────────────────────────────────────────────────────────
 function CheckoutDialog({ asset, onClose, onDone }: { asset: any; onClose: () => void; onDone: (msg: string) => void }) {
   const { data: personData } = useApi<{ data: any[] }>('/api/accountable-persons')
+  const { data: orgData }     = useApi<{ data: any }>('/api/org')
+  const { data: profileData } = useApi<any>('/api/user/profile')
   const persons = personData?.data ?? []
+
+  // The server decides this too; doing it here as well means a crew member
+  // sees why the field is fixed instead of being refused after typing a name.
+  const myName  = profileData?.full_name ?? profileData?.email ?? ''
+  const selfOnly = !!orgData?.data?.restrict_checkout_to_self && !canIssueToOthers(profileData?.role)
+  const overThreshold = approvalNeeded(asset, {
+    approvalsEnabled: true,
+    approvalOver: orgData?.data?.checkout_approval_over,
+  })
+
   const [holder, setHolder]   = useState('')
   const [personId, setPersonId] = useState('')
   const [job, setJob]         = useState('')
@@ -1145,6 +1158,11 @@ function CheckoutDialog({ asset, onClose, onDone }: { asset: any; onClose: () =>
   const [notes, setNotes]     = useState('')
   const [saving, setSaving]   = useState(false)
   const [error, setError]     = useState('')
+
+  // Lock the holder to this person once we know the policy applies.
+  useEffect(() => {
+    if (selfOnly && myName) { setHolder(myName); setPersonId('') }
+  }, [selfOnly, myName])
 
   const submit = async () => {
     if (!holder.trim()) { setError('Enter who is taking the tool'); return }
@@ -1177,15 +1195,32 @@ function CheckoutDialog({ asset, onClose, onDone }: { asset: any; onClose: () =>
           </h2>
           <Button variant="ghost" size="icon" onClick={onClose}><X className="w-4 h-4" /></Button>
         </div>
-        {asset.requires_checkout_approval && (
-          <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-            <Lock className="w-3.5 h-3.5" /> This tool needs approval — a manager will confirm before it's released.
+        {(asset.requires_checkout_approval || overThreshold.required) && (
+          <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            <Lock className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+            <span>
+              {asset.requires_checkout_approval
+                ? 'This tool needs approval — a manager will confirm before it is released.'
+                : 'This tool is above the value your company allows without approval — a manager will confirm before it is released.'}
+            </span>
           </div>
         )}
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Who's taking it? <span className="text-red-500">*</span></label>
-            <Input value={holder} onChange={e => setHolder(e.target.value)} placeholder="Name of the person / crew" autoFocus />
+            <label className="block text-xs font-medium text-slate-600 mb-1">Who&apos;s taking it? <span className="text-red-500">*</span></label>
+            <Input
+              value={holder}
+              onChange={e => setHolder(e.target.value)}
+              placeholder="Name of the person / crew"
+              autoFocus={!selfOnly}
+              disabled={selfOnly}
+            />
+            {selfOnly && (
+              <p className="text-xs text-slate-400 mt-1">
+                Your company has tools signed out to the person taking them. A supervisor or the
+                storekeeper can issue one to someone else.
+              </p>
+            )}
             {persons.length > 0 && (
               <select
                 value={personId}

@@ -133,6 +133,21 @@ up for an organization is its Owner.
 - Members can carry an **employee number** as a reference.
 - Reports include **all tools currently checked out** and **tools grouped by
   crew name**.
+- **Who may issue a tool** (Settings → Organization, off by default): with
+  *"Crew can only take tools for themselves"* on, a crew member checking out a
+  tool is recorded as holding it themselves and cannot sign it out to someone
+  else. Owners, supervisors (operations), buyers (procurement) and the
+  storekeeper (receiver) can still issue a tool to anyone — that is the
+  "manager issues tools to staff" case. Taking a tool for yourself is always
+  allowed, whatever your role.
+- **Approval above a value** (Settings → Organization): set a threshold and any
+  tool worth more than it needs approving before it leaves, whether or not that
+  tool is individually marked as needing approval — so nobody has to remember
+  to tick the box on every expensive item. It uses the tool's current book
+  value, so a heavily depreciated item can fall below the line. Leave blank for
+  no threshold. Approvals are a **Pro** feature; on Starter nothing is held.
+- Whoever performs a check-out is recorded alongside the holder, so "issued by
+  X to Y" is always in the custody history.
 
 ## Inspections, calibration & certificates
 - A schedule can be a **Maintenance**, **Inspection** or **Calibration** job —
