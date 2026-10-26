@@ -57,6 +57,12 @@ export interface HolderDecision {
   holderPersonId: string | null
   /** True when the person took it for themselves. */
   isSelf: boolean
+  /**
+   * They named someone else and aren't a supervisor: this becomes a request
+   * for approval rather than a refusal, so a foreman can still ask for a tool
+   * on a crew member's behalf and the custody record names the right person.
+   */
+  needsApproval: boolean
 }
 
 /**
@@ -84,21 +90,31 @@ export function resolveHolder(
   if (selfRequested) {
     const name = asked || selfName
     if (!name) {
-      return { error: 'We need a name for whoever is taking this tool.', holderName: '', holderPersonId: null, isSelf: true }
+      return {
+        error: 'We need a name for whoever is taking this tool.',
+        holderName: '', holderPersonId: null, isSelf: true, needsApproval: false,
+      }
     }
-    return { error: null, holderName: name, holderPersonId: askedPerson ?? actor.personId ?? null, isSelf: true }
+    return {
+      error: null, holderName: name,
+      holderPersonId: askedPerson ?? actor.personId ?? null,
+      isSelf: true, needsApproval: false,
+    }
   }
 
   if (policy.restrictToSelf && !canIssueToOthers(actor.role)) {
-    return {
-      error: 'You can only check tools out to yourself. Ask a supervisor or the storekeeper to issue it to someone else.',
-      holderName: asked,
-      holderPersonId: askedPerson,
-      isSelf: false,
+    // Without approvals there is nobody to ask, so this has to be a refusal.
+    if (!policy.approvalsEnabled) {
+      return {
+        error: 'You can only check tools out to yourself. Ask a supervisor or the storekeeper to issue it to someone else.',
+        holderName: asked, holderPersonId: askedPerson, isSelf: false, needsApproval: false,
+      }
     }
+    // Otherwise it stands as a request on someone else's behalf.
+    return { error: null, holderName: asked, holderPersonId: askedPerson, isSelf: false, needsApproval: true }
   }
 
-  return { error: null, holderName: asked, holderPersonId: askedPerson, isSelf: false }
+  return { error: null, holderName: asked, holderPersonId: askedPerson, isSelf: false, needsApproval: false }
 }
 
 export interface ApprovalDecision {

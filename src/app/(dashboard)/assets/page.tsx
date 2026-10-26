@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { CardSkeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/lib/use-api'
 import { canIssueToOthers, approvalNeeded } from '@/lib/checkout-rules'
+import { planHasFeature } from '@/lib/entitlements'
 import { formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import {
@@ -1145,7 +1146,13 @@ function CheckoutDialog({ asset, onClose, onDone }: { asset: any; onClose: () =>
   // The server decides this too; doing it here as well means a crew member
   // sees why the field is fixed instead of being refused after typing a name.
   const myName  = profileData?.full_name ?? profileData?.email ?? ''
-  const selfOnly = !!orgData?.data?.restrict_checkout_to_self && !canIssueToOthers(profileData?.role)
+  const restricted = !!orgData?.data?.restrict_checkout_to_self && !canIssueToOthers(profileData?.role)
+  const approvalsOn = planHasFeature(orgData?.data?.plan, 'approvals')
+  // Restricted and approvals available: they may still ask for a tool on a
+  // crew member's behalf, it just waits for a supervisor. With no approvals
+  // there's nobody to ask, so the field stays locked to them.
+  const selfOnly   = restricted && !approvalsOn
+  const onBehalf   = restricted && approvalsOn
   const overThreshold = approvalNeeded(asset, {
     approvalsEnabled: true,
     approvalOver: orgData?.data?.checkout_approval_over,
@@ -1161,8 +1168,12 @@ function CheckoutDialog({ asset, onClose, onDone }: { asset: any; onClose: () =>
 
   // Lock the holder to this person once we know the policy applies.
   useEffect(() => {
-    if (selfOnly && myName) { setHolder(myName); setPersonId('') }
-  }, [selfOnly, myName])
+    if ((selfOnly || onBehalf) && myName) { setHolder(myName); setPersonId('') }
+  }, [selfOnly, onBehalf, myName])
+
+  // Naming anyone but themselves makes this a request, not a hand-out.
+  const forSomeoneElse =
+    onBehalf && !!holder.trim() && holder.trim().toLowerCase() !== myName.toLowerCase()
 
   const submit = async () => {
     if (!holder.trim()) { setError('Enter who is taking the tool'); return }
@@ -1181,7 +1192,7 @@ function CheckoutDialog({ asset, onClose, onDone }: { asset: any; onClose: () =>
       const j = await res.json()
       if (!res.ok) { setError(j.error ?? 'Failed to check out'); return }
       onDone(j.pending
-        ? `Checkout request sent for approval — ${asset.name}.`
+        ? `Request sent for approval — ${asset.name} for ${holder.trim()}.`
         : `${asset.name} checked out to ${holder.trim()}.`)
     } finally { setSaving(false) }
   }
@@ -1221,6 +1232,12 @@ function CheckoutDialog({ asset, onClose, onDone }: { asset: any; onClose: () =>
                 storekeeper can issue one to someone else.
               </p>
             )}
+            {onBehalf && (
+              <p className="text-xs text-slate-400 mt-1">
+                Leave your own name to take it yourself, or name someone else to request it on
+                their behalf — a supervisor approves that before the tool is released.
+              </p>
+            )}
             {persons.length > 0 && (
               <select
                 value={personId}
@@ -1251,7 +1268,7 @@ function CheckoutDialog({ asset, onClose, onDone }: { asset: any; onClose: () =>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={submit} disabled={saving} className="gap-2">
             {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            {asset.requires_checkout_approval ? 'Request checkout' : 'Check out'}
+            {asset.requires_checkout_approval || overThreshold.required || forSomeoneElse ? 'Request checkout' : 'Check out'}
           </Button>
         </div>
       </div>

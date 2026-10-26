@@ -63,6 +63,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // organization has said so.
   const { data: me } = await supabase
     .from('user_profiles').select('full_name, email').eq('id', auth.userId).maybeSingle()
+  const requesterName = (me as any)?.full_name ?? (me as any)?.email ?? 'Someone'
 
   const policy = {
     restrictToSelf:   (orgRow as any)?.restrict_checkout_to_self,
@@ -82,7 +83,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const holderName = holder.holderName
 
   const approval = approvalNeeded(asset as any, policy)
-  const needsApproval = approval.required
+  // Either the tool itself needs approving, or they asked for it on somebody
+  // else's behalf and aren't a supervisor. Either way it waits.
+  const needsApproval = approval.required || holder.needsApproval
+  const approvalReason = approval.reason
+    ?? (holder.needsApproval
+      ? `Issued to someone else — a supervisor needs to approve handing this to ${holderName}.`
+      : null)
   const jobLabel = String(body.job_code ?? body.job_reference ?? '').trim() || null
 
   const { data: checkout, error: coErr } = await supabase
@@ -140,7 +147,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         orgId:  auth.orgId,
         type:   'asset.checkout_request',
         title:  `Tool checkout needs approval — ${asset.asset_tag ?? ''} ${asset.name}`.trim(),
-        body:   `${holderName} requested ${asset.name}${jobLabel ? ` for ${jobLabel}` : ''}.`,
+        body:   holder.isSelf
+          ? `${holderName} requested ${asset.name}${jobLabel ? ` for ${jobLabel}` : ''}.`
+          : `${requesterName} requested ${asset.name} for ${holderName}${jobLabel ? ` on ${jobLabel}` : ''}.`,
         data:   { asset_id: id, checkout_id: checkout.id },
         actionUrl: '/assets',
       })
@@ -151,7 +160,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     data: { checkout_id: checkout.id, status: checkout.status },
     pending: needsApproval,
     // Why it is waiting, so the hold makes sense to whoever asked.
-    approval_reason: approval.reason ?? undefined,
+    approval_reason: approvalReason ?? undefined,
     // Allowed out, but the crew should know its check is due.
     warning: guard.reason ?? undefined,
   }, { status: 201 })

@@ -41,11 +41,61 @@ describe('settling who holds the tool', () => {
     expect(r.isSelf).toBe(true)
   })
 
-  // The control itself.
+  // The control itself: with nobody able to approve, it has to be a refusal.
   it('stops a crew member signing a tool out to somebody else', () => {
     const r = resolveHolder({ holderName: 'The new guy' }, crew, RESTRICT)
     expect(r.error).toMatch(/only check tools out to yourself/i)
     expect(r.error).toMatch(/supervisor|storekeeper/i)
+    expect(r.needsApproval).toBe(false)
+  })
+})
+
+// Requesting on someone else's behalf: the point is that custody records the
+// person actually holding the tool, not whoever happened to fetch it.
+describe('asking for a tool on someone else’s behalf', () => {
+  const RESTRICT_WITH_APPROVALS = { restrictToSelf: true, approvalsEnabled: true }
+
+  it('turns a crew member’s request for someone else into an approval', () => {
+    const r = resolveHolder({ holderName: 'Leo Park' }, crew, RESTRICT_WITH_APPROVALS)
+    expect(r.error).toBe(null)
+    expect(r.needsApproval).toBe(true)
+    expect(r.isSelf).toBe(false)
+    // Recorded against the person who ends up with it.
+    expect(r.holderName).toBe('Leo Park')
+  })
+
+  it('keeps the named person’s id, so the custody record points at them', () => {
+    const r = resolveHolder(
+      { holderName: 'Leo Park', holderPersonId: 'p-leo' }, crew, RESTRICT_WITH_APPROVALS)
+    expect(r.holderPersonId).toBe('p-leo')
+  })
+
+  it('asks for no approval when they take it themselves', () => {
+    const r = resolveHolder({ holderName: 'Sam Rivera' }, crew, RESTRICT_WITH_APPROVALS)
+    expect(r.needsApproval).toBe(false)
+    expect(r.isSelf).toBe(true)
+  })
+
+  it('does not make a supervisor wait to issue a tool', () => {
+    for (const actor of [store, boss]) {
+      const r = resolveHolder({ holderName: 'Leo Park' }, actor, RESTRICT_WITH_APPROVALS)
+      expect(r.error).toBe(null)
+      expect(r.needsApproval).toBe(false)
+    }
+  })
+
+  it('refuses rather than queues when there are no approvals to queue for', () => {
+    const r = resolveHolder({ holderName: 'Leo Park' }, crew,
+      { restrictToSelf: true, approvalsEnabled: false })
+    expect(r.error).toBeTruthy()
+    expect(r.needsApproval).toBe(false)
+  })
+
+  it('needs no approval at all when the restriction is off', () => {
+    const r = resolveHolder({ holderName: 'Leo Park' }, crew,
+      { restrictToSelf: false, approvalsEnabled: true })
+    expect(r.error).toBe(null)
+    expect(r.needsApproval).toBe(false)
   })
 
   it('lets the storekeeper and the supervisor issue to anyone', () => {

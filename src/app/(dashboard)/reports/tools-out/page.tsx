@@ -17,6 +17,15 @@ interface Checkout {
   checked_out_at?: string
   asset?:          { id: string; asset_tag?: string; name?: string }
   holder?:         { id: string; name?: string; employee_no?: string } | null
+  /** Who signed it out — the same person, or a supervisor acting for them. */
+  requester?:      { id: string; full_name?: string } | null
+}
+
+/** Only worth naming when somebody signed the tool out for someone else. */
+const issuedBy = (c: Checkout) => {
+  const by = (c.requester?.full_name ?? '').trim()
+  if (!by) return ''
+  return by.toLowerCase() === (c.holder_name ?? '').trim().toLowerCase() ? '' : by
 }
 
 const isOverdue = (c: Checkout) => !!c.due_at && new Date(c.due_at).getTime() < Date.now()
@@ -34,6 +43,7 @@ export default function ToolsOutReport() {
       (c.asset?.asset_tag ?? '').toLowerCase().includes(s) ||
       (c.holder_name ?? '').toLowerCase().includes(s) ||
       (c.holder?.employee_no ?? '').toLowerCase().includes(s) ||
+      (c.requester?.full_name ?? '').toLowerCase().includes(s) ||
       (c.job_code ?? '').toLowerCase().includes(s) ||
       (c.job_reference ?? '').toLowerCase().includes(s)
     )
@@ -42,12 +52,13 @@ export default function ToolsOutReport() {
   const overdueCount = all.filter(isOverdue).length
 
   const buildSheets = () => {
-    const header = ['Tool', 'Asset Tag', 'Assigned To', 'Employee No', 'Job', 'Checked Out', 'Due', 'Status']
+    const header = ['Tool', 'Asset Tag', 'Assigned To', 'Employee No', 'Issued By', 'Job', 'Checked Out', 'Due', 'Status']
     const body = rows.map(c => [
       c.asset?.name ?? '',
       c.asset?.asset_tag ?? '',
       c.holder_name ?? '',
       c.holder?.employee_no ?? '',
+      issuedBy(c),
       c.job_code || c.job_reference || '',
       c.checked_out_at ? formatDate(c.checked_out_at) : '',
       c.due_at ? formatDate(c.due_at) : '',
@@ -127,6 +138,9 @@ export default function ToolsOutReport() {
                             {c.holder_name || <span className="text-slate-400">—</span>}
                             {c.holder?.employee_no && (
                               <span className="ml-2 text-xs font-mono text-indigo-600">{c.holder.employee_no}</span>
+                            )}
+                            {issuedBy(c) && (
+                              <p className="text-xs text-slate-400">issued by {issuedBy(c)}</p>
                             )}
                           </td>
                           <td className="px-4 py-3 hidden md:table-cell text-slate-600">{c.job_code || c.job_reference || <span className="text-slate-300">—</span>}</td>
