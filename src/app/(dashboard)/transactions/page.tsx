@@ -1,5 +1,6 @@
 'use client'
 
+import { useMoney } from '@/lib/use-currency'
 import { useState, useCallback } from 'react'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent } from '@/components/ui/card'
@@ -8,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/lib/use-api'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import { Search, Plus, Download, ArrowRight, FileCheck, Trash2, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -94,6 +95,7 @@ function DraftsSection({ onPosted }: { onPosted: () => void }) {
 }
 
 export default function TransactionsPage() {
+  const { money } = useMoney()
   const [search, setSearch]       = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [tick, setTick]           = useState(0)
@@ -189,7 +191,7 @@ export default function TransactionsPage() {
                             {m.quantity > 0 ? `+${m.quantity}` : m.quantity}
                           </td>
                           <td className="px-4 py-3 text-right hidden md:table-cell text-slate-700">
-                            {formatCurrency(Math.abs(total))}
+                            {money(Math.abs(total))}
                           </td>
                           <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs">
                             {formatDate(m.created_at)}

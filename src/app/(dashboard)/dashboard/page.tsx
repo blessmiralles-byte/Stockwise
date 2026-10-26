@@ -1,12 +1,13 @@
 'use client'
 
+import { useMoney } from '@/lib/use-currency'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CardSkeleton, Skeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/lib/use-api'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import {
   Package, AlertTriangle, TrendingUp, Building2,
   Wrench, ArrowUpRight, ScanBarcode, ArrowLeftRight,
@@ -23,6 +24,7 @@ const typeColors: Record<string, string> = {
 }
 
 export default function DashboardPage() {
+  const { money } = useMoney()
   const { data, loading }                        = useApi<any>('/api/dashboard')
   const { data: onboarding, refetch: refetchOB } = useApi<any>('/api/onboarding/status')
 
@@ -33,7 +35,7 @@ export default function DashboardPage() {
       change: `${data.low_stock_count} low stock`,
     },
     {
-      label: 'Inventory Value', value: formatCurrency(data.total_inventory_value),
+      label: 'Inventory Value', value: money(data.total_inventory_value),
       icon: TrendingUp, color: 'bg-green-50 text-green-600',
       change: `${data.out_of_stock_count} out of stock`,
     },
@@ -194,7 +196,7 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-semibold text-slate-900">{formatCurrency(tx.quantity * tx.unit_cost)}</p>
+                        <p className="text-sm font-semibold text-slate-900">{money(tx.quantity * tx.unit_cost)}</p>
                         <p className="text-xs text-slate-400">qty: {tx.quantity}</p>
                       </div>
                     </div>

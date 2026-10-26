@@ -1,5 +1,6 @@
 'use client'
 
+import { useMoney } from '@/lib/use-currency'
 import { useState, useEffect } from 'react'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/lib/use-api'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import { PurchaseOrder, PurchaseOrderLine, Supplier, Product } from '@/types'
 import {
   Plus, Search, X, ChevronRight, Package, Truck, CheckCircle2,
@@ -151,6 +152,7 @@ function InlineNewItemForm({
 
 // ── New PO Drawer ─────────────────────────────────────────────────────────────
 function NewPODrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const { money } = useMoney()
   const { data: suppData } = useApi<{ data: Supplier[] }>('/api/suppliers')
   const [prodSearch,    setProdSearch]   = useState('')
   const [products,      setProducts]     = useState<Product[]>([])
@@ -348,7 +350,7 @@ function NewPODrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
                       ))}
                       <tr className="border-t border-slate-200 bg-slate-50">
                         <td colSpan={2} className="px-3 py-2 text-xs font-semibold text-slate-600 text-right">Total</td>
-                        <td className="px-3 py-2 text-right font-bold text-slate-900">{formatCurrency(total)}</td>
+                        <td className="px-3 py-2 text-right font-bold text-slate-900">{money(total)}</td>
                         <td></td>
                       </tr>
                     </tbody>
@@ -376,6 +378,7 @@ function NewPODrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function PurchaseOrdersPage() {
+  const { money } = useMoney()
   const [statusFilter, setStatusFilter] = useState('all')
   const [search, setSearch]             = useState('')
   const [showNew, setShowNew]           = useState(false)
@@ -452,7 +455,7 @@ export default function PurchaseOrdersPage() {
                             {o.supplier && <p className="text-xs text-slate-400">{o.supplier.lead_time_days}d lead time</p>}
                           </td>
                           <td className="px-4 py-3 text-right text-slate-600 hidden md:table-cell">{(o.lines ?? []).length}</td>
-                          <td className="px-4 py-3 text-right font-semibold text-slate-900 hidden lg:table-cell">{formatCurrency(total)}</td>
+                          <td className="px-4 py-3 text-right font-semibold text-slate-900 hidden lg:table-cell">{money(total)}</td>
                           <td className="px-4 py-3 text-slate-500 text-xs hidden md:table-cell">{o.order_date ? formatDate(o.order_date) : '—'}</td>
                           <td className="px-4 py-3 text-slate-500 text-xs hidden lg:table-cell">{o.expected_date ? formatDate(o.expected_date) : '—'}</td>
                           <td className="px-4 py-3 text-center">

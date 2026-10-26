@@ -1,5 +1,6 @@
 'use client'
 
+import { useMoney } from '@/lib/use-currency'
 import { useState, useMemo } from 'react'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent } from '@/components/ui/card'
@@ -8,7 +9,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/lib/use-api'
-import { formatCurrency } from '@/lib/utils'
 import {
   TrendingUp, AlertTriangle, Search, Info, ShoppingCart, BarChart2, RefreshCw,
 } from 'lucide-react'
@@ -57,6 +57,7 @@ const LOOKBACK_OPTIONS  = [{ value: 30, label: '30 days' }, { value: 60, label: 
 const FORECAST_OPTIONS  = [{ value: 14, label: '2 weeks' }, { value: 30, label: '30 days' }, { value: 60, label: '60 days' }, { value: 90, label: '90 days' }]
 
 export default function ForecastingPage() {
+  const { money } = useMoney()
   const [daysBack,      setDaysBack]      = useState(90)
   const [forecastDays,  setForecastDays]  = useState(30)
   const [statusFilter,  setStatusFilter]  = useState('all')
@@ -169,7 +170,7 @@ export default function ForecastingPage() {
                   <ShoppingCart className="w-4 h-4 text-indigo-500" />
                   <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Projected Demand</span>
                 </div>
-                <p className="text-2xl font-bold text-indigo-700">{formatCurrency(summary.total_projected_value ?? 0)}</p>
+                <p className="text-2xl font-bold text-indigo-700">{money(summary.total_projected_value ?? 0)}</p>
                 <p className="text-xs text-slate-400 mt-0.5">Next {forecastDays} days</p>
               </CardContent>
             </Card>
@@ -179,7 +180,7 @@ export default function ForecastingPage() {
                   <BarChart2 className="w-4 h-4 text-green-500" />
                   <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Reorder Value</span>
                 </div>
-                <p className="text-2xl font-bold text-green-700">{formatCurrency(summary.total_reorder_value ?? 0)}</p>
+                <p className="text-2xl font-bold text-green-700">{money(summary.total_reorder_value ?? 0)}</p>
                 <p className="text-xs text-slate-400 mt-0.5">{needsReorder.length} items need restocking</p>
               </CardContent>
             </Card>
@@ -292,7 +293,7 @@ export default function ForecastingPage() {
                           {/* Projected demand */}
                           <td className="px-4 py-3 text-right">
                             <span className="font-semibold text-indigo-700 tabular-nums">{r.projected_qty.toLocaleString()}</span>
-                            <span className="block text-xs text-slate-400 tabular-nums">{formatCurrency(r.projected_value)}</span>
+                            <span className="block text-xs text-slate-400 tabular-nums">{money(r.projected_value)}</span>
                           </td>
 
                           {/* Current stock */}

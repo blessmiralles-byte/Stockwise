@@ -6,6 +6,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { billingState } from '@/lib/billing'
 import { resolveOrgPricingRegion } from '@/lib/pricing-region-server'
 import { enforceTrialClaim } from '@/lib/trial-claims'
+import { CurrencyProvider } from '@/lib/use-currency'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   // Access gate: an org whose trial has ended or whose subscription was
@@ -14,6 +15,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   let plan: string | null = null
+  let currency: string | null = null
 
   if (user) {
     const service = createServiceClient()
@@ -26,12 +28,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
     if (profile?.org_id) {
       const { data: org } = await service
         .from('organizations')
-        .select('id, plan, plan_status, trial_ends_at, ls_subscription_id, pricing_region, trial_checked_at, trial_reused')
+        .select('id, plan, plan_status, trial_ends_at, ls_subscription_id, pricing_region, trial_checked_at, trial_reused, currency')
         .eq('id', profile.org_id)
         .single()
 
       if (org) {
         plan = org.plan
+        currency = (org as any).currency ?? null
 
         // One free trial per person: a repeat signup (same email, new account
         // after deleting the old one) starts with its trial already expired.
@@ -57,10 +60,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50">
-      <Sidebar plan={plan} />
-      <main className="flex-1 overflow-y-auto bg-slate-50">{children}</main>
-      <SupportChat />
-    </div>
+    <CurrencyProvider currency={currency}>
+      <div className="flex h-screen overflow-hidden bg-slate-50">
+        <Sidebar plan={plan} />
+        <main className="flex-1 overflow-y-auto bg-slate-50">{children}</main>
+        <SupportChat />
+      </div>
+    </CurrencyProvider>
   )
 }

@@ -1,5 +1,6 @@
 'use client'
 
+import { useMoney } from '@/lib/use-currency'
 import { useState, use, useEffect } from 'react'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -10,7 +11,7 @@ import { useApi } from '@/lib/use-api'
 import { usePlan } from '@/lib/use-plan'
 import { ApprovalTrail, approveLabel } from '@/components/approvals/approval-trail'
 import { RequestedVsOrdered } from '@/components/purchase-orders/requested-vs-ordered'
-import { formatCurrency, formatDate, receivableCap } from '@/lib/utils'
+import { formatDate, receivableCap } from '@/lib/utils'
 import { PurchaseOrder, Location } from '@/types'
 import { ArrowLeft, Truck, CheckCircle2, Send, X, FileText, AlertTriangle, Scale, Loader2, Plus, Trash2, Download, PackagePlus } from 'lucide-react'
 import Link from 'next/link'
@@ -532,6 +533,7 @@ function OrderLinesCard({ po, products, categories, poId, onUpdated, onProductCr
   po: PurchaseOrder; products: any[]; categories: { id: string; name: string }[];
   poId: string; onUpdated: () => void; onProductCreated: (product: any) => void
 }) {
+  const { money } = useMoney()
   const canEdit = po.status !== 'received' && po.status !== 'cancelled'
   const isDraft = po.status === 'draft'
 
@@ -605,8 +607,8 @@ function OrderLinesCard({ po, products, categories, poId, onUpdated, onProductCr
                     <td className={`px-4 py-3 text-right tabular-nums font-semibold ${outstanding > 0 ? 'text-orange-600' : 'text-slate-400'}`}>
                       {outstanding}
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(l.unit_cost)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold">{formatCurrency(l.quantity_ordered * l.unit_cost)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{money(l.unit_cost)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold">{money(l.quantity_ordered * l.unit_cost)}</td>
                     {isDraft && (
                       <td className="px-3 py-3">
                         {l.quantity_received === 0 && (
@@ -705,7 +707,7 @@ function OrderLinesCard({ po, products, categories, poId, onUpdated, onProductCr
                     />
                   </td>
                   <td className="px-2 py-2 text-right tabular-nums text-sm text-slate-500">
-                    {newQty && newCost ? formatCurrency(parseFloat(newQty) * parseFloat(newCost)) : '—'}
+                    {newQty && newCost ? money(parseFloat(newQty) * parseFloat(newCost)) : '—'}
                   </td>
                   <td className="px-3 py-2">
                     <Button size="sm" onClick={addLine} disabled={adding} className="gap-1 h-8 px-2.5">
@@ -718,7 +720,7 @@ function OrderLinesCard({ po, products, categories, poId, onUpdated, onProductCr
 
               <tr className="border-t-2 border-slate-200 bg-slate-50">
                 <td colSpan={isDraft ? 5 : 5} className="px-4 py-3 text-right font-bold text-slate-700">Total</td>
-                <td className="px-4 py-3 text-right font-bold text-slate-900">{formatCurrency(total)}</td>
+                <td className="px-4 py-3 text-right font-bold text-slate-900">{money(total)}</td>
                 {isDraft && <td />}
               </tr>
             </tbody>
@@ -745,6 +747,7 @@ function OrderLinesCard({ po, products, categories, poId, onUpdated, onProductCr
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function PODetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { money } = useMoney()
   const { id } = use(params)
   const [showGRN, setShowGRN]       = useState(false)
   const [grnSuccess, setGrnSuccess] = useState('')
@@ -870,7 +873,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
               <div key={col.label} className="bg-slate-50 rounded-xl p-3 text-center">
                 <p className="text-xs text-slate-500 mb-1">{col.label}</p>
                 <p className={`text-lg font-bold ${col.color}`}>
-                  {col.value !== null ? formatCurrency(col.value) : '—'}
+                  {col.value !== null ? money(col.value) : '—'}
                 </p>
                 <p className="text-xs text-slate-400 mt-0.5">{col.note}</p>
               </div>
@@ -886,7 +889,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
               }
               {matched
                 ? 'Invoice matches goods received — cleared for payment.'
-                : `Variance: ${formatCurrency(Math.abs(variance))} ${overInv ? '(invoice exceeds GRN — query with vendor before paying)' : '(invoice below GRN — partial invoice or credit note expected)'}`
+                : `Variance: ${money(Math.abs(variance))} ${overInv ? '(invoice exceeds GRN — query with vendor before paying)' : '(invoice below GRN — partial invoice or credit note expected)'}`
               }
             </div>
           )}
@@ -1041,7 +1044,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
             {po.status === 'pending_approval' && !statusError && (
               <div className="mt-4 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-700">
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                Awaiting approval — total {formatCurrency(total)}. It goes through the submitter&apos;s reporting
+                Awaiting approval — total {money(total)}. It goes through the submitter&apos;s reporting
                 line until someone whose PO limit covers the amount approves it.
               </div>
             )}

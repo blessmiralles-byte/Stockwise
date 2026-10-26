@@ -28,6 +28,12 @@ up for an organization is its Owner.
 - The **Getting Started** page walks a new owner through first setup: adding
   vendors, products, locations, and inviting the team.
 - To change your organization name, go to **Settings → Organization**.
+- **Currency:** set it in **Settings → Organization → Currency**. Every amount
+  in the app, in reports and in exports is then labelled with it. Stocked does
+  **not convert between currencies** - an organization records its costs in one
+  currency, and changing this setting relabels what is displayed, it does not
+  restate anything already entered. Existing accounts stay on US dollars.
+- Prices for your Stocked subscription are always in USD, separately from this.
 - **Managing members (Settings → Users, owner only):** change someone's role
   from the Role dropdown; click **edit** in the Approvals column to change their
   name, job title, reporting line and approval limits. Members who haven't set

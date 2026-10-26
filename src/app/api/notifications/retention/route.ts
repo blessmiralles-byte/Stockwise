@@ -74,7 +74,7 @@ async function run(dryRun: boolean) {
       }
       continue
     }
-    if (!inactiveFrom(org)) continue
+    if (!inactiveFrom(org, today)) continue
 
     const action = retentionAction(org, today)
     if (!action) continue

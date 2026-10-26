@@ -47,10 +47,13 @@ export function daysSince(from: string | Date, today: string | Date = new Date()
  * A cancelled subscription dates from when the job first noticed, which is
  * conservative: the clock starts later rather than earlier.
  */
-export function inactiveFrom(org: RetentionOrg): string | null {
+export function inactiveFrom(org: RetentionOrg, today: string | Date = new Date()): string | null {
   if (org.plan_status === 'cancelled') return org.inactive_since ?? null
   if (org.plan === 'trial' && org.trial_ends_at) {
-    const ended = daysSince(org.trial_ends_at) > 0
+    // Measured against the date we were given, not the system clock — otherwise
+    // this disagrees with the rest of the calculation whenever a caller is
+    // reasoning about a different day.
+    const ended = daysSince(org.trial_ends_at, today) > 0
     return ended ? org.trial_ends_at : null
   }
   return null
@@ -67,7 +70,7 @@ export function retentionAction(org: RetentionOrg, today: string | Date = new Da
   // An active paid plan is live, full stop.
   if (org.plan !== 'trial' && org.plan_status !== 'cancelled') return null
 
-  const from = inactiveFrom(org)
+  const from = inactiveFrom(org, today)
   if (!from) return null
 
   const days = daysSince(from, today)
@@ -88,7 +91,7 @@ export function retentionAction(org: RetentionOrg, today: string | Date = new Da
 
 /** Days left before removal, for the warning email. */
 export function daysUntilPurge(org: RetentionOrg, today: string | Date = new Date()): number {
-  const from = inactiveFrom(org)
+  const from = inactiveFrom(org, today)
   if (!from) return RETENTION.purgeDay
   return Math.max(0, RETENTION.purgeDay - daysSince(from, today))
 }

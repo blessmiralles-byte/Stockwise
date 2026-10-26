@@ -1,5 +1,6 @@
 'use client'
 
+import { useMoney } from '@/lib/use-currency'
 import { useState } from 'react'
 import { Topbar } from '@/components/layout/topbar'
 import { ExportButtons } from '@/components/reports/export-buttons'
@@ -7,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useApi } from '@/lib/use-api'
-import { formatCurrency } from '@/lib/utils'
 import { BarChart2, TrendingUp, TrendingDown, Package, AlertTriangle, Printer } from 'lucide-react'
 
 function SummaryCard({ label, value, sub, color, icon: Icon }: {
@@ -28,6 +28,7 @@ function SummaryCard({ label, value, sub, color, icon: Icon }: {
 }
 
 export default function ValuationReportPage() {
+  const { money } = useMoney()
   // Default to current month
   const now = new Date()
   const firstDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
@@ -116,34 +117,34 @@ export default function ValuationReportPage() {
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
               <SummaryCard
                 label="Opening Stock"
-                value={formatCurrency(summary.opening_value)}
+                value={money(summary.opening_value)}
                 color="text-slate-700"
                 icon={Package}
               />
               <SummaryCard
                 label="Purchases"
-                value={formatCurrency(summary.purchases_value)}
+                value={money(summary.purchases_value)}
                 sub="Stock received"
                 color="text-green-600"
                 icon={TrendingUp}
               />
               <SummaryCard
                 label="Issues / COGS"
-                value={formatCurrency(summary.issues_value)}
+                value={money(summary.issues_value)}
                 sub="Consumed + sold"
                 color="text-red-600"
                 icon={TrendingDown}
               />
               <SummaryCard
                 label="Adjustments"
-                value={formatCurrency(Math.abs(summary.adjustments_value))}
+                value={money(Math.abs(summary.adjustments_value))}
                 sub={summary.adjustments_value >= 0 ? 'Net positive' : 'Net negative'}
                 color="text-yellow-600"
                 icon={AlertTriangle}
               />
               <SummaryCard
                 label="Closing Stock"
-                value={formatCurrency(summary.closing_value)}
+                value={money(summary.closing_value)}
                 sub="Current balance"
                 color="text-indigo-700"
                 icon={BarChart2}
@@ -162,13 +163,13 @@ export default function ValuationReportPage() {
 
             {/* Reconciliation formula */}
             <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-4 py-3 text-sm text-indigo-700 font-mono">
-              {formatCurrency(summary.opening_value)}
-              {' + '}{formatCurrency(summary.purchases_value)}
-              {' − '}{formatCurrency(summary.issues_value)}
+              {money(summary.opening_value)}
+              {' + '}{money(summary.purchases_value)}
+              {' − '}{money(summary.issues_value)}
               {summary.adjustments_value !== 0 && (
-                <>{' '}{summary.adjustments_value >= 0 ? '+' : '−'}{' '}{formatCurrency(Math.abs(summary.adjustments_value))}</>
+                <>{' '}{summary.adjustments_value >= 0 ? '+' : '−'}{' '}{money(Math.abs(summary.adjustments_value))}</>
               )}
-              {' = '}<strong>{formatCurrency(summary.closing_value)}</strong>
+              {' = '}<strong>{money(summary.closing_value)}</strong>
             </div>
 
             {/* Product breakdown */}
@@ -204,10 +205,10 @@ export default function ValuationReportPage() {
                             <p className="text-xs text-slate-400 font-mono">{l.product?.sku}</p>
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">{l.product?.category?.name ?? '—'}</td>
-                          <td className="px-4 py-3 text-right tabular-nums text-slate-500 hidden lg:table-cell">{formatCurrency(l.opening_value ?? 0)}</td>
-                          <td className="px-4 py-3 text-right tabular-nums text-green-700 font-medium">{formatCurrency(l.purchases_value)}</td>
-                          <td className="px-4 py-3 text-right tabular-nums text-red-600">{formatCurrency(l.issues_value)}</td>
-                          <td className="px-4 py-3 text-right tabular-nums font-bold text-indigo-700">{formatCurrency(l.closing_value)}</td>
+                          <td className="px-4 py-3 text-right tabular-nums text-slate-500 hidden lg:table-cell">{money(l.opening_value ?? 0)}</td>
+                          <td className="px-4 py-3 text-right tabular-nums text-green-700 font-medium">{money(l.purchases_value)}</td>
+                          <td className="px-4 py-3 text-right tabular-nums text-red-600">{money(l.issues_value)}</td>
+                          <td className="px-4 py-3 text-right tabular-nums font-bold text-indigo-700">{money(l.closing_value)}</td>
                           <td className="px-4 py-3 text-right tabular-nums text-slate-600 hidden lg:table-cell">
                             {l.closing_qty?.toLocaleString()} <span className="text-slate-400 text-xs">{l.product?.unit_of_measure}</span>
                           </td>

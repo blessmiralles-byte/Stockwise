@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useApi } from '@/lib/use-api'
 import { usePlan } from '@/lib/use-plan'
+import { CURRENCIES, formatMoney } from '@/lib/currency'
 import { UpgradePrompt, PlanBadge } from '@/components/billing/upgrade-prompt'
 import { Settings, Bell, Shield, Key, Send, CheckCircle2, AlertCircle, Loader2,
   ToggleLeft, ToggleRight, Briefcase, CalendarRange, Plus, X, Lock, Unlock, Download,
@@ -923,9 +924,13 @@ function OrgSettingsSection({ isAdmin }: { isAdmin: boolean }) {
   // Refuse check-out of kit whose inspection is overdue or certificate expired
   const [blockOverdueOverride, setBlockOverdueOverride] = useState<boolean | null>(null)
 
+  // Display currency: a label for amounts already recorded, never a conversion.
+  const [currencyOverride, setCurrencyOverride] = useState<string | null>(null)
+
   const [costDimOverride, setCostDimOverride] = useState<boolean | null>(null)
   const requireCostDim = costDimOverride ?? !!data?.data?.require_cost_dimension
   const blockOverdue   = blockOverdueOverride ?? !!data?.data?.block_checkout_when_overdue
+  const currency       = currencyOverride ?? data?.data?.currency ?? 'USD'
 
   // Locked policies can still be switched OFF (e.g. after a downgrade), never ON.
   const { has } = usePlan()
@@ -944,6 +949,7 @@ function OrgSettingsSection({ isAdmin }: { isAdmin: boolean }) {
         require_checkout_approval: requireApproval,
         require_cost_dimension:    requireCostDim,
         block_checkout_when_overdue: blockOverdue,
+        currency,
       }),
     })
     const json = await res.json()
@@ -969,6 +975,32 @@ function OrgSettingsSection({ isAdmin }: { isAdmin: boolean }) {
               placeholder="Your company name"
             />
             {orgError && <p className="text-xs text-red-600 mt-1">{orgError}</p>}
+          </div>
+        )}
+
+        {data?.data && (
+          <div>
+            <label className="text-sm font-medium text-slate-700 block mb-1">Currency</label>
+            <div className="flex items-center gap-3 flex-wrap">
+              <select
+                value={currency}
+                onChange={e => setCurrencyOverride(e.target.value)}
+                disabled={!isAdmin}
+                className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+              >
+                {CURRENCIES.map(c => (
+                  <option key={c.code} value={c.code}>{c.code} — {c.name}</option>
+                ))}
+              </select>
+              <span className="text-xs text-slate-500">
+                Amounts will show as <span className="font-medium text-slate-700">{formatMoney(1234.5, currency)}</span>
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1.5">
+              The currency you buy and sell in. Stocked labels your figures with it — it never
+              converts between currencies, so changing this does not restate anything you have
+              already recorded. Remember to save.
+            </p>
           </div>
         )}
 

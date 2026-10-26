@@ -20,15 +20,15 @@ const cancelled = (daysAgo: number, emails: Record<string, string> = {}): Retent
 
 describe('when the clock starts', () => {
   it('runs a lapsed trial from the day it ended', () => {
-    expect(inactiveFrom(lapsedTrial(30))).toBe(day(-30))
+    expect(inactiveFrom(lapsedTrial(30), TODAY)).toBe(day(-30))
   })
 
   it('has not started for a trial still running', () => {
-    expect(inactiveFrom({ ...lapsedTrial(0), trial_ends_at: day(5) })).toBe(null)
+    expect(inactiveFrom({ ...lapsedTrial(0), trial_ends_at: day(5) }, TODAY)).toBe(null)
   })
 
   it('runs a cancelled plan from when we first noticed', () => {
-    expect(inactiveFrom(cancelled(10))).toBe(day(-10))
+    expect(inactiveFrom(cancelled(10), TODAY)).toBe(day(-10))
   })
 
   it('counts days by date', () => {

@@ -1,10 +1,10 @@
 'use client'
 
+import { useMoney } from '@/lib/use-currency'
 import { useState } from 'react'
 import { Topbar } from '@/components/layout/topbar'
 import { downloadExcel } from '@/lib/export-sheet'
 import { Button } from '@/components/ui/button'
-import { formatCurrency } from '@/lib/utils'
 import {
   Download, Loader2, RefreshCw, BookOpen,
   AlertCircle, CheckCircle2, Info,
@@ -61,6 +61,7 @@ function defaultDates() {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function AccountingExportPage() {
+  const { money } = useMoney()
   const def = defaultDates()
   const [from,        setFrom]        = useState(def.from)
   const [to,          setTo]          = useState(def.to)
@@ -279,12 +280,12 @@ export default function AccountingExportPage() {
             <div className="w-px h-8 bg-slate-200" />
             <div>
               <p className="text-xs text-slate-400">Total debits</p>
-              <p className="text-lg font-bold text-slate-900">{formatCurrency(summary.total)}</p>
+              <p className="text-lg font-bold text-slate-900">{money(summary.total)}</p>
             </div>
             <div className="w-px h-8 bg-slate-200" />
             <div>
               <p className="text-xs text-slate-400">Total credits</p>
-              <p className="text-lg font-bold text-slate-900">{formatCurrency(summary.total)}</p>
+              <p className="text-lg font-bold text-slate-900">{money(summary.total)}</p>
             </div>
             <div className="ml-auto flex items-center gap-1.5 text-xs text-green-600 font-medium">
               <CheckCircle2 className="w-4 h-4" /> Balanced
@@ -333,7 +334,7 @@ export default function AccountingExportPage() {
                         {' '}{e.credit_account}
                       </td>
                       <td className="px-4 py-2.5 text-right font-mono font-semibold text-slate-900">
-                        {formatCurrency(e.amount)}
+                        {money(e.amount)}
                       </td>
                     </tr>
                   ))
@@ -343,7 +344,7 @@ export default function AccountingExportPage() {
                 <tr>
                   <td colSpan={6} className="px-4 py-2.5 text-xs font-semibold text-slate-500">Total</td>
                   <td className="px-4 py-2.5 text-right font-mono font-bold text-slate-900">
-                    {formatCurrency(summary?.total ?? 0)}
+                    {money(summary?.total ?? 0)}
                   </td>
                 </tr>
               </tfoot>

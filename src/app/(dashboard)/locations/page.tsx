@@ -1,5 +1,6 @@
 'use client'
 
+import { useMoney } from '@/lib/use-currency'
 import { useState } from 'react'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent } from '@/components/ui/card'
@@ -7,7 +8,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CardSkeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/lib/use-api'
-import { formatCurrency } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import {
   Search, Plus, MapPin, Package, DollarSign,
@@ -237,6 +237,7 @@ function LocationRow({
   onEdit:   (loc: Loc) => void
   onDelete: (loc: Loc) => void
 }) {
+  const { money } = useMoney()
   const [open, setOpen] = useState(depth === 0)
   const kids = children[loc.id] ?? []
   const hasKids = kids.length > 0
@@ -304,7 +305,7 @@ function LocationRow({
             </div>
             <div className="text-right">
               <p className="text-xs text-slate-400">Value</p>
-              <p className="font-semibold text-sm text-slate-900">{formatCurrency(loc.value ?? 0)}</p>
+              <p className="font-semibold text-sm text-slate-900">{money(loc.value ?? 0)}</p>
             </div>
           </div>
         )}

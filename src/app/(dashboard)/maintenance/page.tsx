@@ -1,5 +1,6 @@
 'use client'
 
+import { useMoney } from '@/lib/use-currency'
 import { useState, useCallback } from 'react'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent } from '@/components/ui/card'
@@ -10,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/lib/use-api'
 import { usePlan } from '@/lib/use-plan'
 import { UpgradePrompt } from '@/components/billing/upgrade-prompt'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import {
   Search, Plus, Wrench, Bell, CheckCircle2, Clock,
   AlertCircle, Calendar, Loader2, X, Repeat, UserCheck, ShieldCheck,
@@ -376,6 +377,7 @@ function MarkDoneDialog({
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function MaintenancePage() {
+  const { money } = useMoney()
   const [search,       setSearch]       = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [kindFilter,   setKindFilter]   = useState('all')
@@ -536,7 +538,7 @@ export default function MaintenancePage() {
                               </span>
                             )}
                             {schedule.cost > 0 && (
-                              <span className="font-medium text-slate-600">{formatCurrency(schedule.cost)}</span>
+                              <span className="font-medium text-slate-600">{money(schedule.cost)}</span>
                             )}
                             <span className="flex items-center gap-1">
                               <Bell className="w-3 h-3" />

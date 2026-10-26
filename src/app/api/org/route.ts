@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireAnyRole } from '@/lib/api-auth'
 import { logAudit } from '@/lib/audit'
 import { resolveOrgPricingRegion } from '@/lib/pricing-region-server'
+import { isSupportedCurrency } from '@/lib/currency'
 
 /**
  * GET /api/org — return the current user's organization details
@@ -19,7 +20,7 @@ export async function GET() {
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('organizations')
-    .select('id, name, slug, plan, plan_status, trial_ends_at, max_users, require_checkout_approval, require_cost_dimension, block_checkout_when_overdue, pricing_region, ls_subscription_id, created_at')
+    .select('id, name, slug, plan, plan_status, trial_ends_at, max_users, require_checkout_approval, require_cost_dimension, block_checkout_when_overdue, pricing_region, currency, ls_subscription_id, created_at')
     .eq('id', auth.orgId)
     .single()
 
@@ -49,7 +50,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const allowed = ['name', 'require_checkout_approval', 'require_cost_dimension', 'block_checkout_when_overdue']
+  const allowed = ['name', 'require_checkout_approval', 'require_cost_dimension', 'block_checkout_when_overdue', 'currency']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]
@@ -62,6 +63,13 @@ export async function PATCH(req: NextRequest) {
   }
   if ('block_checkout_when_overdue' in updates) {
     updates.block_checkout_when_overdue = !!updates.block_checkout_when_overdue
+  }
+  if ('currency' in updates) {
+    // A label, not a conversion: amounts already recorded are not restated.
+    if (!isSupportedCurrency(updates.currency)) {
+      return NextResponse.json({ error: 'That currency is not one we support yet' }, { status: 422 })
+    }
+    updates.currency = String(updates.currency).toUpperCase()
   }
 
   // Plan gates: these policies can't be switched ON without the feature.
@@ -124,7 +132,7 @@ export async function PATCH(req: NextRequest) {
     .from('organizations')
     .update(updates)
     .eq('id', auth.orgId)
-    .select('id, name, slug, plan, plan_status, trial_ends_at, max_users, require_checkout_approval, require_cost_dimension, block_checkout_when_overdue, ls_subscription_id, created_at')
+    .select('id, name, slug, plan, plan_status, trial_ends_at, max_users, require_checkout_approval, require_cost_dimension, block_checkout_when_overdue, currency, ls_subscription_id, created_at')
     .single()
 
   if (error) {

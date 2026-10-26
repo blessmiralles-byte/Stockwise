@@ -1,11 +1,12 @@
 'use client'
 
+import { useMoney } from '@/lib/use-currency'
 import { useState, useMemo } from 'react'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent } from '@/components/ui/card'
 import { useApi } from '@/lib/use-api'
 import { ExportButtons } from '@/components/reports/export-buttons'
-import { formatCurrency, formatDate, cn } from '@/lib/utils'
+import { formatDate, cn } from '@/lib/utils'
 import {
   assetCompliance, certificateState, KIND_LABEL, CERT_WARNING_DAYS, type ScheduleLike,
 } from '@/lib/asset-compliance'
@@ -46,6 +47,7 @@ const STATUS_STYLE: Record<string, string> = {
 }
 
 export default function ToolCompliancePage() {
+  const { money } = useMoney()
   const [tab, setTab]       = useState<Tab>('checks')
   const [search, setSearch] = useState('')
 
@@ -121,7 +123,7 @@ export default function ToolCompliancePage() {
           i.description,
         ]),
       ],
-      notes: [`Lost, stolen & damaged — ${counts.open} open, ${formatCurrency(counts.lossValue)} unaccounted for`],
+      notes: [`Lost, stolen & damaged — ${counts.open} open, ${money(counts.lossValue)} unaccounted for`],
     },
   ]
 
@@ -265,7 +267,7 @@ export default function ToolCompliancePage() {
           <>
             {counts.lossValue > 0 && (
               <p className="text-xs text-slate-500">
-                Value still unaccounted for: <span className="font-semibold text-slate-700">{formatCurrency(counts.lossValue)}</span>
+                Value still unaccounted for: <span className="font-semibold text-slate-700">{money(counts.lossValue)}</span>
               </p>
             )}
             <div className="space-y-3">
@@ -296,7 +298,7 @@ export default function ToolCompliancePage() {
                       </div>
                       <div className="text-right">
                         {i.estimated_loss != null && (
-                          <p className="text-sm font-semibold text-slate-900">{formatCurrency(Number(i.estimated_loss))}</p>
+                          <p className="text-sm font-semibold text-slate-900">{money(Number(i.estimated_loss))}</p>
                         )}
                         {i.status === 'open' && (
                           <div className="flex gap-2 mt-2">

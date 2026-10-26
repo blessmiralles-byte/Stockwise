@@ -1,5 +1,6 @@
 'use client'
 
+import { useMoney } from '@/lib/use-currency'
 import { useState, useMemo } from 'react'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent } from '@/components/ui/card'
@@ -8,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/lib/use-api'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import {
   Search, Plus, ScanBarcode, ArrowLeftRight, AlertTriangle,
   Package, ArrowDownToLine, ArrowUpFromLine, Scale,
@@ -43,6 +44,7 @@ function AttrChips({ attrs }: { attrs?: Record<string, string> }) {
 
 // ─── Stock tab ────────────────────────────────────────────────────────────────
 function StockTab() {
+  const { money } = useMoney()
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'low' | 'out' | 'review' | 'transit'>('all')
 
@@ -287,9 +289,9 @@ function StockTab() {
                             <AlertTriangle className="inline w-3 h-3 ml-1 text-yellow-500" />
                           )}
                         </td>
-                        <td className="px-4 py-3 text-right hidden md:table-cell text-slate-600">{formatCurrency(b.avg_cost)}</td>
+                        <td className="px-4 py-3 text-right hidden md:table-cell text-slate-600">{money(b.avg_cost)}</td>
                         <td className="px-4 py-3 text-right hidden lg:table-cell font-medium text-slate-900">
-                          {formatCurrency(b.avg_cost * b.quantity)}
+                          {money(b.avg_cost * b.quantity)}
                         </td>
                         <td className="px-4 py-3 text-center hidden md:table-cell">
                           <Badge variant="outline" className="uppercase text-xs">{b.product?.cost_method}</Badge>
@@ -364,6 +366,7 @@ const expiryConfig = {
 }
 
 function BatchesTab() {
+  const { money } = useMoney()
   const [search, setSearch] = useState('')
   const [expiryFilter, setExpiryFilter] = useState<'all' | 'expiring' | 'expired'>('all')
 
@@ -456,7 +459,7 @@ function BatchesTab() {
                         <td className="px-4 py-3 hidden md:table-cell text-slate-600 text-xs">{r.location?.name ?? '—'}</td>
                         <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs">{formatDate(r.purchase_date)}</td>
                         <td className="px-4 py-3 text-right font-semibold text-slate-900">{r.quantity_remaining}</td>
-                        <td className="px-4 py-3 text-right hidden md:table-cell text-slate-600">{formatCurrency(r.unit_cost)}</td>
+                        <td className="px-4 py-3 text-right hidden md:table-cell text-slate-600">{money(r.unit_cost)}</td>
                         <td className="px-4 py-3">
                           {r.expiration_date ? (
                             <div>
@@ -501,6 +504,7 @@ function BatchesTab() {
 
 // ─── Ledger tab ───────────────────────────────────────────────────────────────
 function LedgerTab() {
+  const { money } = useMoney()
   const [selectedProduct, setSelectedProduct] = useState('')
   const [typeFilter, setTypeFilter]           = useState('all')
 
@@ -608,11 +612,11 @@ function LedgerTab() {
             </div>
             <div>
               <p className="text-xs text-slate-400 mb-0.5">Avg Cost</p>
-              <p className="text-xl font-bold text-slate-900">{formatCurrency(stockInfo.avgCost)}</p>
+              <p className="text-xl font-bold text-slate-900">{money(stockInfo.avgCost)}</p>
             </div>
             <div>
               <p className="text-xs text-slate-400 mb-0.5">Stock Value</p>
-              <p className="text-xl font-bold text-indigo-600">{formatCurrency(stockInfo.avgCost * stockInfo.totalQty)}</p>
+              <p className="text-xl font-bold text-indigo-600">{money(stockInfo.avgCost * stockInfo.totalQty)}</p>
             </div>
           </div>
         </div>
@@ -626,14 +630,14 @@ function LedgerTab() {
               <ArrowDownToLine className="w-3.5 h-3.5" /> Total Debit
             </div>
             <p className="text-lg font-bold text-green-700 tabular-nums">+{totalDebitQty.toLocaleString()}</p>
-            <p className="text-xs text-green-600 mt-0.5">{formatCurrency(totalDebitVal)}</p>
+            <p className="text-xs text-green-600 mt-0.5">{money(totalDebitVal)}</p>
           </div>
           <div className="bg-red-50 border border-red-100 rounded-lg px-4 py-3">
             <div className="flex items-center gap-1.5 text-red-600 text-xs font-medium mb-1">
               <ArrowUpFromLine className="w-3.5 h-3.5" /> Total Credit
             </div>
             <p className="text-lg font-bold text-red-600 tabular-nums">{totalCreditQty.toLocaleString()}</p>
-            <p className="text-xs text-red-500 mt-0.5">{formatCurrency(totalCreditVal)}</p>
+            <p className="text-xs text-red-500 mt-0.5">{money(totalCreditVal)}</p>
           </div>
           <div className="bg-slate-50 border border-slate-100 rounded-lg px-4 py-3">
             <div className="flex items-center gap-1.5 text-slate-500 text-xs font-medium mb-1">
@@ -727,7 +731,7 @@ function LedgerTab() {
                             {debitQty > 0 ? (
                               <div>
                                 <span className="font-semibold text-green-600 tabular-nums">+{debitQty}</span>
-                                <span className="block text-xs text-green-500 tabular-nums">{formatCurrency(debitVal)}</span>
+                                <span className="block text-xs text-green-500 tabular-nums">{money(debitVal)}</span>
                               </div>
                             ) : (
                               <span className="text-slate-200">—</span>
@@ -739,7 +743,7 @@ function LedgerTab() {
                             {creditQty > 0 ? (
                               <div>
                                 <span className="font-semibold text-red-500 tabular-nums">{creditQty}</span>
-                                <span className="block text-xs text-red-400 tabular-nums">{formatCurrency(creditVal)}</span>
+                                <span className="block text-xs text-red-400 tabular-nums">{money(creditVal)}</span>
                               </div>
                             ) : (
                               <span className="text-slate-200">—</span>
@@ -766,11 +770,11 @@ function LedgerTab() {
                         <td className="hidden xl:table-cell" />
                         <td className="px-4 py-3 text-right">
                           <span className="text-green-600 tabular-nums">+{totalDebitQty.toLocaleString()}</span>
-                          <span className="block text-xs text-green-500 font-normal">{formatCurrency(totalDebitVal)}</span>
+                          <span className="block text-xs text-green-500 font-normal">{money(totalDebitVal)}</span>
                         </td>
                         <td className="px-4 py-3 text-right">
                           <span className="text-red-500 tabular-nums">{totalCreditQty.toLocaleString()}</span>
-                          <span className="block text-xs text-red-400 font-normal">{formatCurrency(totalCreditVal)}</span>
+                          <span className="block text-xs text-red-400 font-normal">{money(totalCreditVal)}</span>
                         </td>
                         <td className="px-4 py-3 text-right">
                           <span className={`tabular-nums text-sm ${closingBalance < 0 ? 'text-red-600' : 'text-indigo-700'}`}>

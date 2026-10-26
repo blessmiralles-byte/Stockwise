@@ -1,9 +1,9 @@
 'use client'
 
+import { useMoney } from '@/lib/use-currency'
 import Link from 'next/link'
 import { AlertTriangle, FileText } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { formatCurrency } from '@/lib/utils'
 
 /**
  * Shown when a purchase order was raised from a requisition: what the crew
@@ -11,6 +11,7 @@ import { formatCurrency } from '@/lib/utils'
  * Approvers see any price increase here before they approve the order.
  */
 export function RequestedVsOrdered({ po }: { po: any }) {
+  const { money } = useMoney()
   const req = po?.requisition
   if (!req) return null
 
@@ -86,10 +87,10 @@ export function RequestedVsOrdered({ po }: { po: any }) {
                   </td>
                   <td className="py-2 text-right text-slate-500 whitespace-nowrap">
                     {r.requestedQty != null ? `${r.requestedQty} × ` : '—'}
-                    {r.requestedEach != null ? formatCurrency(r.requestedEach) : ''}
+                    {r.requestedEach != null ? money(r.requestedEach) : ''}
                   </td>
                   <td className="py-2 text-right text-slate-800 whitespace-nowrap">
-                    {r.orderedQty} × {formatCurrency(r.orderedEach)}
+                    {r.orderedQty} × {money(r.orderedEach)}
                   </td>
                   <td className={`py-2 text-right font-medium whitespace-nowrap ${pctClass(r.diffPct)}`}>
                     {pctLabel(r.diffPct)}
@@ -101,8 +102,8 @@ export function RequestedVsOrdered({ po }: { po: any }) {
               <tfoot>
                 <tr className="border-t-2 border-slate-200 font-semibold">
                   <td className="py-2">Total</td>
-                  <td className="py-2 text-right text-slate-500">{formatCurrency(requestedTotal)}</td>
-                  <td className="py-2 text-right text-slate-900">{formatCurrency(orderedTotal)}</td>
+                  <td className="py-2 text-right text-slate-500">{money(requestedTotal)}</td>
+                  <td className="py-2 text-right text-slate-900">{money(orderedTotal)}</td>
                   <td className={`py-2 text-right ${pctClass(totalPct)}`}>{pctLabel(totalPct)}</td>
                 </tr>
               </tfoot>

@@ -1,5 +1,6 @@
 'use client'
 
+import { useMoney } from '@/lib/use-currency'
 import { useState, useMemo } from 'react'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent } from '@/components/ui/card'
@@ -8,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CardSkeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/lib/use-api'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import {
   Search, Plus, ScanBarcode, Building2, MoreVertical, User, MapPin,
@@ -41,6 +42,7 @@ const DEPRECIATION_LABELS: Record<string, string> = {
 function DepreciationPreview({
   cost, salvage, lifeYears, method,
 }: { cost: number; salvage: number; lifeYears: number; method: string }) {
+  const { money } = useMoney()
   if (!cost || !lifeYears || method === 'none' || method === 'units_of_production') return null
   const depBase = Math.max(0, cost - salvage)
 
@@ -58,9 +60,9 @@ function DepreciationPreview({
   return (
     <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2.5 text-xs text-indigo-700 space-y-0.5">
       <p className="font-semibold">Depreciation estimate</p>
-      <p>Annual: <strong>{formatCurrency(annualAmt)}</strong> · Monthly: <strong>{formatCurrency(annualAmt / 12)}</strong></p>
+      <p>Annual: <strong>{money(annualAmt)}</strong> · Monthly: <strong>{money(annualAmt / 12)}</strong></p>
       {method === 'straight_line' && (
-        <p className="text-indigo-500">({formatCurrency(cost)} − {formatCurrency(salvage)}) ÷ {lifeYears} years</p>
+        <p className="text-indigo-500">({money(cost)} − {money(salvage)}) ÷ {lifeYears} years</p>
       )}
     </div>
   )
@@ -254,6 +256,7 @@ function RetireSellDialog({
   onClose: () => void
   onSaved: () => void
 }) {
+  const { money } = useMoney()
   const [date,   setDate]   = useState(new Date().toISOString().split('T')[0])
   const [reason, setReason] = useState('')
   const [buyer,  setBuyer]  = useState('')
@@ -388,10 +391,10 @@ function RetireSellDialog({
                     : 'bg-amber-50 border-amber-100 text-amber-700'
                 )}>
                   {Number(price) >= asset.purchase_cost
-                    ? `Gain on sale: ${formatCurrency(Number(price) - asset.purchase_cost)}`
-                    : `Loss on sale: ${formatCurrency(asset.purchase_cost - Number(price))}`
+                    ? `Gain on sale: ${money(Number(price) - asset.purchase_cost)}`
+                    : `Loss on sale: ${money(asset.purchase_cost - Number(price))}`
                   }
-                  {' '}(purchase cost was {formatCurrency(asset.purchase_cost)})
+                  {' '}(purchase cost was {money(asset.purchase_cost)})
                 </div>
               )}
 
@@ -1424,6 +1427,7 @@ function ToolCheckoutsPanel({ canApprove, onChange }: { canApprove: boolean; onC
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function AssetsPage() {
+  const { money } = useMoney()
   const [search,         setSearch]         = useState('')
   const [statusFilter,   setStatusFilter]   = useState('all')
   const [showAdd,        setShowAdd]        = useState(false)
@@ -1649,7 +1653,7 @@ export default function AssetsPage() {
                     <div className="flex items-center justify-between border-t border-slate-50 pt-3">
                       <div>
                         <p className="text-xs text-slate-400">Purchase Cost</p>
-                        <p className="font-bold text-slate-900">{formatCurrency(asset.purchase_cost ?? 0)}</p>
+                        <p className="font-bold text-slate-900">{money(asset.purchase_cost ?? 0)}</p>
                       </div>
                       <Badge variant={cfg.variant}>{cfg.label}</Badge>
                     </div>
