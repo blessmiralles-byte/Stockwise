@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { fetchAllPaged } from '@/lib/fetch-paged'
 import { requireAuth } from '@/lib/api-auth'
 
 /**
@@ -33,12 +34,17 @@ export async function GET(req: NextRequest) {
   startDate.setDate(startDate.getDate() - daysBack)
 
   // ── 1. Get consumption + sale transactions in the lookback window ──────────
-  const { data: txns, error: txErr } = await supabase
-    .from('inventory_transactions')
-    .select('product_id, quantity, transaction_type, created_at')
-    .eq('org_id', auth.orgId)
-    .in('transaction_type', ['consumption', 'sale'])
-    .gte('created_at', startDate.toISOString())
+  // Paged: a forecast built on the first N rows of the window, presented as a
+  // forecast on the whole window, is worse than no forecast.
+  const { rows: txns, truncated, error: txErr } = await fetchAllPaged<any>((from, to) =>
+    supabase
+      .from('inventory_transactions')
+      .select('product_id, quantity, transaction_type, created_at')
+      .eq('org_id', auth.orgId)
+      .in('transaction_type', ['consumption', 'sale'])
+      .gte('created_at', startDate.toISOString())
+      .order('id')
+      .range(from, to))
 
   if (txErr) {
     console.error('[GET /api/forecasting] txns', txErr)
@@ -177,6 +183,10 @@ export async function GET(req: NextRequest) {
     data: rows,
     count: rows.length,
     summary,
-    meta: { days_back: daysBack, forecast_days: forecastDays, review_period: reviewPeriod },
+    meta: {
+      days_back: daysBack, forecast_days: forecastDays, review_period: reviewPeriod,
+      // A forecast on part of the window is flagged, not quietly served.
+      ...(truncated ? { partial: true } : {}),
+    },
   })
 }

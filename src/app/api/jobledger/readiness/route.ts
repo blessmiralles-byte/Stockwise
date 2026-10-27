@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { fetchAllPaged } from '@/lib/fetch-paged'
+
+/** Supplier reliability looks back one rolling year. */
+const RELIABILITY_WINDOW_DAYS = 365
 
 /**
  * POST /api/jobledger/readiness
@@ -87,8 +91,13 @@ export async function POST(req: NextRequest) {
 
   const reliabilityMap = new Map<string, { onTimePct: number; fillRatePct: number; avgLeadDays: number | null }>()
 
+  const sinceIso = new Date(Date.now() - RELIABILITY_WINDOW_DAYS * 86_400_000).toISOString()
+
   if (supplierIds.length > 0) {
-    const { data: poData } = await supabase
+    // Reliability is a rolling year, not all time: a supplier who was late in
+    // 2023 and dependable since shouldn't still be scored on 2023. It also
+    // keeps this bounded as a customer's PO history grows.
+    const { rows: poData } = await fetchAllPaged<any>((from, to) => supabase
       .from('purchase_orders')
       .select(`
         id, supplier_id, expected_date,
@@ -97,6 +106,9 @@ export async function POST(req: NextRequest) {
       .eq('org_id', org_id)
       .in('supplier_id', supplierIds)
       .in('status', ['received', 'partial'])
+      .gte('created_at', sinceIso)
+      .order('id')
+      .range(from, to))
 
     // Group by supplier
     const bySupplier = new Map<string, any[]>()
@@ -106,13 +118,21 @@ export async function POST(req: NextRequest) {
       bySupplier.get(sid)!.push(po)
     }
 
-    // Also get GRN dates from inventory_transactions
-    const { data: grnTxs } = await supabase
+    // Also get GRN dates from inventory_transactions. Same rolling year, and
+    // paged — this used to read every goods receipt the customer had ever
+    // recorded, on every readiness check JobLedger made.
+    // created_at DESC with an id tiebreak: the loop below keeps the first
+    // sighting of each reference, which must be the most recent receipt, and
+    // paging needs a total order to not drop or repeat rows.
+    const { rows: grnTxs } = await fetchAllPaged<any>((from, to) => supabase
       .from('inventory_transactions')
       .select('reference_no, created_at')
       .eq('org_id', org_id)
       .eq('transaction_type', 'purchase')
+      .gte('created_at', sinceIso)
       .order('created_at', { ascending: false })
+      .order('id')
+      .range(from, to))
 
     const grnByRef = new Map<string, string>()
     for (const tx of (grnTxs ?? []) as any[]) {

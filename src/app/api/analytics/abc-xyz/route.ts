@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { fetchAllPaged } from '@/lib/fetch-paged'
 import { requireRole } from '@/lib/api-auth'
 
 /**
@@ -13,12 +14,17 @@ export async function POST(req: NextRequest) {
   const supabase = createServiceClient()
   const since = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString()
 
-  const { data: txs, error: txErr } = await supabase
-    .from('inventory_transactions')
-    .select('product_id, quantity, total_cost, created_at')
-    .eq('org_id', auth.orgId)
-    .in('transaction_type', ['consumption', 'sale'])
-    .gte('created_at', since)
+  // A year of movements, paged — classifying on a silently truncated slice
+  // would put fast-moving stock in the wrong class.
+  const { rows: txs, truncated, error: txErr } = await fetchAllPaged<any>((from, to) =>
+    supabase
+      .from('inventory_transactions')
+      .select('product_id, quantity, total_cost, created_at')
+      .eq('org_id', auth.orgId)
+      .in('transaction_type', ['consumption', 'sale'])
+      .gte('created_at', since)
+      .order('id')
+      .range(from, to))
 
   if (txErr) {
     return NextResponse.json({ error: 'Failed to fetch transactions' }, { status: 500 })
@@ -103,5 +109,12 @@ export async function POST(req: NextRequest) {
     Z: updates.filter(u => u.xyz_class === 'Z').length,
   }
 
-  return NextResponse.json({ data: { classified: updates.length, summary } })
+  return NextResponse.json({
+    data: {
+      classified: updates.length,
+      summary,
+      // Say so rather than pass off a partial year as a full one.
+      ...(truncated ? { partial: true, partial_reason: 'Too much movement history to classify in one pass — narrow the period or contact support.' } : {}),
+    },
+  })
 }
