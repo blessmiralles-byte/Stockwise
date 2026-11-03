@@ -45,11 +45,11 @@ export const PLAN_CONFIG = {
     features: [
       'Up to 5 users',
       'Inventory, purchase orders & receiving',
-      'Fixed assets, tool check-out & maintenance',
+      'Fixed assets, tool custody & maintenance',
       'Barcode scanning & mobile app',
       'Accounting journal export (CSV)',
       'Audit log',
-      'Email support — real humans',
+      'Email support, answered by a person',
     ],
   },
   pro: {
@@ -58,13 +58,13 @@ export const PLAN_CONFIG = {
     prices:   { standard: 149, asean: 99 },
     features: [
       'Up to 15 users, everything in Starter',
-      'Approvals & delegation of authority',
+      'Approval limits & reporting lines',
       'Job costing by cost center & job code',
-      'Bookkeeping connection (no CSV imports)',
+      'Syncs with QuickBooks Online and Xero',
       'Recurring preventive maintenance',
       'Demand forecasting',
       'Priority support — same-day response',
-      'Help importing your existing data',
+      'We import your existing data for you',
     ],
   },
   enterprise: {

@@ -28,9 +28,9 @@ export type Feature =
 
 export const FEATURES: Record<Feature, { label: string; minPlan: TierPlan; description: string }> = {
   approvals: {
-    label: 'Approvals & delegation of authority',
+    label: 'Approval limits',
     minPlan: 'pro',
-    description: 'Requisitions, approval limits per member, reporting lines, PO approval workflow, and tool check-out approvals.',
+    description: 'Requisitions, a spending limit per person, reporting lines, PO approvals, and sign-off on tool check-outs.',
   },
   recurring_maintenance: {
     label: 'Recurring preventive maintenance',
@@ -48,9 +48,9 @@ export const FEATURES: Record<Feature, { label: string; minPlan: TierPlan; descr
     description: 'Projected usage, reorder points and suggested order quantities from your real consumption.',
   },
   accounting_sync: {
-    label: 'Bookkeeping connection',
+    label: 'Syncs with QuickBooks Online and Xero',
     minPlan: 'pro',
-    description: 'Feed journal entries straight into your bookkeeping app instead of importing CSV files.',
+    description: 'Journal entries land in your bookkeeping app on their own — no CSV files to import.',
   },
   integrations: {
     label: 'JobLedger & POS integrations',

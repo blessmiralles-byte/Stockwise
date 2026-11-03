@@ -7,7 +7,7 @@ import {
   Package, BarChart3, Truck, ClipboardList, Wrench,
   CheckCircle2, ArrowRight, Shield, Zap, Users, Star, Minus, ShieldCheck, PackageX,
   ChevronRight, Smartphone, TrendingDown, CalendarClock, History,
-  Hammer, HardHat, HeartPulse, UtensilsCrossed, Building2, MapPin,
+  Hammer, HardHat, Building2, MapPin,
 } from 'lucide-react'
 import { PLAN_CONFIG, monthlyPrice, annualPrice } from '@/lib/plan-config'
 import { usePricingRegion } from '@/lib/use-pricing-region'
@@ -25,10 +25,12 @@ function Nav() {
           <span className="text-white font-bold text-lg tracking-tight">Stocked</span>
         </div>
 
-        <div className="hidden sm:flex items-center gap-6 text-sm text-indigo-300">
+        {/* lg, not sm: the full section names need the room, and below this
+            width they pushed the sign-in buttons off the page. */}
+        <div className="hidden lg:flex items-center gap-6 text-sm text-indigo-300">
           <a href="#features"   className="hover:text-white transition-colors">Features</a>
-          <a href="#assets"     className="hover:text-white transition-colors">Assets &amp; Tools</a>
-          <a href="#industries" className="hover:text-white transition-colors">Industries</a>
+          <a href="#assets"     className="hover:text-white transition-colors">Assets &amp; Tool Custody</a>
+          <a href="#industries" className="hover:text-white transition-colors">Who it&apos;s for</a>
           <a href="#pricing"    className="hover:text-white transition-colors">Pricing</a>
         </div>
 
@@ -56,14 +58,13 @@ function Hero() {
         </div>
 
         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-tight mb-6">
-          Stop losing materials<br />
-          <span className="text-indigo-300">between the warehouse and the job</span>
+          Nothing walks off site<br />
+          <span className="text-indigo-300">unaccounted for</span>
         </h1>
 
         <p className="text-lg text-indigo-200 max-w-2xl mx-auto mb-10">
-          Your crew requests materials from their phone. You approve. Stock deducts against
-          the job — automatically. Purchase orders, receiving, tool tracking, and stock counts
-          in one system, so nothing walks off site unaccounted for.
+          Materials, tools, and equipment on one system. Your crew requests from
+          their phone. You approve. Stock deducts against the job — automatically.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -73,16 +74,51 @@ function Hero() {
             Start free trial
             <ArrowRight className="w-4 h-4" />
           </Link>
+          {/* Sign in is already in the nav — this slot answers "how much work
+              is this?", which is the objection at this moment. */}
           <Link
-            href="/login"
+            href="/getting-started"
             className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm transition-colors border border-white/10">
-            Sign in
+            See how it works
           </Link>
         </div>
 
         <p className="text-xs text-indigo-400 mt-5">
-          For the businesses that keep the world running
+          Set up in an afternoon. Import your product list and go.
         </p>
+      </div>
+    </section>
+  )
+}
+
+// ── Positioning ───────────────────────────────────────────────────────────────
+// The page had no "why us". This is the only place that explains why Stocked
+// exists, so it sits directly under the hero.
+function Positioning() {
+  return (
+    <section className="py-16 bg-white border-b border-slate-100">
+      <div className="max-w-4xl mx-auto px-6 text-center">
+        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-4">
+          Three systems, or one.
+        </h2>
+        <p className="text-slate-600 max-w-2xl mx-auto mb-10 leading-relaxed">
+          Consumables in a spreadsheet. Tools on a whiteboard. Fixed assets in your
+          accountant&apos;s depreciation schedule, once a year. Stocked replaces all
+          three — and every dollar lands on the job that used it.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-left">
+          {[
+            { icon: Package,   title: 'Materials', sub: 'Stock, purchase orders, receiving, and counts — costed to the job that consumed them.' },
+            { icon: Wrench,    title: 'Tools',     sub: 'Who has it, when it\'s due back, and whether it\'s still certified.' },
+            { icon: Building2, title: 'Assets',    sub: 'Capital equipment from purchase to disposal, with depreciation your accountant can post.' },
+          ].map(p => (
+            <div key={p.title} className="p-5 rounded-2xl bg-slate-50 border border-slate-100">
+              <p.icon className="w-5 h-5 text-indigo-600 mb-3" />
+              <h3 className="font-semibold text-slate-900 mb-1.5">{p.title}</h3>
+              <p className="text-sm text-slate-500 leading-relaxed">{p.sub}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   )
@@ -95,10 +131,10 @@ function TrustBar() {
       <div className="max-w-4xl mx-auto px-6">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 text-center">
           {[
-            { icon: ClipboardList, label: 'Request → approve → deduct', sub: 'Materials booked to the job, not lost' },
-            { icon: Smartphone,    label: 'Field-ready',         sub: 'Scan and update stock from any job site' },
-            { icon: Wrench,        label: 'Tools accounted for', sub: 'Who holds it, when it is due, is it in date' },
-            { icon: Users,         label: '6 team roles',        sub: 'Orderers can\'t approve their own receipts' },
+            { icon: Package,       label: 'One register',      sub: 'Consumables, tools, and fixed assets — not three systems' },
+            { icon: ClipboardList, label: 'Costed to the job', sub: 'Every unit booked to the job that consumed it' },
+            { icon: Smartphone,    label: 'Field-first',       sub: 'Request, scan, and receive from any phone' },
+            { icon: Shield,        label: 'Built-in controls',  sub: 'The person who orders can\'t sign off the delivery' },
           ].map(item => (
             <div key={item.label} className="space-y-1">
               <item.icon className="w-6 h-6 text-indigo-500 mx-auto" />
@@ -127,27 +163,19 @@ const FEATURES = [
   {
     icon:  Truck,
     title: 'Purchase Orders & Receiving',
-    desc:  'Create POs, send them to vendors, and receive goods in a few taps. Built-in controls mean the person who orders can\'t also approve the receipt — keeping your process clean.',
+    desc:  'Create POs, send them to vendors, and receive goods in a few taps. Partial deliveries, over-receipt tolerances, and vendor invoices matched against what actually arrived.',
   },
   {
     icon:  Smartphone,
     title: 'Mobile & Field Access',
     desc:  'Field staff update stock and check out equipment directly from their phone — on site, not back at the office. Scan any barcode to pull up live inventory, assets, or a purchase order instantly.',
   },
-  {
-    icon:  Building2,
-    title: 'Fixed Assets & Depreciation',
-    desc:  'Every tool, vehicle, and machine on your books: purchase cost, book value, automated depreciation, maintenance history, and the correct entries when you sell, scrap, or write one off.',
-  },
-  {
-    icon:  Wrench,
-    title: 'Tool Tracking & Custody',
-    desc:  'Check the same tools out to a person, van, or job and always know who has what and when it is due back. Overdue kit is flagged, inspection and calibration certificates are kept with the tool, and a lost or stolen item is reported from site in seconds.',
-  },
+  // Assets and tool custody are not cards here — the section below owns that
+  // pillar properly, and duplicating it was what made the page feel unfocused.
   {
     icon:  Shield,
-    title: 'Approvals & Delegation of Authority',
-    desc:  'Set who reports to whom and how much each person can approve. A request goes to their manager first and climbs the line until someone has the authority to sign it off — with the full trail on the document. Nobody approves their own spend.',
+    title: 'Approval limits',
+    desc:  'Set who reports to whom and how much each person can approve. A request goes to their manager first, then climbs the line until someone has the authority to sign it off — with the full trail on the document.',
   },
   {
     icon:  BarChart3,
@@ -162,11 +190,11 @@ function Features() {
       <div className="max-w-6xl mx-auto px-6">
         <div className="text-center mb-16">
           <h2 className="text-3xl font-bold text-slate-900 mb-3">
-            Everything from purchase order to the job site
+            Inventory and job costing, from the purchase order to the job site
           </h2>
           <p className="text-slate-500 max-w-xl mx-auto">
-            One platform that connects your warehouse, your field team, and your
-            accountant. No spreadsheets, no missing stock, no surprises.
+            Your warehouse, your crew, and your accountant working off the same
+            numbers — and every unit landing on the job that consumed it.
           </p>
         </div>
 
@@ -205,28 +233,28 @@ const ASSET_FEATURES = [
   },
   {
     icon:  Users,
-    title: 'Check-out & custody',
-    desc:  'Assign or lend equipment to a person or job and always know who is holding what. Field staff check tools in and out from their phone.',
+    title: 'Tool custody',
+    desc:  'Check tools out to a person, van, or job and always know who has what and when it\'s due back. Overdue tools are flagged, and the crew checks them in and out from their phones.',
   },
   {
     icon:  ShieldCheck,
     title: 'Inspections & calibration',
-    desc:  'Safety and calibration checks on their own cycle, with the certificate number and expiry stored against the tool. See at a glance what is due, what has lapsed, and what expires this month — and stop uncertified kit leaving the store.',
+    desc:  'Safety and calibration checks on their own cycle, with the certificate number and expiry stored against the tool. See what\'s due, what\'s lapsed, and what expires this month — and stop uncertified tools going out.',
   },
   {
     icon:  PackageX,
     title: 'Lost, stolen & damaged',
-    desc:  'Report a missing tool in seconds: who had it, where it was last seen, the police report number. It comes out of service immediately, owners are told, and the value you are carrying in losses is there in one figure.',
+    desc:  'Report a missing tool in seconds: who had it, where it was last seen, the police report number. It comes out of service immediately, owners are notified, and you see your total losses in one number.',
   },
   {
     icon:  History,
     title: 'Disposal & audit trail',
-    desc:  'Retire, sell, or dispose of an asset with the correct accounting entries posted automatically — accumulated depreciation relieved, gain or loss recognised — and a complete history from purchase to disposal.',
+    desc:  'Retire, sell, or dispose of an asset with the correct accounting entries posted automatically — accumulated depreciation relieved, gain or loss recognized — and a complete history from purchase to disposal.',
   },
   {
     icon:  BarChart3,
-    title: 'Reports & accounting export',
-    desc:  'Depreciation schedules, an asset roll-forward (opening cost, additions, disposals, closing net book value), and journal entries ready to import into QuickBooks, Xero, or MYOB.',
+    title: 'For your accountant',
+    desc:  'Depreciation schedules, an asset roll-forward (opening cost, additions, disposals, closing net book value), and journal entries ready to import into QuickBooks Online or Xero.',
   },
 ]
 
@@ -239,23 +267,23 @@ function Assets() {
           <div>
             <div className="inline-flex items-center gap-2 bg-indigo-500/15 border border-indigo-400/30 text-indigo-300 text-xs font-semibold px-3 py-1.5 rounded-full mb-5">
               <Wrench className="w-3.5 h-3.5" />
-              Fixed Assets & Tool Tracking
+              Fixed asset tracking &amp; tool custody
             </div>
             <h2 className="text-3xl font-bold mb-4 leading-tight">
-              It&apos;s a fixed-asset register too — not just inventory
+              Your tools are assets, not consumables
             </h2>
             <p className="text-slate-300 leading-relaxed mb-6">
-              Your tools, vehicles, and equipment are assets on your books, not consumables.
-              Stocked tracks them from purchase to disposal — with depreciation, maintenance,
-              custody and safety certificates built in — so your fixed-asset register stays in
-              sync with your accountant, and you always know where each tool is.
+              A $40,000 excavator and a box of fittings don&apos;t belong in the same column.
+              Stocked tracks capital equipment from purchase to disposal — depreciation,
+              maintenance, custody, certificates — so your fixed-asset register stays in step
+              with your accountant, and you always know where each tool is.
             </p>
             <ul className="space-y-2.5 mb-8">
               {[
-                'GAAP-aligned depreciation and disposal entries',
-                'One audit trail from acquisition to write-off',
-                'Barcode & asset-tag scanning from any phone',
-                'Custody, due dates, and certificates that never quietly lapse',
+                'Depreciation and disposal entries your accountant can post as-is — GAAP and IFRS',
+                'One audit trail, from the invoice to the write-off',
+                'Scan an asset tag with any phone',
+                'Certificates that can\'t quietly lapse',
               ].map(point => (
                 <li key={point} className="flex items-start gap-2.5 text-sm text-slate-200">
                   <CheckCircle2 className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
@@ -289,36 +317,24 @@ function Assets() {
 }
 
 // ── Industries ────────────────────────────────────────────────────────────────
+// Contractors only. Healthcare and hospitality get their own landing pages —
+// "track linen to laundry" on a page that opens with job costing costs us the
+// contractor we came for.
 const INDUSTRIES = [
   {
     icon:  Hammer,
-    title: 'Trade & Contractors',
-    desc:  'Electricians, plumbers, HVAC, civil works — track materials consumed per job, manage tools in the field, and keep every purchase order clean.',
+    title: 'Trade contractors',
+    desc:  'Electricians, plumbers, HVAC, heavy civil — track materials consumed per job, manage tools in the field, and keep every purchase order clean.',
   },
   {
     icon:  HardHat,
-    title: 'Construction & Fitout',
+    title: 'Construction & build-out',
     desc:  'Site managers, builders, and project teams — track materials across active sites, manage equipment check-out, and stay audit-ready.',
   },
   {
-    icon:  HeartPulse,
-    title: 'Healthcare & Aged Care',
-    desc:  'Hospitals, clinics, pharmacies, and retirement homes — manage medical supplies and medications with expiry alerts, batch tracking, and full traceability.',
-  },
-  {
-    icon:  UtensilsCrossed,
-    title: 'Hospitality & F&B',
-    desc:  'Hotels, restaurants, and Airbnbs — track linen to laundry, kitchen stock with expiry dates, amenities, and supplies across all your properties.',
-  },
-  {
-    icon:  Building2,
-    title: 'Facilities Management',
-    desc:  'Building services, cleaning, and property maintenance — manage parts inventory, fixed assets, and maintenance schedules across every site.',
-  },
-  {
     icon:  MapPin,
-    title: 'Field Service Teams',
-    desc:  'Technical crews and on-site operations — equip your team with mobile stock access, equipment check-in/out, and live inventory from the field.',
+    title: 'Field service teams',
+    desc:  'Technical crews and on-site operations — mobile stock access, tool check-in and check-out, and live inventory from the field.',
   },
 ]
 
@@ -330,7 +346,7 @@ function Industries() {
         <div className="flex items-center gap-4 mb-5">
           <div className="h-px flex-1 bg-slate-200" />
           <span className="text-indigo-500 text-xs font-semibold tracking-widest uppercase">
-            Operations & Services
+            Who it&apos;s for
           </span>
           <div className="h-px flex-1 bg-slate-200" />
         </div>
@@ -340,9 +356,8 @@ function Industries() {
             Built for the businesses that keep the world running
           </h2>
           <p className="text-slate-500 max-w-xl mx-auto">
-            Trade contractors, healthcare teams, hospitality operators, facilities managers —
-            any operations-driven business that needs to know what it has,
-            where it is, and when to restock.
+            For owner-operators and ops managers running 5 to 40 people — the businesses
+            too big for a spreadsheet and too small for an ERP.
           </p>
         </div>
 
@@ -377,9 +392,10 @@ function Pricing() {
     <section className="py-24 bg-white" id="pricing">
       <div className="max-w-5xl mx-auto px-6">
         <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-slate-900 mb-3">Honest pricing. No surprises.</h2>
+          <h2 className="text-3xl font-bold text-slate-900 mb-3">Simple pricing.</h2>
           <p className="text-slate-500">
-            Try everything free for 14 days. No credit card. Cancel in one click.
+            Two plans. Start on either and move up when you need to. 14 days free,
+            no credit card. Cancel anytime — no phone call, no email.
           </p>
         </div>
 
@@ -415,7 +431,8 @@ function Pricing() {
               >
                 {highlight && (
                   <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-400 text-amber-900 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                    <Star className="w-3 h-3" /> Most Popular
+                    {/* Not "Most Popular" — we have no customers to count yet. */}
+                    <Star className="w-3 h-3" /> Recommended
                   </span>
                 )}
                 <div>
@@ -464,7 +481,7 @@ function Pricing() {
         <PlanComparison />
 
         <p className="text-center text-sm text-slate-500 mt-6">
-          The free trial includes everything in Pro. Need more than 15 users?{' '}
+          Your free trial includes everything in Pro. Need more than 15 users?{' '}
           <a href="mailto:hello@stocked.tech" className="font-medium text-indigo-600 hover:underline">Talk to us</a>.
         </p>
       </div>
@@ -477,10 +494,11 @@ function CtaBanner() {
   return (
     <section className="py-20 bg-indigo-600">
       <div className="max-w-3xl mx-auto px-6 text-center text-white">
-        <h2 className="text-3xl font-bold mb-4">Your materials deserve better than a spreadsheet.</h2>
+        <h2 className="text-3xl font-bold mb-4">Stop running your stock on a spreadsheet.</h2>
         <p className="text-indigo-200 mb-8">
-          Import your product list, set up your locations, and your crew is requesting,
-          scanning, and receiving from their phones — with every unit booked to a job.
+          Import your product list, set your locations, and your crew can request from
+          their phones the same day. Know what every job cost you in materials by the
+          end of your first week.
         </p>
         <Link
           href="/register"
@@ -531,6 +549,7 @@ export default function LandingPage() {
       <Nav />
       <div className="pt-16">
         <Hero />
+        <Positioning />
         <TrustBar />
         <Features />
         <Assets />
@@ -546,16 +565,19 @@ export default function LandingPage() {
 // ── Starter vs Pro comparison ──────────────────────────────────────────────────
 // Pro rows come from lib/entitlements.ts, so this table can't drift from what the
 // app actually unlocks.
-const SHARED_ROWS = [
-  'Inventory, locations & stock transfers',
-  'Purchase orders & receiving',
-  'Barcode scanning & mobile field app',
-  'Stock counts with sign-off',
-  'Fixed assets, depreciation & disposal',
-  'Tool check-out & custody',
-  'Maintenance scheduling with sign-off',
-  'Reports & accounting journal export (CSV)',
-  'Audit log — who changed what, and when',
+// Every Pro row carries a description (they come from entitlements.ts). When
+// these were bare nouns, Starter read as a stub next to it — same visual
+// weight, a third of the substance. Say what each one does.
+const SHARED_ROWS: { label: string; description: string }[] = [
+  { label: 'Inventory, locations & transfers', description: 'Live stock by location, with batch and expiry tracking.' },
+  { label: 'Purchase orders & receiving',      description: 'Raise POs, receive partial deliveries, match vendor invoices.' },
+  { label: 'Barcode scanning & mobile app',    description: 'Scan any barcode to pull up stock, a tool, or a PO from the field.' },
+  { label: 'Stock counts with sign-off',       description: 'Count sheets, variance review, and posted adjustments.' },
+  { label: 'Fixed assets & depreciation',      description: 'Asset register, four depreciation methods, disposal entries.' },
+  { label: 'Tool custody',                     description: 'Who has what, when it\'s due back, and what\'s overdue.' },
+  { label: 'Maintenance scheduling',           description: 'Service intervals, alerts before they fall due, signed-off history.' },
+  { label: 'Reports & accounting export',      description: 'Valuation, movement, job materials, depreciation — CSV or Excel.' },
+  { label: 'Audit log',                        description: 'Who changed what, and when — kept for every plan.' },
 ]
 
 function PlanComparison() {
@@ -582,7 +604,13 @@ function PlanComparison() {
         </thead>
         <tbody>
           {row('Users', 'Up to 5', 'Up to 15', 'users')}
-          {SHARED_ROWS.map(r => row(r, yes, yes, r))}
+          {SHARED_ROWS.map(r => row(
+            <>
+              <span className="font-medium text-slate-900">{r.label}</span>
+              <span className="block text-xs text-slate-500 mt-0.5">{r.description}</span>
+            </>,
+            yes, yes, r.label,
+          ))}
           {proRows.map(f => row(
             <>
               <span className="font-medium text-slate-900">{f.label}</span>
@@ -591,7 +619,7 @@ function PlanComparison() {
             no, yes, f.label,
           ))}
           {row('Support', 'Email', 'Priority, same-day', 'support')}
-          {row('Help importing your existing data', no, yes, 'import')}
+          {row('We import your existing data for you', no, yes, 'import')}
         </tbody>
       </table>
     </div>

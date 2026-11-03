@@ -5,7 +5,9 @@ import {
 } from 'lucide-react'
 
 export const metadata = {
-  title: 'Getting Started — Stocked',
+  // The root layout's template appends "· Stocked" — including it here gave
+  // "Getting Started — Stocked · Stocked".
+  title: 'Getting Started',
   description: 'A step-by-step guide to setting up your Stocked account, from your first location to inviting your team.',
 }
 

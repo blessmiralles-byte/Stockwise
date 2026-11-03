@@ -17,9 +17,11 @@ const siteUrl =
   process.env.NEXT_PUBLIC_APP_URL ??
   "https://stocked.tech";
 
-const TITLE = "Stocked — Stop losing money to stock you can't see";
+// The title names the category (what people search for); the H1 carries the
+// promise. Keep the description under ~160 characters or Google truncates it.
+const TITLE = "Stocked — Inventory, Tool Tracking & Fixed Assets for Contractors";
 const DESCRIPTION =
-  "Real-time inventory, expiry & batch tracking, equipment management, and mobile field access — built for trade contractors, healthcare teams, hospitality operators, and field crews. Free 14-day trial, no credit card.";
+  "Inventory, job costing, and tool tracking for trade contractors. Crews request materials from their phone; every unit is booked to the job. Free 14-day trial.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -30,14 +32,14 @@ export const metadata: Metadata = {
   description: DESCRIPTION,
   applicationName: "Stocked",
   keywords: [
-    "inventory management",
-    "asset management",
-    "stock control",
-    "expiry tracking",
-    "field service inventory",
-    "equipment tracking",
-    "purchase orders",
-    "barcode scanning",
+    "contractor inventory management",
+    "tool tracking software",
+    "equipment check in check out",
+    "fixed asset tracking and depreciation",
+    "construction inventory software",
+    "job costing materials",
+    "purchase orders and receiving",
+    "barcode scanning inventory",
   ],
   alternates: { canonical: "/" },
   openGraph: {
