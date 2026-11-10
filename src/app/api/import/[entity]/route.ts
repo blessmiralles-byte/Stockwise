@@ -83,7 +83,8 @@ function transformAsset(row: Record<string, any>) {
     serial_number:       r.serial_number ?? r.serial ?? null,
     purchase_cost:       parseNumber(r.purchase_cost ?? r.cost ?? 0),
     current_value:       parseNumber(r.current_value ?? r.book_value ?? r.purchase_cost ?? r.cost ?? 0),
-    purchase_date:       parseDate(r.purchase_date ?? r.date_purchased),
+    // Required by the table; a tool list often has no purchase dates.
+    purchase_date:       parseDate(r.purchase_date ?? r.date_purchased) ?? new Date().toISOString().slice(0, 10),
     useful_life_years:   parseNumber(r.useful_life_years ?? r.useful_life ?? 0),
     salvage_value:       parseNumber(r.salvage_value ?? 0),
     depreciation_method: method,

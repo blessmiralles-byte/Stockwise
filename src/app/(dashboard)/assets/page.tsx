@@ -697,12 +697,12 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons, toolsOnly = false 
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Asset Name <span className="text-red-500">*</span>
+                    {toolsOnly ? 'Tool name' : 'Asset Name'} <span className="text-red-500">*</span>
                   </label>
                   <Input
                     value={name}
                     onChange={e => setName(e.target.value)}
-                    placeholder="e.g. Caterpillar Excavator 320, Generator Set #2"
+                    placeholder={toolsOnly ? 'e.g. Makita angle grinder, Laser level #2' : 'e.g. Caterpillar Excavator 320, Generator Set #2'}
                     autoFocus
                   />
                 </div>
@@ -989,7 +989,7 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons, toolsOnly = false 
                   className="w-4 h-4 rounded text-indigo-600"
                 />
                 <div>
-                  <p className="text-sm font-medium text-slate-900">Schedule a maintenance task for this asset</p>
+                  <p className="text-sm font-medium text-slate-900">Schedule a maintenance task for this {toolsOnly ? 'tool' : 'asset'}</p>
                   <p className="text-xs text-slate-400">Create the first service record right now</p>
                 </div>
               </label>
@@ -1736,7 +1736,7 @@ export default function AssetsPage() {
                         <User className="w-3.5 h-3.5 flex-shrink-0" />
                         <span>{asset.accountable_person?.name ?? '—'}</span>
                       </div>
-                      {asset.depreciation_method && asset.depreciation_method !== 'none' && (
+                      {!toolsOnly && asset.depreciation_method && asset.depreciation_method !== 'none' && (
                         <div className="flex items-center gap-2 text-xs text-slate-400">
                           <TrendingDown className="w-3.5 h-3.5 flex-shrink-0" />
                           <span>{DEPRECIATION_LABELS[asset.depreciation_method] ?? asset.depreciation_method}
@@ -1810,7 +1810,7 @@ export default function AssetsPage() {
         {!loading && filtered.length === 0 && (
           <div className="text-center py-16 text-slate-400">
             <Building2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p>No assets found</p>
+            <p>{toolsOnly ? (assets.length === 0 ? 'No tools yet — add your first one.' : 'No tools match.') : 'No assets found'}</p>
           </div>
         )}
       </div>

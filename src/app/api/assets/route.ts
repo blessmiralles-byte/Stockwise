@@ -130,6 +130,14 @@ export async function POST(req: NextRequest) {
     if (v !== undefined && v !== null && v !== '') insert[k] = v
   }
 
+  // The table requires a cost and a purchase date, but a tool register doesn't:
+  // Stocked Tools never asks for either, and a contractor adding a drill
+  // shouldn't have to dig out the receipt. No cost is recorded as zero; no
+  // date as today.
+  insert.purchase_cost ??= 0
+  insert.current_value ??= insert.purchase_cost
+  insert.purchase_date ??= new Date().toISOString().slice(0, 10)
+
   const { data, error } = await supabase
     .from('fixed_assets')
     .insert(insert)
@@ -141,7 +149,9 @@ export async function POST(req: NextRequest) {
     if (error.code === '23505') {
       return NextResponse.json({ error: `Asset tag "${tag}" is already in use` }, { status: 409 })
     }
-    return NextResponse.json({ error: error.message ?? 'Failed to create asset' }, { status: 500 })
+    // Not the raw database message — that is how "null value in column
+    // purchase_cost violates not-null constraint" reached a customer's screen.
+    return NextResponse.json({ error: 'Could not add that. Check the details and try again.' }, { status: 500 })
   }
 
   return NextResponse.json({ data }, { status: 201 })
