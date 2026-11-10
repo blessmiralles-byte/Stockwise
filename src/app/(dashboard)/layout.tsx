@@ -7,9 +7,8 @@ import { billingState } from '@/lib/billing'
 import { resolveOrgPricingRegion } from '@/lib/pricing-region-server'
 import { enforceTrialClaim } from '@/lib/trial-claims'
 import { CurrencyProvider } from '@/lib/use-currency'
-import { headers } from 'next/headers'
-import { redirect } from 'next/navigation'
-import { isToolsPlan, toolsPageAllowed, TOOLS_HOME } from '@/lib/entitlements'
+import { isToolsPlan } from '@/lib/entitlements'
+import { ToolsGate } from '@/components/layout/tools-gate'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   // Access gate: an org whose trial has ended or whose subscription was
@@ -62,20 +61,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
     }
   }
 
-  // A Stocked Tools account opening a page outside the tool tracker (an old
-  // bookmark, the post-login /dashboard) is sent to its tools. This runs on
-  // full page loads only; the sidebar doesn't link anywhere else, and the API
-  // refuses the data regardless (lib/api-auth.ts).
-  if (isToolsPlan(plan)) {
-    const path = (await headers()).get('x-pathname')
-    if (!toolsPageAllowed(path)) redirect(TOOLS_HOME)
-  }
-
   return (
     <CurrencyProvider currency={currency}>
       <div className="flex h-screen overflow-hidden bg-slate-50">
         <Sidebar plan={plan} />
-        <main className="flex-1 overflow-y-auto bg-slate-50">{children}</main>
+        <main className="flex-1 overflow-y-auto bg-slate-50">
+          {/* Stocked Tools accounts are kept to the tool tracker's pages. */}
+          {isToolsPlan(plan) ? <ToolsGate>{children}</ToolsGate> : children}
+        </main>
         <SupportChat />
       </div>
     </CurrencyProvider>
