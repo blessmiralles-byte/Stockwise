@@ -148,9 +148,12 @@ describe('Tools pricing and checkout', () => {
     expect(isCheckoutPlan('tools_free')).toBe(false)
   })
 
-  it('costs the same in every region, with two months free on annual', () => {
-    expect(monthlyPrice('tools', 'standard')).toBe(monthlyPrice('tools', 'asean'))
-    expect(annualPrice('tools', 'standard')).toBe(monthlyPrice('tools', 'standard') * 10)
+  it('is priced per region like the other plans, with two months free on annual', () => {
+    expect(monthlyPrice('tools', 'standard')).toBe(25)
+    expect(monthlyPrice('tools', 'asean')).toBe(20)
+    for (const region of ['standard', 'asean'] as const) {
+      expect(annualPrice('tools', region)).toBe(monthlyPrice('tools', region) * 10)
+    }
   })
 
   it('stays well under Starter, so moving up is a real step', () => {

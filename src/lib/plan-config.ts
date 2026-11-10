@@ -51,8 +51,7 @@ export const PLAN_CONFIG = {
   tools: {
     label:    'Stocked Tools',
     maxUsers: 3,
-    // One price everywhere — already priced for the smallest crews.
-    prices:   { standard: 20, asean: 20 },
+    prices:   { standard: 25, asean: 20 },
     features: [
       'Unlimited tools',
       'Everything in Free',

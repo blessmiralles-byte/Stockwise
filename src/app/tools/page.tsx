@@ -4,7 +4,8 @@ import {
   Wrench, ArrowRight, CheckCircle2, QrCode, Users, CalendarClock, PackageX,
   History, BellRing, Smartphone, Minus,
 } from 'lucide-react'
-import { PLAN_CONFIG, FREE_TOOL_LIMIT, monthlyPrice, annualPrice } from '@/lib/plan-config'
+import { PLAN_CONFIG, FREE_TOOL_LIMIT, monthlyPrice, annualPrice, isPricingRegion } from '@/lib/plan-config'
+import { requestPricingRegion } from '@/lib/pricing-region-server'
 import { AttributionTracker } from '@/components/marketing/attribution-tracker'
 
 /**
@@ -12,8 +13,9 @@ import { AttributionTracker } from '@/components/marketing/attribution-tracker'
  *
  * A separate page from the main site because it is a separate pitch: "do you
  * know who has your tools?" needs none of the inventory and purchasing story,
- * and is answered the same afternoon. One price in every region, so unlike the
- * home page this reads no request data and can be served static.
+ * and is answered the same afternoon. Priced per region, so like the home page
+ * it reads the visitor's country from the request and puts the real price in
+ * the HTML.
  */
 
 export const metadata: Metadata = {
@@ -24,8 +26,6 @@ export const metadata: Metadata = {
 }
 
 const SIGNUP = '/register?product=tools'
-const PRICE  = monthlyPrice('tools', 'standard')
-const YEARLY = annualPrice('tools', 'standard')
 
 const STEPS = [
   { icon: QrCode,        title: 'Label it',     desc: 'Add a tool, print its QR label, stick it on. A name is all it needs.' },
@@ -61,7 +61,19 @@ function Cell({ v }: { v: string | boolean }) {
   return <>{v}</>
 }
 
-export default function StockedToolsPage() {
+export default async function StockedToolsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ region?: string }>
+}) {
+  // ?region= previews the other price band — never in production, so the page
+  // can't be made to show a price checkout won't charge.
+  const { region: override } = await searchParams
+  const isProd = process.env.VERCEL_ENV === 'production'
+  const region = !isProd && isPricingRegion(override) ? override : await requestPricingRegion()
+  const PRICE  = monthlyPrice('tools', region)
+  const YEARLY = annualPrice('tools', region)
+
   return (
     <div className="min-h-screen">
       <AttributionTracker />
