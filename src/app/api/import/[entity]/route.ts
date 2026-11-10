@@ -3,6 +3,8 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
 import { importLimiter } from '@/lib/rate-limit'
 import * as XLSX from 'xlsx'
+import { fetchAllPaged } from '@/lib/fetch-paged'
+import { generateItemCode, normaliseItemCode, validateItemCode } from '@/lib/item-code'
 
 /**
  * POST /api/import/[entity]
@@ -179,6 +181,58 @@ const TABLE_NAMES: Record<Entity, string> = {
   cost_centers: 'cost_centers',
 }
 
+// ── Products: codes ───────────────────────────────────────────────────────────
+/**
+ * Check item codes and barcodes before inserting, row by row.
+ *
+ * Rows go in batches of 100, and one bad row fails its whole batch with a raw
+ * database message — so a single blank code (the column is NOT NULL) or one
+ * code they already use cost the customer 99 good rows and told them nothing
+ * useful. Now a blank code gets a placeholder, and a clash skips just that row,
+ * saying which item already has it.
+ */
+async function screenProductRows(
+  supabase: ReturnType<typeof createServiceClient>,
+  orgId: string,
+  rows: any[],
+  errors: string[],
+): Promise<any[]> {
+  const { rows: existing } = await fetchAllPaged<{ sku: string; barcode: string | null; name: string }>((from, to) => supabase
+    .from('products')
+    .select('sku, barcode, name')
+    .eq('org_id', orgId)
+    .order('id')
+    .range(from, to))
+
+  const skuHolder     = new Map(existing.map(p => [p.sku, p.name]))
+  const barcodeHolder = new Map(existing.filter(p => p.barcode).map(p => [p.barcode as string, p.name]))
+
+  const kept: any[] = []
+  rows.forEach(row => {
+    const line = row.__line
+    row.sku = normaliseItemCode(row.sku) || generateItemCode()
+    const invalid = validateItemCode(row.sku)
+    if (invalid) { errors.push(`Row ${line}: ${invalid} — skipped.`); return }
+
+    const codeTaken = skuHolder.get(row.sku)
+    if (codeTaken !== undefined) {
+      errors.push(`Row ${line}: you already have an item with the code ${row.sku} (${codeTaken}) — skipped.`)
+      return
+    }
+    const barcodeTaken = row.barcode ? barcodeHolder.get(row.barcode) : undefined
+    if (barcodeTaken !== undefined) {
+      errors.push(`Row ${line}: you already have an item with the barcode ${row.barcode} (${barcodeTaken}) — skipped.`)
+      return
+    }
+
+    // Later rows in the same file count as taken too.
+    skuHolder.set(row.sku, row.name)
+    if (row.barcode) barcodeHolder.set(row.barcode, row.name)
+    kept.push(row)
+  })
+  return kept
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 export async function POST(
   req: NextRequest,
@@ -246,11 +300,20 @@ export async function POST(
         errors.push(`Row ${i + 2}: Missing required fields — skipped.`)
         return
       }
-      toInsert.push({ ...transformed, org_id: auth.orgId })
+      // __line is the spreadsheet row, for messages; stripped before insert.
+      toInsert.push({ ...transformed, org_id: auth.orgId, __line: i + 2 })
     } catch (err: any) {
       errors.push(`Row ${i + 2}: ${err.message}`)
     }
   })
+
+  if (entity === 'products' && toInsert.length > 0) {
+    const kept = await screenProductRows(supabase, auth.orgId, toInsert, errors)
+    toInsert.length = 0
+    toInsert.push(...kept)
+  }
+
+  for (const row of toInsert) delete row.__line
 
   if (toInsert.length === 0) {
     return NextResponse.json({ imported: 0, skipped: rows.length, errors })

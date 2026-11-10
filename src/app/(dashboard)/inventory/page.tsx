@@ -13,12 +13,16 @@ import { formatDate } from '@/lib/utils'
 import {
   Search, Plus, ScanBarcode, ArrowLeftRight, AlertTriangle,
   Package, ArrowDownToLine, ArrowUpFromLine, Scale,
-  ChevronDown, CalendarClock, Layers, ClipboardCheck,
+  ChevronDown, CalendarClock, Layers, ClipboardCheck, Tags,
 } from 'lucide-react'
 import Link from 'next/link'
 import { ReviewItemDialog, type ReviewProduct } from '@/components/inventory/review-item-dialog'
 import { MoveStockDialog } from '@/components/inventory/move-stock-dialog'
 import { ReceiveDeliveryDialog } from '@/components/inventory/receive-delivery-dialog'
+import { RecodeDialog } from '@/components/inventory/recode-dialog'
+
+/** Who may bulk-change item codes — matches /api/products/recode. */
+const CAN_RECODE = ['owner', 'admin', 'operations', 'procurement']
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const typeConfig: Record<string, { label: string; variant: any }> = {
@@ -67,6 +71,9 @@ function StockTab() {
   const [reviewItem, setReviewItem] = useState<ReviewProduct | null>(null)
   const [moveBalance, setMoveBalance] = useState<any | null>(null)
   const [receiveTransfer, setReceiveTransfer] = useState<any | null>(null)
+  const [recoding, setRecoding] = useState(false)
+  const { data: profile } = useApi<any>('/api/user/profile')
+  const canRecode = CAN_RECODE.includes(profile?.role ?? '')
 
   const onReviewDone = () => {
     setReviewItem(null)
@@ -137,6 +144,11 @@ function StockTab() {
           </div>
         </div>
         <div className="flex gap-2">
+          {canRecode && (
+            <Button variant="outline" className="gap-2" onClick={() => setRecoding(true)}>
+              <Tags className="w-4 h-4" />Update item codes
+            </Button>
+          )}
           <Link href="/transactions/new">
             <Button variant="outline" className="gap-2"><ScanBarcode className="w-4 h-4" />Scan</Button>
           </Link>
@@ -350,6 +362,14 @@ function StockTab() {
           transfer={receiveTransfer}
           onClose={() => setReceiveTransfer(null)}
           onDone={() => { setReceiveTransfer(null); refetchTransit(); refetch() }}
+        />
+      )}
+
+      {recoding && (
+        <RecodeDialog
+          onClose={() => setRecoding(false)}
+          // Stay open on the success screen; refresh the list behind it.
+          onDone={() => { refetch(); refetchProducts() }}
         />
       )}
     </>

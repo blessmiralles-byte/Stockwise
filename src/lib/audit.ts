@@ -26,6 +26,7 @@ export type AuditAction =
   | 'period.close'
   | 'cost_center.create'
   | 'cost_center.update'
+  | 'product.code_change'
 
 export async function logAudit(params: {
   actorId: string

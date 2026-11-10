@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
 import { lookupBarcode } from '@/lib/barcode-lookup'
+import { generateItemCode } from '@/lib/item-code'
 
 /**
  * POST /api/products/from-barcode
@@ -55,9 +56,7 @@ export async function POST(req: NextRequest) {
   const name = suppliedName || external?.name || `Unknown item ${barcode}`
   const source = external?.found ? 'global' : 'manual'
 
-  const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-  const rand = Math.random().toString(36).slice(2, 6).toUpperCase()
-  const sku = `ITM-${datePart}-${rand}`
+  const sku = generateItemCode()
 
   // Optional details supplied by the field "Add Item" form (fall back to
   // sensible defaults for the pure scan-at-the-dock case).
@@ -94,6 +93,25 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) {
+    // The barcode is already ours after all: an archived item (the lookup
+    // above only matches active ones), or one created by someone scanning the
+    // same delivery a moment ago. Receiving must not stop here — hand back
+    // that item, and if it was archived, it's evidently back in use.
+    if (error.code === '23505' && barcode) {
+      const { data: held } = await supabase
+        .from('products')
+        .select('id, sku, barcode, name, unit_of_measure, cost_method, reorder_point, needs_review, is_active, category:categories(name)')
+        .eq('org_id', auth.orgId)
+        .eq('barcode', barcode)
+        .maybeSingle()
+      if (held) {
+        if (!(held as any).is_active) {
+          await supabase.from('products').update({ is_active: true }).eq('id', (held as any).id).eq('org_id', auth.orgId)
+        }
+        const { is_active: _ignored, ...product } = held as any
+        return NextResponse.json({ data: product, created: false, source: 'existing' })
+      }
+    }
     console.error('[POST /api/products/from-barcode]', error)
     return NextResponse.json({ error: 'Failed to create item from barcode' }, { status: 500 })
   }

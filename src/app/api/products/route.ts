@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireAnyRole } from '@/lib/api-auth'
+import { generateItemCode, normaliseItemCode, validateItemCode } from '@/lib/item-code'
+import { findCodeHolder, clashedField, clashMessage } from '@/lib/item-code-server'
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth()
@@ -47,14 +49,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'name is required' }, { status: 422 })
   }
 
-  // Auto-generate SKU if not supplied
-  if (!sku?.trim()) {
-    const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-    const rand = Math.random().toString(36).slice(2, 6).toUpperCase()
-    sku = `ITM-${datePart}-${rand}`
-  } else {
-    sku = sku.trim()
-  }
+  // Their own code if they gave one; otherwise a placeholder they can replace
+  // later from the product list.
+  sku = normaliseItemCode(sku) || generateItemCode()
+  const invalidCode = validateItemCode(sku)
+  if (invalidCode) return NextResponse.json({ error: invalidCode }, { status: 422 })
 
   // M-2 style: basic field validation
   if (reorder_point != null && (!Number.isInteger(reorder_point) || reorder_point < 0)) {
@@ -90,7 +89,12 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     if (error.code === '23505') {
-      return NextResponse.json({ error: 'An item with that SKU already exists' }, { status: 409 })
+      // This used to blame the SKU for every clash, barcode included — and
+      // before codes were per company, for clashes with other companies' items.
+      const field = clashedField(error)
+      const value = field === 'barcode' ? barcode : sku
+      const holder = field && value ? await findCodeHolder(supabase, auth.orgId, field, String(value).trim()) : null
+      return NextResponse.json({ error: clashMessage(field, holder?.name), field }, { status: 409 })
     }
     console.error('[POST /api/products]', error)
     return NextResponse.json({ error: 'Failed to create product' }, { status: 500 })

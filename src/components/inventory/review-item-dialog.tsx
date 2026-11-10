@@ -36,6 +36,7 @@ export function ReviewItemDialog({
   onDone: () => void
 }) {
   const [name, setName]           = useState(product.name ?? '')
+  const [code, setCode]           = useState(product.sku ?? '')
   const [categoryId, setCategory] = useState(product.category?.id ?? '')
   const [unit, setUnit]           = useState(product.unit_of_measure ?? 'pcs')
   const [costMethod, setCostMethod] = useState(product.cost_method ?? 'average')
@@ -63,6 +64,7 @@ export function ReviewItemDialog({
 
   const approve = async () => {
     if (!name.trim()) { setError('Item name is required'); return }
+    if (!code.trim()) { setError('Item code is required'); return }
     if (wantsOpening && !locationId) { setError('Choose a location for the opening stock'); return }
     setSaving(true); setError('')
 
@@ -73,6 +75,8 @@ export function ReviewItemDialog({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name:            name.trim(),
+          // Only sent when changed, so an untouched code isn't re-checked.
+          ...(code.trim() !== (product.sku ?? '') ? { sku: code.trim() } : {}),
           category_id:     categoryId || null,
           unit_of_measure: unit,
           cost_method:     costMethod,
@@ -157,6 +161,16 @@ export function ReviewItemDialog({
           <div>
             <label className="text-xs font-medium text-slate-600 block mb-1">Item name *</label>
             <Input value={name} onChange={e => setName(e.target.value)} autoFocus />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-slate-600 block mb-1">Item code *</label>
+            <Input value={code} onChange={e => setCode(e.target.value)} className="font-mono" maxLength={50} />
+            {/^ITM-\d{8}-/.test(product.sku ?? '') && code === product.sku && (
+              <p className="text-xs text-slate-400 mt-1">
+                This code was made up for you. Replace it with the one your team uses.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
