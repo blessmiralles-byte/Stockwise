@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/api-auth'
 import { createNotification } from '@/lib/notify'
 import { sendToolsOverdue } from '@/lib/email'
 import { overdueToRemind, overdueSummary } from '@/lib/tool-returns'
+import { planHasFeature } from '@/lib/entitlements'
 
 /**
  * Overdue tools — chase what was due back and isn't.
@@ -77,11 +78,13 @@ async function run(scopedOrgId: string | null) {
   }
 
   const [{ data: orgs }, { data: people }] = await Promise.all([
-    supabase.from('organizations').select('id, name').in('id', orgIds),
+    supabase.from('organizations').select('id, name, plan').in('id', orgIds),
     supabase.from('user_profiles').select('id, org_id, email, role, is_active')
       .in('org_id', orgIds).in('role', ['owner', 'admin', 'operations', 'manager']).eq('is_active', true),
   ])
   const orgName = new Map((orgs ?? []).map((o: any) => [o.id, o.name as string]))
+  // The email is part of paid plans; the in-app notice goes to everyone.
+  const emailsOn = new Set((orgs ?? []).filter((o: any) => planHasFeature(o.plan, 'tool_reminders')).map((o: any) => o.id))
   const staffByOrg = new Map<string, any[]>()
   for (const p of (people ?? []) as any[]) {
     staffByOrg.set(p.org_id, [...(staffByOrg.get(p.org_id) ?? []), p])
@@ -128,7 +131,7 @@ async function run(scopedOrgId: string | null) {
     }
 
     const to = staff.map(s => s.email).filter(Boolean)
-    if (to.length && process.env.RESEND_API_KEY) {
+    if (to.length && emailsOn.has(orgId) && process.env.RESEND_API_KEY) {
       try {
         await sendToolsOverdue({
           to,

@@ -7,6 +7,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { useApi } from '@/lib/use-api'
 import { formatDate } from '@/lib/utils'
 import { Search, History, AlertTriangle } from 'lucide-react'
+import { usePlan } from '@/lib/use-plan'
+import { UpgradePrompt } from '@/components/billing/upgrade-prompt'
 
 interface Checkout {
   id:               string
@@ -63,6 +65,7 @@ export default function ToolHistoryReport() {
   }, [all, q])
 
   const damaged = rows.filter(c => c.return_condition === 'damaged').length
+  const { has } = usePlan()
 
   const buildSheets = () => {
     const header = ['Tool', 'Asset Tag', 'Held By', 'Employee No', 'Issued By', 'Job', 'Out', 'Due', 'Returned', 'Outcome', 'Note']
@@ -84,6 +87,15 @@ export default function ToolHistoryReport() {
       rows: [header, ...body],
       notes: [`Tool custody history — ${from} to ${to}${q.trim() ? ` — matching "${q.trim()}"` : ''} — ${rows.length} check-outs`],
     }]
+  }
+
+  if (!has('tool_reports')) {
+    return (
+      <div>
+        <Topbar title="Tool History" />
+        <UpgradePrompt feature="tool_reports" />
+      </div>
+    )
   }
 
   return (
@@ -111,7 +123,7 @@ export default function ToolHistoryReport() {
               className="block mt-1 h-10 px-3 rounded-lg border border-slate-200 text-sm text-slate-700" />
           </label>
           <div className="flex-1" />
-          <ExportButtons filename="Tool history" build={buildSheets} disabled={rows.length === 0} />
+          <ExportButtons feature="tool_reports" filename="Tool history" build={buildSheets} disabled={rows.length === 0} />
         </div>
 
         <div className="flex flex-wrap gap-2 text-sm">

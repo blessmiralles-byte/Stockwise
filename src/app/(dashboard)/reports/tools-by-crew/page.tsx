@@ -141,6 +141,7 @@ export default function ToolsByCrewReport() {
               )}
               <div className="flex-1" />
               <ExportButtons
+feature="tool_reports"
                 filename={`Tools for ${name.trim() || 'crew'}`}
                 build={buildSheets}
                 disabled={matched.length === 0}

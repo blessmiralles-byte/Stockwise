@@ -4,6 +4,7 @@ import { requireAnyRole } from '@/lib/api-auth'
 import { importLimiter } from '@/lib/rate-limit'
 import * as XLSX from 'xlsx'
 import { fetchAllPaged } from '@/lib/fetch-paged'
+import { toolLimitRefusal } from '@/lib/tool-limit-server'
 import { generateItemCode, normaliseItemCode, validateItemCode } from '@/lib/item-code'
 
 /**
@@ -314,6 +315,13 @@ export async function POST(
   }
 
   for (const row of toInsert) delete row.__line
+
+  // The free Stocked Tools plan holds a fixed number of tools; refuse the file
+  // whole rather than import an arbitrary first few.
+  if (entity === 'assets' && toInsert.length > 0) {
+    const overLimit = await toolLimitRefusal(supabase, auth.orgId, toInsert.length)
+    if (overLimit) return overLimit
+  }
 
   if (toInsert.length === 0) {
     return NextResponse.json({ imported: 0, skipped: rows.length, errors })

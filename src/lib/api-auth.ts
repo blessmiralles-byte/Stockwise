@@ -3,6 +3,32 @@ import { headers } from 'next/headers'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import {
+  FEATURES, PLAN_REQUIRED_CODE, isToolsPlan, toolsApiBlock, upgradeMessage,
+} from '@/lib/entitlements'
+
+/**
+ * Stocked Tools accounts get the tool tracker and nothing else. Rather than
+ * gate dozens of inventory and purchasing routes one by one — and forget the
+ * next one added — the refusal happens here, where every route already comes
+ * to find out who is calling. The path arrives in a header set by proxy.ts.
+ */
+async function toolsPlanRefusal(plan: string | null | undefined): Promise<NextResponse | null> {
+  if (!isToolsPlan(plan)) return null
+  let path: string | null = null
+  try { path = (await headers()).get('x-pathname') } catch { /* no request scope */ }
+  const feature = toolsApiBlock(path)
+  if (!feature) return null
+  return NextResponse.json(
+    {
+      error:         upgradeMessage(feature),
+      code:          PLAN_REQUIRED_CODE,
+      feature,
+      required_plan: FEATURES[feature].minPlan,
+    },
+    { status: 403 },
+  )
+}
 
 /**
  * Resolve the authenticated user from either an Authorization: Bearer <jwt>
@@ -103,11 +129,30 @@ export async function requireAuth(): Promise<AuthResult> {
   // Load role + active status — gracefully default to 'viewer' if table isn't set up yet
   try {
     const service = createServiceClient()
-    const { data: profile } = await service
+    // The org's plan rides along in the same query. If that embed ever fails,
+    // fall back to the plain profile — signing in must not depend on it.
+    let profile: any = null
+    const withPlan = await service
       .from('user_profiles')
-      .select('role, is_active, org_id')
+      .select('role, is_active, org_id, organization:organizations(plan)')
       .eq('id', userId)
       .single()
+    if (withPlan.error) {
+      const plain = await service
+        .from('user_profiles')
+        .select('role, is_active, org_id')
+        .eq('id', userId)
+        .single()
+      profile = plain.data
+      // Still find the plan, so the gate below can't be skipped by accident.
+      if (profile?.org_id) {
+        const { data: org } = await service
+          .from('organizations').select('plan').eq('id', profile.org_id).maybeSingle()
+        profile = { ...profile, organization: org ?? null }
+      }
+    } else {
+      profile = withPlan.data
+    }
 
     // C-2: Deactivated users are blocked at the auth layer regardless of role
     if (profile?.is_active === false) {
@@ -124,6 +169,10 @@ export async function requireAuth(): Promise<AuthResult> {
 
     const role  = (profile?.role as Role) ?? 'viewer'
     const orgId = profile?.org_id ?? ''
+
+    const refusal = await toolsPlanRefusal(profile?.organization?.plan)
+    if (refusal) return { userId, role, orgId, error: refusal }
+
     return { userId, role, orgId, error: null }
   } catch {
     // user_profiles table missing (setup not yet run) — grant owner to prevent lockout

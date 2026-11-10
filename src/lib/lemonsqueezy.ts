@@ -1,7 +1,7 @@
 'server only'
 
 import crypto from 'crypto'
-import { PLAN_CONFIG, PAID_PLANS, PRICING_REGIONS, type PricingRegion } from '@/lib/plan-config'
+import { PLAN_CONFIG, PAID_PLANS, CHECKOUT_PLANS, PRICING_REGIONS, type PricingRegion } from '@/lib/plan-config'
 
 /**
  * Server-side Lemon Squeezy client — never import this in client components.
@@ -78,7 +78,7 @@ export function planFromVariant(variantId: string | number | null | undefined): 
   }
 
   if (v) {
-    for (const plan of PAID_PLANS) {
+    for (const plan of CHECKOUT_PLANS) {
       for (const region of PRICING_REGIONS) {
         if (v === variantFor(plan, 'monthly', region) || v === variantFor(plan, 'annual', region)) {
           return { plan, maxUsers: PLAN_CONFIG[plan].maxUsers, known: true }
@@ -111,6 +111,24 @@ export function planStatusFromLS(status: string): string {
     default:
       return 'past_due'
   }
+}
+
+/**
+ * What an organization ends up on after a subscription event.
+ *
+ * Usually exactly what the event says. The exception: a Stocked Tools
+ * subscription that has run out drops back to the free Tools plan instead of
+ * locking the account — there is a free tier to fall to, and their tools are
+ * still out with their crew. Nothing is deleted; over the free limit they
+ * simply can't add more.
+ */
+export function settleSubscription(s: { plan: string; planStatus: string; maxUsers: number }): {
+  plan: string; planStatus: string; maxUsers: number
+} {
+  if (s.plan === 'tools' && s.planStatus === 'cancelled') {
+    return { plan: 'tools_free', planStatus: 'active', maxUsers: PLAN_CONFIG.tools_free.maxUsers }
+  }
+  return s
 }
 
 /**

@@ -31,7 +31,38 @@ export function isPricingRegion(v: unknown): v is PricingRegion {
   return v === 'standard' || v === 'asean'
 }
 
+/** Tools a free Stocked Tools account can keep on its register. */
+export const FREE_TOOL_LIMIT = 20
+
 export const PLAN_CONFIG = {
+  // ── Stocked Tools: the tool tracker on its own ──────────────────────────────
+  tools_free: {
+    label:    'Stocked Tools — Free',
+    price:    0,
+    maxUsers: 2,
+    features: [
+      `Up to ${FREE_TOOL_LIMIT} tools`,
+      'Check-out, check-in & due dates',
+      'Unlimited borrowers — no logins needed',
+      'QR labels & phone scanning',
+      'Lost, stolen & damaged reports',
+    ],
+  },
+  tools: {
+    label:    'Stocked Tools',
+    maxUsers: 3,
+    // One price everywhere — already priced for the smallest crews.
+    prices:   { standard: 20, asean: 20 },
+    features: [
+      'Unlimited tools',
+      'Everything in Free',
+      'Overdue reminders by email',
+      'Tool history by tool and by person',
+      'Excel export',
+      '3 team logins',
+    ],
+  },
+  // ── Stocked: the full product ───────────────────────────────────────────────
   trial: {
     label:    'Free Trial',
     price:    0,
@@ -82,6 +113,7 @@ export type PlanKey = keyof typeof PLAN_CONFIG
  * import this instead of hardcoding plan names, so adding or removing a tier
  * doesn't mean hunting through the pricing UI, checkout validation and paywall.
  */
+/** The full-Stocked plans shown on the main pricing page and the paywall. */
 export const PAID_PLANS = ['starter', 'pro'] as const
 export type PaidPlanKey = (typeof PAID_PLANS)[number]
 
@@ -89,12 +121,33 @@ export function isPaidPlan(v: unknown): v is PaidPlanKey {
   return typeof v === 'string' && (PAID_PLANS as readonly string[]).includes(v)
 }
 
+/** Every plan that can be bought through checkout — Stocked Tools included. */
+export const CHECKOUT_PLANS = ['tools', 'starter', 'pro'] as const
+export type CheckoutPlanKey = (typeof CHECKOUT_PLANS)[number]
+
+export function isCheckoutPlan(v: unknown): v is CheckoutPlanKey {
+  return typeof v === 'string' && (CHECKOUT_PLANS as readonly string[]).includes(v)
+}
+
+/**
+ * How many tools this plan may keep on its register; null = no limit.
+ * Only the free Tools plan is capped.
+ */
+export function toolLimit(plan: string | null | undefined): number | null {
+  return plan === 'tools_free' ? FREE_TOOL_LIMIT : null
+}
+
+/** Whether adding `adding` tools to the `have` already there breaks `limit`. */
+export function toolsOverLimit(limit: number | null, have: number, adding = 1): boolean {
+  return limit != null && have + adding > limit
+}
+
 /** Monthly price in USD for a plan in a region. */
-export function monthlyPrice(plan: PaidPlanKey, region: PricingRegion): number {
+export function monthlyPrice(plan: CheckoutPlanKey, region: PricingRegion): number {
   return PLAN_CONFIG[plan].prices[region]
 }
 
 /** Annual price in USD — ten months' worth (two months free). */
-export function annualPrice(plan: PaidPlanKey, region: PricingRegion): number {
+export function annualPrice(plan: CheckoutPlanKey, region: PricingRegion): number {
   return monthlyPrice(plan, region) * 10
 }

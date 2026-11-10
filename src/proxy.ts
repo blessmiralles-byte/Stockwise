@@ -4,6 +4,8 @@ import { createServerClient } from '@supabase/ssr'
 const PUBLIC_PATHS = [
   '/', '/login', '/register', '/auth/callback', '/auth/confirm', '/forgot-password', '/reset-password',
   '/onboarding', '/privacy', '/terms', '/one-pager', '/getting-started', '/delete-account',
+  // Stocked Tools landing page
+  '/tools',
   // Public SEO / social-share assets — must be reachable by unauthenticated
   // crawlers (Slackbot, LinkedIn, Twitterbot, Googlebot), not redirected to login.
   '/opengraph-image', '/twitter-image', '/robots.txt', '/sitemap.xml',
@@ -47,8 +49,24 @@ async function touchLastSeen(userId: string) {
   }).catch(() => { /* non-critical */ })
 }
 
+/**
+ * Header carrying the path of the request to server code. Route handlers and
+ * layouts can't otherwise see which URL they're serving, and plan gating
+ * (lib/api-auth.ts, the dashboard layout) needs to. Always overwritten here,
+ * so a client can't supply its own.
+ */
+const PATH_HEADER = 'x-pathname'
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // Every pass-through goes via this, so the path header is always present.
+  // Built at call time: the Supabase client may have rewritten request cookies.
+  const pass = () => {
+    const headers = new Headers(request.headers)
+    headers.set(PATH_HEADER, pathname)
+    return NextResponse.next({ request: { headers } })
+  }
 
   // Static assets + public pages — pass through immediately
   if (
@@ -56,10 +74,10 @@ export async function proxy(request: NextRequest) {
     pathname === '/favicon.ico' ||
     PUBLIC_PATHS.some(p => pathname === p || (p !== '/' && pathname.startsWith(p)))
   ) {
-    return NextResponse.next()
+    return pass()
   }
 
-  let response = NextResponse.next({ request })
+  let response = pass()
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -71,7 +89,7 @@ export async function proxy(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           )
-          response = NextResponse.next({ request })
+          response = pass()
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           )
@@ -83,13 +101,13 @@ export async function proxy(request: NextRequest) {
   // API routes — exempt specific paths, block everything else if unauthenticated
   if (pathname.startsWith('/api/')) {
     if (API_EXEMPT_PATHS.some(p => pathname.startsWith(p))) {
-      return NextResponse.next()
+      return pass()
     }
     // Bearer-authenticated clients (the Expo mobile app) don't carry the
     // session cookie this middleware validates. Let them through — the route's
     // requireAuth() validates the Bearer JWT itself.
     if (request.headers.get('authorization')?.toLowerCase().startsWith('bearer ')) {
-      return NextResponse.next()
+      return pass()
     }
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {

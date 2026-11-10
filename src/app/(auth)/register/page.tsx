@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Eye, EyeOff, UserPlus, Mail } from 'lucide-react'
 import { captureAttribution, getAttribution } from '@/lib/attribution'
-import { isPaidPlan } from '@/lib/plan-config'
+import { isPaidPlan, FREE_TOOL_LIMIT } from '@/lib/plan-config'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -22,12 +22,16 @@ export default function RegisterPage() {
   const [emailExists, setEmailExists] = useState(false)
   const [needsConfirmation, setNeedsConfirmation] = useState(false)
   const [agreedToTerms, setAgreedToTerms] = useState(false)
+  // 'tools' when they arrived for Stocked Tools (/register?product=tools): the
+  // account starts on the free Tools plan instead of a full-Stocked trial.
+  const [product, setProduct] = useState<'tools' | null>(null)
 
   // Capture plan intent from the landing pricing CTAs (/register?plan=pro).
   // We can't act on it during a no-card trial signup, so we stash it for the
   // billing page to pre-highlight once the user decides to upgrade.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
+    if (params.get('product') === 'tools') setProduct('tools')
     const plan = params.get('plan')
     if (isPaidPlan(plan)) {
       localStorage.setItem('stocked.intended_plan', plan)
@@ -81,6 +85,9 @@ export default function RegisterPage() {
           terms_version:     'v1',
           // First-touch channel data — stamped onto the organization at onboarding
           ...(attribution ? { attribution } : {}),
+          // Read by the signup trigger to create the organization on the
+          // free Tools plan (scripts/migrate-stocked-tools.sql).
+          ...(product ? { product } : {}),
         },
       },
     })
@@ -137,9 +144,11 @@ export default function RegisterPage() {
   return (
     <Card className="shadow-xl border-0">
       <CardHeader className="pb-4">
-        <CardTitle className="text-xl">Start your free trial</CardTitle>
+        <CardTitle className="text-xl">{product === 'tools' ? 'Start tracking your tools' : 'Start your free trial'}</CardTitle>
         <CardDescription>
-          14 days free · No credit card · Cancel anytime
+          {product === 'tools'
+            ? `Free for up to ${FREE_TOOL_LIMIT} tools · No credit card · No time limit`
+            : '14 days free · No credit card · Cancel anytime'}
         </CardDescription>
       </CardHeader>
       <CardContent>

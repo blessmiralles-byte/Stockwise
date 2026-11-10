@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
+import { toolLimitRefusal } from '@/lib/tool-limit-server'
 
 const ASSET_SELECT = `
   id, asset_tag, barcode, name, description, status, serial_number,
@@ -67,8 +68,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Asset name is required' }, { status: 400 })
   }
 
-  // H-3: Auto-generate asset_tag using atomic DB sequence (no race condition)
   const supabase = createServiceClient()
+
+  // The free Stocked Tools plan holds a fixed number of tools.
+  const overLimit = await toolLimitRefusal(supabase, auth.orgId)
+  if (overLimit) return overLimit
+
+  // H-3: Auto-generate asset_tag using atomic DB sequence (no race condition)
   let tag = asset_tag?.trim()
   if (!tag) {
     const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')

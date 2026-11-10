@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { verifyWebhookSignature, planFromVariant, planStatusFromLS } from '@/lib/lemonsqueezy'
+import { verifyWebhookSignature, planFromVariant, planStatusFromLS, settleSubscription } from '@/lib/lemonsqueezy'
 
 /**
  * POST /api/billing/webhook
@@ -68,19 +68,24 @@ export async function POST(req: NextRequest) {
           )
         }
 
+        const settled    = settleSubscription({ plan, planStatus, maxUsers })
+        const nextPlan   = settled.plan
+        const nextStatus = settled.planStatus
+        const nextSeats  = settled.maxUsers
+
         await supabase
           .from('organizations')
           .update({
-            plan,
-            plan_status:        planStatus,
+            plan:               nextPlan,
+            plan_status:        nextStatus,
             ls_subscription_id: subId,
             ls_customer_id:     attrs.customer_id != null ? String(attrs.customer_id) : null,
             ls_variant_id:      attrs.variant_id  != null ? String(attrs.variant_id)  : null,
-            max_users:          maxUsers,
+            max_users:          nextSeats,
           })
           .eq('id', orgId)
 
-        console.log(`[webhook] org ${orgId} ${eventName} → ${plan}/${planStatus}`)
+        console.log(`[webhook] org ${orgId} ${eventName} → ${nextPlan}/${nextStatus}`)
         break
       }
 

@@ -186,6 +186,7 @@ export default function ToolCompliancePage() {
               className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
           <ExportButtons
+feature="tool_reports"
             filename="Tool compliance"
             build={buildSheets}
             csvSheetIndex={tab === 'checks' ? 0 : 1}

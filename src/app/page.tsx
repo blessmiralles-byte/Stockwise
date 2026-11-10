@@ -410,6 +410,7 @@ function Footer() {
           </div>
 
           <div className="flex gap-6 text-sm">
+            <Link href="/tools"   className="hover:text-white transition-colors">Stocked Tools</Link>
             <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
             <Link href="/terms"   className="hover:text-white transition-colors">Terms of Service</Link>
             <a href="mailto:hello@stocked.tech" className="hover:text-white transition-colors">Contact</a>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
+import { requireFeature } from '@/lib/entitlements-server'
 
 /**
  * GET /api/assets/checkouts?status=pending|out|overdue|returned|rejected|all
@@ -23,6 +24,12 @@ export async function GET(req: NextRequest) {
 
   const sp = req.nextUrl.searchParams
   const status = sp.get('status') ?? 'pending'
+  // The full history is part of paid Stocked Tools; what's out now is not.
+  if (status === 'all') {
+    const gate = await requireFeature(auth.orgId, 'tool_reports')
+    if (gate) return gate
+  }
+
   const supabase = createServiceClient()
 
   let query = supabase

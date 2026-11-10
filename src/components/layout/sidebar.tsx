@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
-import { type Feature, FEATURES, planHasFeature } from '@/lib/entitlements'
+import { type Feature, FEATURES, planHasFeature, isToolsPlan, toolsPageAllowed } from '@/lib/entitlements'
 import { PlanBadge } from '@/components/billing/upgrade-prompt'
 
 const navItems: { href: string; icon: any; label: string; feature?: Feature }[] = [
@@ -32,6 +32,9 @@ const navItems: { href: string; icon: any; label: string; feature?: Feature }[] 
   { href: '/settings',        icon: Settings,        label: 'Settings'        },
 ]
 
+/** What a Stocked Tools account calls things: it has tools, not fixed assets. */
+const TOOLS_LABELS: Record<string, string> = { '/assets': 'Tools' }
+
 const fieldItems = [
   { href: '/field', icon: ScanBarcode, label: 'Field View' },
 ]
@@ -39,6 +42,13 @@ const fieldItems = [
 export function Sidebar({ plan }: { plan?: string | null }) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+
+  // A Tools account sees only the tool tracker — no locked rows advertising
+  // the rest; the upgrade lives in Settings.
+  const toolsOnly = isToolsPlan(plan)
+  const items = toolsOnly
+    ? navItems.filter(i => toolsPageAllowed(i.href)).map(i => ({ ...i, label: TOOLS_LABELS[i.href] ?? i.label }))
+    : navItems
 
   return (
     <aside
@@ -58,7 +68,7 @@ export function Sidebar({ plan }: { plan?: string | null }) {
         {!collapsed && (
           <div>
             <span className="text-[15px] font-semibold text-white tracking-tight leading-none">Stocked</span>
-            <p className="text-[10px] text-slate-500 mt-0.5 leading-none">Inventory management</p>
+            <p className="text-[10px] text-slate-500 mt-0.5 leading-none">{toolsOnly ? 'Tool tracking' : 'Inventory management'}</p>
           </div>
         )}
       </div>
@@ -70,7 +80,7 @@ export function Sidebar({ plan }: { plan?: string | null }) {
             Workspace
           </p>
         )}
-        {navItems.map(({ href, icon: Icon, label, feature }) => {
+        {items.map(({ href, icon: Icon, label, feature }) => {
           const active = pathname.startsWith(href)
           const lockedTier = feature && !planHasFeature(plan, feature) ? FEATURES[feature].minPlan : null
           return (
@@ -93,8 +103,8 @@ export function Sidebar({ plan }: { plan?: string | null }) {
           )
         })}
 
-        {/* Field worker section */}
-        <div className="pt-3 pb-1">
+        {/* Field worker section — the field view is inventory work */}
+        {!toolsOnly && <div className="pt-3 pb-1">
           <div className="border-t border-slate-800/60 mb-3" />
           {!collapsed && (
             <p className="px-3 pb-1.5 text-[10px] font-semibold text-slate-600 uppercase tracking-widest">
@@ -121,7 +131,7 @@ export function Sidebar({ plan }: { plan?: string | null }) {
               </Link>
             )
           })}
-        </div>
+        </div>}
       </nav>
 
       {/* Collapse toggle */}

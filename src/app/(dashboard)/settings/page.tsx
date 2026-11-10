@@ -14,7 +14,8 @@ import { UpgradePrompt, PlanBadge } from '@/components/billing/upgrade-prompt'
 import { Settings, Bell, Shield, Key, Send, CheckCircle2, AlertCircle, Loader2,
   ToggleLeft, ToggleRight, Briefcase, CalendarRange, Plus, X, Lock, Unlock, Download,
   UserPlus, Building2, CreditCard, Zap, ExternalLink, Star, Trash2 } from 'lucide-react'
-import { PLAN_CONFIG, PAID_PLANS, isPaidPlan, isPricingRegion, monthlyPrice, annualPrice, type PlanKey, type PricingRegion } from '@/lib/plan-config'
+import { PLAN_CONFIG, PAID_PLANS, FREE_TOOL_LIMIT, isPaidPlan, isPricingRegion, monthlyPrice, annualPrice, type PlanKey, type PricingRegion } from '@/lib/plan-config'
+import { isToolsPlan } from '@/lib/entitlements'
 import { createClient } from '@/lib/supabase/client'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -756,6 +757,7 @@ function BillingSection() {
   // Prices shown in the org's locked pricing region (resolved server-side by /api/org).
   const pricingRegion: PricingRegion = isPricingRegion(org?.pricing_region) ? org.pricing_region : 'standard'
   const planStatus  = org?.plan_status ?? 'active'
+  const onTools     = isToolsPlan(currentPlan)
 
   const statusBadge = planStatus === 'active'   ? 'bg-green-100 text-green-700'
                     : planStatus === 'past_due'  ? 'bg-amber-100 text-amber-700'
@@ -801,8 +803,8 @@ function BillingSection() {
               </p>
             )}
 
-            {/* Upgrade cards — show for trial or starter */}
-            {(currentPlan === 'trial' || currentPlan === 'starter') && (
+            {/* Upgrade cards — trial, starter, and Stocked Tools accounts */}
+            {(currentPlan === 'trial' || currentPlan === 'starter' || onTools) && (
               <>
               {/* Monthly / Annual toggle */}
               <div className="flex justify-center">
@@ -823,6 +825,47 @@ function BillingSection() {
                 </div>
               </div>
 
+              {/* Stocked Tools: the paid tool tracker, offered to free Tools accounts */}
+              {currentPlan === 'tools_free' && (
+                <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-slate-900">{PLAN_CONFIG.tools.label}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">You&apos;re on the free plan — up to {FREE_TOOL_LIMIT} tools.</p>
+                    </div>
+                    <p className="text-2xl font-bold text-slate-900 whitespace-nowrap">
+                      ${billingInterval === 'annual' ? annualPrice('tools', pricingRegion) : monthlyPrice('tools', pricingRegion)}
+                      <span className="text-sm font-normal text-slate-500">{billingInterval === 'annual' ? '/yr' : '/mo'}</span>
+                    </p>
+                  </div>
+                  <ul className="grid sm:grid-cols-2 gap-1.5">
+                    {PLAN_CONFIG.tools.features.map(f => (
+                      <li key={f} className="flex items-center gap-2 text-xs text-slate-600">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />{f}
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    onClick={() => checkout('tools')}
+                    disabled={!!upgrading}
+                    className="w-full py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                  >
+                    {upgrading === 'tools'
+                      ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Redirecting…</span>
+                      : <span className="flex items-center justify-center gap-2"><Zap className="w-3.5 h-3.5" />Upgrade to {PLAN_CONFIG.tools.label}</span>}
+                  </button>
+                </div>
+              )}
+
+              {onTools && (
+                <div className="pt-2">
+                  <p className="text-sm font-semibold text-slate-800">Need materials and purchasing too?</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Full Stocked adds inventory, purchase orders, receiving, and asset depreciation. Your tools and their history come with you.
+                  </p>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {PAID_PLANS.map(plan => {
                   const cfg       = PLAN_CONFIG[plan]
@@ -838,7 +881,7 @@ function BillingSection() {
                     >
                       {isPro && (
                         <span className="absolute -top-2 left-4 bg-indigo-600 text-white text-xs font-semibold px-2 py-0.5 rounded-full flex items-center gap-1">
-                          <Star className="w-2.5 h-2.5" /> Most Popular
+                          <Star className="w-2.5 h-2.5" /> Recommended
                         </span>
                       )}
                       <div>
@@ -1331,14 +1374,17 @@ function SettingsInner() {
   }
 
   const isFinance = isAdmin || profile?.role === 'finance' || profile?.role === 'procurement'
+  const { plan: orgPlanName } = usePlan()
+  const toolsOnly = isToolsPlan(orgPlanName)
 
   const tabs = [
     { id: 'general',      label: 'General',          icon: Settings      },
     ...(isAdmin   ? [{ id: 'users',       label: 'Team',             icon: Shield        }] : []),
     ...(isAdmin   ? [{ id: 'billing',     label: 'Billing',          icon: CreditCard    }] : []),
     ...(isAdmin   ? [{ id: 'people',      label: 'People',           icon: UserPlus      }] : []),
-    ...(isFinance ? [{ id: 'costcenters', label: 'Cost Centers',     icon: Briefcase     }] : []),
-    ...(isFinance ? [{ id: 'periods',     label: 'Acct. Periods',    icon: CalendarRange }] : []),
+    // Job costing and period close belong to full Stocked, not Stocked Tools.
+    ...(isFinance && !toolsOnly ? [{ id: 'costcenters', label: 'Cost Centers',     icon: Briefcase     }] : []),
+    ...(isFinance && !toolsOnly ? [{ id: 'periods',     label: 'Acct. Periods',    icon: CalendarRange }] : []),
   ]
 
   const checkoutStatus = searchParams.get('checkout')

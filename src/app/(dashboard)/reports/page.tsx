@@ -4,7 +4,7 @@ import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent } from '@/components/ui/card'
 import { BarChart2, TrendingUp, Package, ChevronRight, Briefcase, TrendingDown, ScrollText, BookOpen, Wrench, HardHat, Grid3x3, ShieldCheck, History } from 'lucide-react'
 import Link from 'next/link'
-import { type Feature, FEATURES } from '@/lib/entitlements'
+import { type Feature, FEATURES, isToolsPlan, toolsPageAllowed } from '@/lib/entitlements'
 import { usePlan } from '@/lib/use-plan'
 import { PlanBadge } from '@/components/billing/upgrade-prompt'
 
@@ -57,6 +57,7 @@ const reports: { href: string; icon: any; color: string; title: string; desc: st
     href: '/reports/tool-history',
     icon: History,
     color: 'bg-violet-50 text-violet-600',
+    feature: 'tool_reports',
     title: 'Tool History',
     desc: 'Every check-out and return — who had which tool, when it came back, and what state it was in. Search by tool or by person.',
   },
@@ -99,14 +100,16 @@ const reports: { href: string; icon: any; color: string; title: string; desc: st
 ]
 
 export default function ReportsPage() {
-  const { has } = usePlan()
+  const { has, plan } = usePlan()
+  // A Stocked Tools account sees the tool reports and nothing else.
+  const visible = isToolsPlan(plan) ? reports.filter(r => toolsPageAllowed(r.href)) : reports
   return (
     <div>
       <Topbar title="Reports" />
       <div className="p-6 space-y-4 max-w-2xl">
         <p className="text-sm text-slate-500">Select a report to view.</p>
         <div className="space-y-3">
-          {reports.map(r => (
+          {visible.map(r => (
             <Link key={r.href} href={r.href}>
               <Card className="hover:shadow-md transition-shadow cursor-pointer">
                 <CardContent className="p-4 flex items-center gap-4">

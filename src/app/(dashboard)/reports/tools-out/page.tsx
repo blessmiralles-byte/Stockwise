@@ -87,6 +87,7 @@ export default function ToolsOutReport() {
           )}
           <div className="flex-1" />
           <ExportButtons
+feature="tool_reports"
             filename="Tools checked out"
             build={buildSheets}
             disabled={rows.length === 0}

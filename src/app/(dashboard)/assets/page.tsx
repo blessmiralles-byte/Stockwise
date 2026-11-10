@@ -10,7 +10,9 @@ import { Input } from '@/components/ui/input'
 import { CardSkeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/lib/use-api'
 import { canIssueToOthers, approvalNeeded } from '@/lib/checkout-rules'
-import { planHasFeature } from '@/lib/entitlements'
+import { planHasFeature, isToolsPlan } from '@/lib/entitlements'
+import { usePlan } from '@/lib/use-plan'
+import { toolLimit } from '@/lib/plan-config'
 import { formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import {
@@ -521,11 +523,16 @@ const TABS: { id: Tab; label: string; icon: any }[] = [
   { id: 'maintenance', label: 'Maintenance',  icon: Wrench       },
 ]
 
-function AddAssetDialog({ onClose, onSaved, canManagePersons }: {
+function AddAssetDialog({ onClose, onSaved, canManagePersons, toolsOnly = false }: {
   onClose: () => void
   onSaved: () => void
   canManagePersons: boolean
+  /** Stocked Tools: a tool register, so no cost or depreciation to fill in. */
+  toolsOnly?: boolean
 }) {
+  const tabs = toolsOnly
+    ? TABS.filter(t => t.id !== 'financials').map(t => t.id === 'info' ? { ...t, label: 'Tool Info' } : t)
+    : TABS
   const { data: catData }    = useApi<{ data: any[] }>('/api/categories?type=fixed_asset')
   const { data: locData }    = useApi<{ data: any[] }>('/api/locations?all=true')
   // Always fetch persons — GET is open to all authenticated users now
@@ -590,7 +597,7 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons }: {
   }
 
   async function handleSubmit() {
-    if (!name.trim()) { setError('Asset name is required'); setTab('info'); return }
+    if (!name.trim()) { setError(toolsOnly ? 'Tool name is required' : 'Asset name is required'); setTab('info'); return }
     if (schedMaint && !maintDate) { setError('Select a date for the maintenance task'); setTab('maintenance'); return }
 
     setSaving(true); setError('')
@@ -655,13 +662,13 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons }: {
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-slate-100 flex-shrink-0">
-          <h2 className="text-base font-semibold text-slate-900">Add Fixed Asset</h2>
+          <h2 className="text-base font-semibold text-slate-900">{toolsOnly ? 'Add Tool' : 'Add Fixed Asset'}</h2>
           <Button variant="ghost" size="icon" onClick={onClose}><X className="w-4 h-4" /></Button>
         </div>
 
         {/* Tabs */}
         <div className="flex border-b border-slate-100 flex-shrink-0 px-2">
-          {TABS.map(t => (
+          {tabs.map(t => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
@@ -1069,7 +1076,7 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons }: {
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 flex-shrink-0 bg-slate-50 rounded-b-xl">
           <div className="flex gap-1.5">
-            {TABS.map((t, i) => (
+            {tabs.map((t, i) => (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
@@ -1094,7 +1101,7 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons }: {
                 <Button variant="outline" onClick={onClose}>Cancel</Button>
                 <Button
                   onClick={() => {
-                    const order: Tab[] = ['info', 'financials', 'warranty', 'maintenance']
+                    const order: Tab[] = tabs.map(t => t.id)
                     const next = order[order.indexOf(tab) + 1]
                     if (next) setTab(next)
                   }}
@@ -1108,7 +1115,7 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons }: {
                 <Button variant="outline" onClick={onClose}>Cancel</Button>
                 <Button onClick={handleSubmit} disabled={saving} className="gap-2">
                   {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  {saving ? 'Saving…' : schedMaint ? 'Add Asset & Schedule' : 'Add Asset'}
+                  {saving ? 'Saving…' : toolsOnly ? (schedMaint ? 'Add Tool & Schedule' : 'Add Tool') : schedMaint ? 'Add Asset & Schedule' : 'Add Asset'}
                 </Button>
               </>
             )}
@@ -1543,7 +1550,14 @@ export default function AssetsPage() {
   const canApprove = canManagePersons || role === 'procurement'
 
   const { data, loading, error, refetch } = useApi<{ data: any[] }>('/api/assets')
+  const { plan } = usePlan()
+  const toolsOnly = isToolsPlan(plan)
   const assets = data?.data ?? []
+
+  // Tools that have left the business don't count against the free limit.
+  const limit     = toolLimit(plan)
+  const liveCount = assets.filter((a: any) => !['disposed', 'retired', 'sold'].includes(a.status)).length
+  const atLimit   = limit != null && liveCount >= limit
 
   const filtered = assets.filter((a: any) => {
     const matchSearch =
@@ -1563,7 +1577,7 @@ export default function AssetsPage() {
 
   return (
     <div>
-      <Topbar title="Fixed Assets" />
+      <Topbar title={toolsOnly ? 'Tools' : 'Fixed Assets'} />
       <div className="p-6 space-y-4">
 
         {toast && (
@@ -1612,7 +1626,8 @@ export default function AssetsPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Link href="/transactions/new">
+            {/* The scan screen here is the stock-movement one; Tools accounts scan from /scan. */}
+            <Link href={toolsOnly ? '/scan' : '/transactions/new'}>
               <Button variant="outline" className="gap-2"><ScanBarcode className="w-4 h-4" />Scan</Button>
             </Link>
             {canManagePersons && (
@@ -1629,11 +1644,27 @@ export default function AssetsPage() {
                 )}
               </Button>
             )}
-            <Button className="gap-2" onClick={() => setShowAdd(true)}>
-              <Plus className="w-4 h-4" /> Add Asset
+            <Button className="gap-2" onClick={() => setShowAdd(true)} disabled={atLimit}>
+              <Plus className="w-4 h-4" /> {toolsOnly ? 'Add Tool' : 'Add Asset'}
             </Button>
           </div>
         </div>
+
+        {/* Free Stocked Tools: how much of the register is used */}
+        {limit != null && (
+          <div className={cn(
+            'flex flex-wrap items-center justify-between gap-2 rounded-lg border px-4 py-2.5 text-sm',
+            atLimit ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-slate-200 bg-white text-slate-600',
+          )}>
+            <span>
+              <strong>{liveCount} of {limit}</strong> tools on the free plan
+              {atLimit && ' — you’ve reached the limit.'}
+            </span>
+            <Link href="/settings?tab=billing" className="font-semibold text-indigo-600 hover:underline">
+              Upgrade for unlimited tools
+            </Link>
+          </div>
+        )}
 
         {error && <p className="text-red-500 text-sm">{error}</p>}
 
@@ -1756,13 +1787,19 @@ export default function AssetsPage() {
                     })()}
 
                     <div className="flex items-center justify-between border-t border-slate-50 pt-3">
-                      <div>
-                        <p className="text-xs text-slate-400">Purchase Cost</p>
-                        <p className="font-bold text-slate-900">{money(asset.purchase_cost ?? 0)}</p>
-                      </div>
+                      {toolsOnly ? (
+                        <p className="text-xs text-slate-400">Status</p>
+                      ) : (
+                        <div>
+                          <p className="text-xs text-slate-400">Purchase Cost</p>
+                          <p className="font-bold text-slate-900">{money(asset.purchase_cost ?? 0)}</p>
+                        </div>
+                      )}
                       <Badge variant={cfg.variant}>{cfg.label}</Badge>
                     </div>
-                    <p className="text-xs text-slate-400 mt-2">Acquired {asset.purchase_date ? formatDate(asset.purchase_date) : '—'}</p>
+                    {!toolsOnly && (
+                      <p className="text-xs text-slate-400 mt-2">Acquired {asset.purchase_date ? formatDate(asset.purchase_date) : '—'}</p>
+                    )}
                   </CardContent>
                 </Card>
               )
@@ -1783,6 +1820,7 @@ export default function AssetsPage() {
           onClose={() => setShowAdd(false)}
           onSaved={() => { setShowAdd(false); refetch?.() }}
           canManagePersons={canManagePersons}
+          toolsOnly={toolsOnly}
         />
       )}
 

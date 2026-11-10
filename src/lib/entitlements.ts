@@ -11,14 +11,23 @@
  *  - Downgrading never deletes data. Locked features stop being usable (and
  *    their rules stop being enforced) but everything recorded is kept and
  *    comes back on upgrade.
- *  - Everything not listed here is available on every plan (inventory, POs,
- *    receiving, barcodes, assets, maintenance, stock counts, the audit log,
- *    the accounting journal CSV export, reports).
+ *  - Everything not listed here is available on every plan (barcodes, tool
+ *    custody, maintenance, the audit log).
+ *
+ * Stocked Tools ('tools_free', 'tools') is the tool tracker sold on its own. It
+ * sits BELOW Starter: the same app with inventory, purchasing and the asset
+ * accounting switched off. Those accounts are held to an allow-list of pages
+ * and API routes (bottom of this file), so a route added later is closed to
+ * them until someone decides otherwise.
  */
 
-export type TierPlan = 'starter' | 'pro' | 'enterprise'
+export type TierPlan = 'tools_free' | 'tools' | 'starter' | 'pro' | 'enterprise'
 
 export type Feature =
+  | 'tool_reminders'        // overdue-tool emails
+  | 'tool_reports'          // tool history report and Excel export of tool reports
+  | 'inventory'             // stock, purchasing, receiving, counts, vendors — the materials side
+  | 'asset_accounting'      // purchase cost, depreciation, disposal entries, asset financial reports
   | 'approvals'             // delegation of authority, requisitions, PO approval workflow, check-out approvals
   | 'recurring_maintenance' // repeating preventive maintenance schedules
   | 'job_costing'           // cost centers, job codes, Expenses + Cost Analysis reports
@@ -27,6 +36,26 @@ export type Feature =
   | 'integrations'          // JobLedger and POS integrations (API)
 
 export const FEATURES: Record<Feature, { label: string; minPlan: TierPlan; description: string }> = {
+  tool_reminders: {
+    label: 'Overdue reminders',
+    minPlan: 'tools',
+    description: 'An email the day a tool goes overdue, and weekly while it stays out.',
+  },
+  tool_reports: {
+    label: 'Tool history & Excel export',
+    minPlan: 'tools',
+    description: 'Every check-out and return, searchable by tool or person, and any tool report as a spreadsheet.',
+  },
+  inventory: {
+    label: 'Inventory & purchasing',
+    minPlan: 'starter',
+    description: 'Stock by location, purchase orders, receiving, stock counts and vendors.',
+  },
+  asset_accounting: {
+    label: 'Asset costing & depreciation',
+    minPlan: 'starter',
+    description: 'Purchase cost, book value, depreciation runs, disposal entries and the accounting export.',
+  },
   approvals: {
     label: 'Approval limits',
     minPlan: 'pro',
@@ -59,9 +88,10 @@ export const FEATURES: Record<Feature, { label: string; minPlan: TierPlan; descr
   },
 }
 
-const RANK: Record<TierPlan, number> = { starter: 1, pro: 2, enterprise: 3 }
+const RANK: Record<TierPlan, number> = { tools_free: 0, tools: 1, starter: 2, pro: 3, enterprise: 4 }
 
 export const TIER_LABEL: Record<TierPlan, string> = {
+  tools_free: 'Stocked Tools Free', tools: 'Stocked Tools',
   starter: 'Starter', pro: 'Pro', enterprise: 'Enterprise',
 }
 
@@ -72,7 +102,14 @@ export const TIER_LABEL: Record<TierPlan, string> = {
 export function effectiveTier(plan: string | null | undefined): TierPlan {
   if (plan === 'enterprise') return 'enterprise'
   if (plan === 'pro' || plan === 'trial') return 'pro'
+  if (plan === 'tools') return 'tools'
+  if (plan === 'tools_free') return 'tools_free'
   return 'starter'
+}
+
+/** Stocked Tools, free or paid — the tool tracker without the rest of Stocked. */
+export function isToolsPlan(plan: string | null | undefined): boolean {
+  return plan === 'tools' || plan === 'tools_free'
 }
 
 export function planHasFeature(plan: string | null | undefined, feature: Feature): boolean {
@@ -90,4 +127,55 @@ export const PLAN_REQUIRED_CODE = 'plan_upgrade_required'
 export function upgradeMessage(feature: Feature): string {
   const f = FEATURES[feature]
   return `${f.label} is available on the ${TIER_LABEL[f.minPlan]} plan. Upgrade in Settings → Billing to use it.`
+}
+
+// ── Stocked Tools: what those accounts can reach ──────────────────────────────
+// Allow-lists, deliberately: anything not named here is closed to a Tools
+// account, including routes that don't exist yet.
+
+/** API route prefixes a Tools account may call. */
+const TOOLS_API_ALLOWED = [
+  '/api/account', '/api/accountable-persons', '/api/assets', '/api/audit-log',
+  '/api/barcode', '/api/billing', '/api/categories', '/api/health',
+  '/api/import/assets', '/api/import/locations', '/api/locations',
+  '/api/maintenance', '/api/members', '/api/notifications', '/api/onboarding',
+  '/api/org', '/api/pricing', '/api/push', '/api/scan', '/api/support',
+  '/api/user', '/api/users',
+]
+
+/** Carved back out of the prefixes above. */
+const TOOLS_API_DENIED: { prefix: string; feature: Feature }[] = [
+  { prefix: '/api/assets/depreciation',   feature: 'asset_accounting' },
+  { prefix: '/api/notifications/reorder', feature: 'inventory' },
+]
+
+/** Dashboard pages a Tools account may open. */
+const TOOLS_PAGES_ALLOWED = [
+  '/assets', '/maintenance', '/locations', '/settings', '/audit-log', '/scan',
+  '/reports/tools-out', '/reports/tools-by-crew', '/reports/tool-compliance', '/reports/tool-history',
+]
+
+/** Where a Tools account lands, and where it is sent from anything closed to it. */
+export const TOOLS_HOME = '/assets'
+
+const under = (path: string, prefix: string) => path === prefix || path.startsWith(prefix + '/')
+
+/**
+ * The feature a Tools account would need for this API path, or null if the
+ * path is open to it. A missing path is treated as closed.
+ */
+export function toolsApiBlock(pathname: string | null | undefined): Feature | null {
+  const path = (pathname ?? '').split('?')[0]
+  if (!path) return 'inventory'
+  const denied = TOOLS_API_DENIED.find(d => under(path, d.prefix))
+  if (denied) return denied.feature
+  return TOOLS_API_ALLOWED.some(p => under(path, p)) ? null : 'inventory'
+}
+
+/** Whether a Tools account may open this dashboard page. /reports itself is allowed (it lists only tool reports for them). */
+export function toolsPageAllowed(pathname: string | null | undefined): boolean {
+  const path = (pathname ?? '').split('?')[0]
+  if (!path) return true   // unknown: let the API gate do the refusing
+  if (path === '/reports') return true
+  return TOOLS_PAGES_ALLOWED.some(p => under(path, p))
 }

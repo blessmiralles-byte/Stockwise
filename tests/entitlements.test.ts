@@ -6,8 +6,13 @@ import {
 const ALL = Object.keys(FEATURES) as Feature[]
 
 describe('plan entitlements', () => {
-  it('gives Starter the shared features only', () => {
-    for (const f of ALL) expect(planHasFeature('starter', f)).toBe(false)
+  // Starter is the whole base product — everything except what Pro and
+  // Enterprise add on top.
+  it('gives Starter the base product and nothing from Pro or Enterprise', () => {
+    for (const f of ALL) {
+      const above = ['pro', 'enterprise'].includes(FEATURES[f].minPlan)
+      expect(planHasFeature('starter', f)).toBe(!above)
+    }
   })
 
   it('unlocks every Pro feature on Pro', () => {
@@ -33,14 +38,16 @@ describe('plan entitlements', () => {
   })
 
   // A typo or an unknown plan from the billing webhook must never hand out
-  // paid features — it falls back to the cheapest tier.
+  // Pro features. It falls back to Starter, not to Stocked Tools: dropping an
+  // existing customer out of their inventory over a typo would be the worse
+  // failure.
   it.each([null, undefined, '', 'platinum', 'PRO', 'business'])('fails closed for plan %s', plan => {
     expect(effectiveTier(plan as any)).toBe('starter')
-    for (const f of ALL) expect(planHasFeature(plan as any, f)).toBe(false)
+    for (const f of ALL) expect(planHasFeature(plan as any, f)).toBe(planHasFeature('starter', f))
   })
 
   it('never lists a feature as introduced at two tiers', () => {
-    const counted = ['starter', 'pro', 'enterprise'].flatMap(t => featuresIntroducedAt(t as any))
+    const counted = ['tools_free', 'tools', 'starter', 'pro', 'enterprise'].flatMap(t => featuresIntroducedAt(t as any))
     expect(new Set(counted).size).toBe(counted.length)
     expect(counted.sort()).toEqual([...ALL].sort())
   })

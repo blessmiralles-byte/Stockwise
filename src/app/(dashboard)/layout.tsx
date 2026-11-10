@@ -7,6 +7,9 @@ import { billingState } from '@/lib/billing'
 import { resolveOrgPricingRegion } from '@/lib/pricing-region-server'
 import { enforceTrialClaim } from '@/lib/trial-claims'
 import { CurrencyProvider } from '@/lib/use-currency'
+import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { isToolsPlan, toolsPageAllowed, TOOLS_HOME } from '@/lib/entitlements'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   // Access gate: an org whose trial has ended or whose subscription was
@@ -57,6 +60,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
         }
       }
     }
+  }
+
+  // A Stocked Tools account opening a page outside the tool tracker (an old
+  // bookmark, the post-login /dashboard) is sent to its tools. This runs on
+  // full page loads only; the sidebar doesn't link anywhere else, and the API
+  // refuses the data regardless (lib/api-auth.ts).
+  if (isToolsPlan(plan)) {
+    const path = (await headers()).get('x-pathname')
+    if (!toolsPageAllowed(path)) redirect(TOOLS_HOME)
   }
 
   return (
