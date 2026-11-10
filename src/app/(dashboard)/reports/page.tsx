@@ -2,7 +2,7 @@
 
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent } from '@/components/ui/card'
-import { BarChart2, TrendingUp, Package, ChevronRight, Briefcase, TrendingDown, ScrollText, BookOpen, Wrench, HardHat, Grid3x3, ShieldCheck } from 'lucide-react'
+import { BarChart2, TrendingUp, Package, ChevronRight, Briefcase, TrendingDown, ScrollText, BookOpen, Wrench, HardHat, Grid3x3, ShieldCheck, History } from 'lucide-react'
 import Link from 'next/link'
 import { type Feature, FEATURES } from '@/lib/entitlements'
 import { usePlan } from '@/lib/use-plan'
@@ -52,6 +52,13 @@ const reports: { href: string; icon: any; color: string; title: string; desc: st
     color: 'bg-teal-50 text-teal-600',
     title: 'Tool Compliance',
     desc: 'Inspection and calibration certificates — what is due, what has expired — plus the register of lost, stolen and damaged tools.',
+  },
+  {
+    href: '/reports/tool-history',
+    icon: History,
+    color: 'bg-violet-50 text-violet-600',
+    title: 'Tool History',
+    desc: 'Every check-out and return — who had which tool, when it came back, and what state it was in. Search by tool or by person.',
   },
   {
     href: '/reports/tools-by-crew',

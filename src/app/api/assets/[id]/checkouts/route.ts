@@ -16,8 +16,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .from('asset_checkouts')
     .select(`
       id, status, holder_name, job_code, job_reference, due_at, notes, reject_reason,
-      checked_out_at, approved_at, returned_at,
+      checked_out_at, approved_at, returned_at, return_condition, return_note,
       checked_out_by:user_profiles!checked_out_by(full_name),
+      returned_by:user_profiles!returned_by(full_name),
       returned_location:locations!returned_to_location_id(name)
     `)
     .eq('org_id', auth.orgId)

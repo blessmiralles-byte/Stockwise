@@ -17,8 +17,9 @@ import {
   Search, Plus, ScanBarcode, Building2, MoreVertical, User, MapPin,
   X, AlertCircle, Loader2, Shield, TrendingDown, Wrench, ChevronRight,
   Calendar, Info, CheckCircle2, Users, Pencil, Trash2, Printer, Tag,
-  Archive, DollarSign, RefreshCw, LogOut, LogIn, Clock, Lock, PackageX,
+  Archive, DollarSign, RefreshCw, LogOut, LogIn, Clock, Lock, PackageX, History,
 } from 'lucide-react'
+import { ToolHistoryDialog } from '@/components/assets/tool-history-dialog'
 import Link from 'next/link'
 import { PrintLabelsDialog, type LabelAsset } from '@/components/print-labels'
 
@@ -1385,15 +1386,31 @@ function CheckinDialog({ asset, onClose, onDone }: { asset: any; onClose: () => 
   const locations = locData?.data ?? []
   const [locId, setLocId] = useState('')
   const [saving, setSaving] = useState(false)
+  // Good is the default so an ordinary return stays one tap.
+  const [condition, setCondition] = useState<'good' | 'damaged'>('good')
+  const [note, setNote]   = useState('')
+  const [error, setError] = useState('')
 
   const submit = async () => {
-    setSaving(true)
+    if (condition === 'damaged' && !note.trim()) { setError('Say briefly what is wrong with it.'); return }
+    setSaving(true); setError('')
     try {
       const res = await fetch(`/api/assets/${asset.id}/checkin`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ returned_to_location_id: locId || null }),
+        body: JSON.stringify({
+          returned_to_location_id: locId || null,
+          return_condition: condition,
+          return_note: note.trim() || null,
+        }),
       })
-      if (res.ok) onDone(`${asset.name} checked in.`)
+      if (res.ok) {
+        onDone(condition === 'damaged'
+          ? `${asset.name} checked in as damaged — sent to maintenance.`
+          : `${asset.name} checked in.`)
+      } else {
+        const j = await res.json().catch(() => ({}))
+        setError(j.error ?? 'Could not check the tool in')
+      }
     } finally { setSaving(false) }
   }
 
@@ -1412,6 +1429,34 @@ function CheckinDialog({ asset, onClose, onDone }: { asset: any; onClose: () => 
           <option value="">— Leave location unchanged —</option>
           {locations.map((l: any) => <option key={l.id} value={l.id}>{'  '.repeat(l.level ?? 0)}{l.name}{l.code ? ` (${l.code})` : ''}</option>)}
         </select>
+
+        <div>
+          <p className="text-xs font-medium text-slate-600 mb-1.5">How did it come back?</p>
+          <div className="grid grid-cols-2 gap-2">
+            {([['good', 'Good to go'], ['damaged', 'Damaged']] as const).map(([value, label]) => (
+              <button
+                key={value} type="button" onClick={() => setCondition(value)}
+                className={cn(
+                  'px-3 py-2 rounded-lg border text-sm font-medium transition-colors',
+                  condition === value
+                    ? value === 'damaged' ? 'border-red-300 bg-red-50 text-red-700' : 'border-green-300 bg-green-50 text-green-700'
+                    : 'border-slate-200 text-slate-600 hover:bg-slate-50',
+                )}>
+                {label}
+              </button>
+            ))}
+          </div>
+          {condition === 'damaged' && (
+            <div className="mt-2">
+              <Input value={note} onChange={e => setNote(e.target.value)} placeholder="What's wrong with it?" autoFocus />
+              <p className="text-xs text-slate-400 mt-1">
+                It goes to maintenance instead of back on the shelf, and your supervisors are told.
+              </p>
+            </div>
+          )}
+        </div>
+        {error && <p className="text-xs text-red-600">{error}</p>}
+
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={submit} disabled={saving} className="gap-2 bg-green-600 hover:bg-green-700">
@@ -1488,6 +1533,7 @@ export default function AssetsPage() {
   const [disposeTarget,  setDisposeTarget]  = useState<{ asset: any; mode: 'retire' | 'sell' } | null>(null)
   const [checkoutTarget, setCheckoutTarget] = useState<any>(null)
   const [incidentTarget, setIncidentTarget] = useState<any>(null)
+  const [historyTarget,  setHistoryTarget]  = useState<any>(null)
   const [checkinTarget,  setCheckinTarget]  = useState<any>(null)
   const [toast,          setToast]          = useState('')
 
@@ -1692,6 +1738,13 @@ export default function AssetsPage() {
                             </Button>
                           )}
                           <button
+                            onClick={() => setHistoryTarget(asset)}
+                            title="Who's had it"
+                            className="text-slate-400 hover:text-indigo-600 transition-colors flex-shrink-0"
+                          >
+                            <History className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => setIncidentTarget(asset)}
                             title="Report lost, stolen or damaged"
                             className="text-slate-400 hover:text-red-600 transition-colors flex-shrink-0"
@@ -1751,6 +1804,10 @@ export default function AssetsPage() {
           onClose={() => setDisposeTarget(null)}
           onSaved={() => { setDisposeTarget(null); refetch() }}
         />
+      )}
+
+      {historyTarget && (
+        <ToolHistoryDialog asset={historyTarget} onClose={() => setHistoryTarget(null)} />
       )}
 
       {incidentTarget && (

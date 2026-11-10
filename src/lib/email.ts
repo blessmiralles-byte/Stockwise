@@ -459,3 +459,86 @@ export async function sendRetentionWarning({
     html,
   })
 }
+
+// ── Overdue tools ─────────────────────────────────────────────────────────────
+interface OverdueTool {
+  name:         string
+  asset_tag:    string | null
+  holder:       string | null
+  job:          string | null
+  due_at:       string
+  days_overdue: number
+}
+
+/**
+ * Tools that were due back and aren't. Sent the day a tool goes overdue and
+ * then weekly while it stays out — see lib/tool-returns.ts.
+ */
+export async function sendToolsOverdue({
+  to,
+  businessName,
+  tools,
+}: {
+  to: string | string[]
+  businessName: string
+  tools: OverdueTool[]
+}) {
+  const subject = `${tools.length} tool${tools.length > 1 ? 's' : ''} overdue — ${businessName}`
+  const esc = (s: string | null) => (s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
+
+  const row = (t: OverdueTool) => `
+    <tr>
+      <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;">
+        <div style="font-weight:600;color:#111;">${esc(t.name)}</div>
+        <div style="font-size:12px;color:#6b7280;">${esc([t.asset_tag, t.job].filter(Boolean).join(' · ')) || '&nbsp;'}</div>
+      </td>
+      <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#111;">${esc(t.holder) || '—'}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#6b7280;">${new Date(t.due_at).toISOString().slice(0, 10)}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#b91c1c;font-weight:600;">${t.days_overdue} day${t.days_overdue > 1 ? 's' : ''}</td>
+    </tr>`
+
+  const html = `
+    <!DOCTYPE html>
+    <html><head><meta charset="utf-8"></head>
+    <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f9fafb;margin:0;padding:20px;color:#111;">
+      <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+        <div style="background:#4f46e5;color:#fff;padding:24px 32px;">
+          <h1 style="margin:0;font-size:20px;">Tools due back</h1>
+          <p style="margin:4px 0 0;font-size:14px;opacity:.85;">${esc(businessName)}</p>
+        </div>
+        <div style="padding:24px 32px;">
+          <p style="margin:0 0 16px;font-size:14px;color:#374151;">
+            ${tools.length} tool${tools.length > 1 ? 's were' : ' was'} due back and ${tools.length > 1 ? 'haven’t' : 'hasn’t'} been checked in.
+          </p>
+          <table style="width:100%;border-collapse:collapse;font-size:14px;">
+            <thead>
+              <tr style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;">
+                <th style="text-align:left;padding:0 12px 8px;">Tool</th>
+                <th style="text-align:left;padding:0 12px 8px;">With</th>
+                <th style="text-align:right;padding:0 12px 8px;">Was due</th>
+                <th style="text-align:right;padding:0 12px 8px;">Overdue</th>
+              </tr>
+            </thead>
+            <tbody>${tools.map(row).join('')}</tbody>
+          </table>
+          <a href="${process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'}/reports/tools-out"
+             style="display:inline-block;margin-top:20px;background:#4f46e5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:14px;">
+            See everything that’s out →
+          </a>
+          <p style="margin:16px 0 0;font-size:12px;color:#6b7280;">
+            You’ll hear about each of these again in a week if it’s still out.
+          </p>
+        </div>
+        <div style="padding:16px 32px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280;">
+          Sent by Stocked · You receive this because you look after tools for ${esc(businessName)}.
+        </div>
+      </div>
+    </body></html>`
+
+  return resend.emails.send({
+    from: process.env.RESEND_FROM_EMAIL ?? 'Stocked <notifications@stocked.tech>',
+    to,
+    subject,
+    html,
+  })
+}

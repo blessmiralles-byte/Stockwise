@@ -10,6 +10,10 @@
       "schedule": "30 1 * * *"
     },
     {
+      "path": "/api/notifications/tools-overdue",
+      "schedule": "45 1 * * *"
+    },
+    {
       "path": "/api/notifications/trial",
       "schedule": "0 2 * * *"
     },
