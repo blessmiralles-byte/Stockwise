@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
+import { fetchAllPaged } from '@/lib/fetch-paged'
+import { jobLabels } from '@/lib/job-codes'
 
 /**
  * GET /api/reports/cost-analysis
@@ -46,7 +48,7 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = createServiceClient()
-  const { data: txs, error } = await supabase
+  const { rows: txs, truncated, error } = await fetchAllPaged<any>((a, b) => supabase
     .from('inventory_transactions')
     .select(`
       quantity, unit_cost, total_cost, job_code,
@@ -56,6 +58,11 @@ export async function GET(req: NextRequest) {
     .in('transaction_type', ['consumption', 'sale'])
     .gte('created_at', fromDate.toISOString())
     .lte('created_at', toDate.toISOString())
+    .order('created_at').order('id')
+    .range(a, b))
+
+  const { data: jobRows } = await supabase.from('job_codes').select('code, name').eq('org_id', auth.orgId)
+  const nameJob = jobLabels((jobRows ?? []) as any[])
 
   if (error) {
     console.error('[GET /api/reports/cost-analysis]', error)
@@ -79,7 +86,7 @@ export async function GET(req: NextRequest) {
     if (tx.cost_center && !ccLabel[ccKey]) {
       ccLabel[ccKey] = tx.cost_center.code ? `${tx.cost_center.code} — ${tx.cost_center.name}` : tx.cost_center.name
     }
-    if (tx.job_code && !jobLabel[jobKey]) jobLabel[jobKey] = tx.job_code
+    if (tx.job_code && !jobLabel[jobKey]) jobLabel[jobKey] = nameJob(tx.job_code)
 
     ccTotal[ccKey]   = (ccTotal[ccKey]  ?? 0) + cost
     jobTotal[jobKey] = (jobTotal[jobKey] ?? 0) + cost
@@ -102,6 +109,7 @@ export async function GET(req: NextRequest) {
     period:            { from, to },
     grand_total:       round(grandTotal),
     transaction_count: transactions.length,
+    truncated,
     cost_centers,
     job_codes,
     cells,

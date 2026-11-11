@@ -4,16 +4,18 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireAnyRole } from '@/lib/api-auth'
 
 /** GET /api/cost-centers — all authenticated users */
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   const auth = await requireAuth()
   if (auth.error) return auth.error
 
   const supabase = createServiceClient()
-  const { data, error } = await supabase
+  let query = supabase
     .from('cost_centers')
     .select('id, code, name, description, is_active')
     .eq('org_id', auth.orgId)
     .order('code')
+  if (req.nextUrl.searchParams.get('active') === 'true') query = query.eq('is_active', true)
+  const { data, error } = await query
 
   if (error) return NextResponse.json({ error: 'Failed to fetch cost centers' }, { status: 500 })
   return NextResponse.json({ data: data ?? [] })

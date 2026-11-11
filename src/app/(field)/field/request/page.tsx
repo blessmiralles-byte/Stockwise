@@ -116,6 +116,7 @@ export default function FieldRequestPage() {
   const [newCost, setNewCost]       = useState('')
   const [jobRef, setJobRef]         = useState('')
   const [jobCode, setJobCode]       = useState('')
+  const [jobCodes, setJobCodes]     = useState<any[]>([])
   const [costCenterId, setCcId]     = useState('')
   const [costCenters, setCCs]       = useState<any[]>([])
   const [requiredBy, setRequiredBy] = useState('')
@@ -126,6 +127,7 @@ export default function FieldRequestPage() {
 
   useEffect(() => {
     fetch('/api/cost-centers').then(r => r.json()).then(j => setCCs(j.data ?? [])).catch(() => {})
+    fetch('/api/job-codes?active=true').then(r => r.json()).then(j => setJobCodes(j.data ?? [])).catch(() => {})
   }, [])
 
   const detailsComplete = !!costCenterId && !!jobCode.trim()
@@ -402,12 +404,23 @@ export default function FieldRequestPage() {
 
               <div>
                 <label className="text-sm font-semibold text-gray-600 block mb-2">Job Code <span className="text-red-500">*</span></label>
-                <input
-                  value={jobCode}
-                  onChange={e => setJobCode(e.target.value)}
-                  placeholder="e.g. JOB-2026-0042"
-                  className="w-full h-14 px-4 rounded-2xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
-                />
+                {jobCodes.length > 0 ? (
+                  <select
+                    value={jobCode}
+                    onChange={e => setJobCode(e.target.value)}
+                    className="w-full h-14 px-4 rounded-2xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                  >
+                    <option value="">— Select a job code —</option>
+                    {jobCodes.map((j: any) => <option key={j.id} value={j.code}>{j.code} — {j.name}</option>)}
+                  </select>
+                ) : (
+                  <input
+                    value={jobCode}
+                    onChange={e => setJobCode(e.target.value)}
+                    placeholder="e.g. JOB-2026-0042"
+                    className="w-full h-14 px-4 rounded-2xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                  />
+                )}
               </div>
 
               <div>

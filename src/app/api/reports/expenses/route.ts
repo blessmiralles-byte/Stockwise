@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
+import { fetchAllPaged } from '@/lib/fetch-paged'
+import { jobLabels } from '@/lib/job-codes'
 
 /**
  * GET /api/reports/expenses
@@ -45,6 +47,7 @@ export async function GET(req: NextRequest) {
   const supabase = createServiceClient()
 
   // Fetch consumption + sale transactions in the period
+  const { rows: txs, truncated, error: txErr } = await fetchAllPaged<any>((a, b) => {
   let query = supabase
     .from('inventory_transactions')
     .select(`
@@ -58,12 +61,16 @@ export async function GET(req: NextRequest) {
     .in('transaction_type', ['consumption', 'sale'])
     .gte('created_at', fromDate.toISOString())
     .lte('created_at', toDate.toISOString())
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false }).order('id')
 
   if (ccFilter)  query = query.eq('cost_center_id', ccFilter)
   if (jobFilter) query = query.eq('job_code', jobFilter)
+  return query.range(a, b)
+  })
 
-  const { data: txs, error: txErr } = await query
+  const { data: jobRows } = await supabase.from('job_codes').select('code, name').eq('org_id', auth.orgId)
+  const nameJob = jobLabels((jobRows ?? []) as any[])
+
   if (txErr) {
     console.error('[GET /api/reports/expenses]', txErr)
     return NextResponse.json({ error: 'Failed to fetch expense data' }, { status: 500 })
@@ -103,7 +110,7 @@ export async function GET(req: NextRequest) {
       meta  = tx.cost_center ?? null
     } else {
       key   = tx.job_code ?? '__unassigned__'
-      label = tx.job_code ?? 'No Job Code'
+      label = tx.job_code ? nameJob(tx.job_code) : 'No Job Code'
       meta  = null
     }
 
@@ -144,6 +151,7 @@ export async function GET(req: NextRequest) {
       group_by:      groupBy,
       grand_total:   Math.round(grandTotal * 100) / 100,
       transaction_count: transactions.length,
+      truncated,
       groups:        groupList,
     },
   })

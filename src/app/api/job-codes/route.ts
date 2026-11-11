@@ -8,16 +8,19 @@ import { requireAuth, requireAnyRole } from '@/lib/api-auth'
  * POST /api/job-codes — create a new job code (owner, operations, procurement)
  */
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const auth = await requireAuth()
   if (auth.error) return auth.error
 
   const supabase = createServiceClient()
-  const { data, error } = await supabase
+  let query = supabase
     .from('job_codes')
     .select('id, code, name, description, billing_entity, address, contact_name, contact_phone, contact_email, is_active')
     .eq('org_id', auth.orgId)
     .order('code')
+  // Pickers ask for ?active=true; closed jobs should not be offered.
+  if (req.nextUrl.searchParams.get('active') === 'true') query = query.eq('is_active', true)
+  const { data, error } = await query
 
   if (error) {
     // Table may not exist yet — return empty list instead of crashing

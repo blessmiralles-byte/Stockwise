@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { resolveJobCode } from '@/lib/job-codes'
 import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
@@ -88,7 +89,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { type, job_reference, job_code, notes, required_by, location_id, cost_center_id, items } = body
+  const { type, job_reference, job_code: jobCodeTyped, notes, required_by, location_id, cost_center_id, items } = body
+  let job_code: string | null = typeof jobCodeTyped === 'string' ? jobCodeTyped.trim() : null
 
   if (!type || !['checkout', 'new_asset', 'inventory'].includes(type)) {
     return NextResponse.json(
@@ -123,6 +125,11 @@ export async function POST(req: NextRequest) {
   }
   const req_number = `REQ-${datePart}-${String(seqVal).padStart(4, '0')}`
 
+  {
+    const jobMatch = await resolveJobCode(supabase, auth.orgId, job_code)
+    if (!jobMatch.ok) return NextResponse.json({ error: jobMatch.error }, { status: 400 })
+    job_code = jobMatch.code
+  }
   const insert: Record<string, any> = {
     org_id: auth.orgId,
     req_number,

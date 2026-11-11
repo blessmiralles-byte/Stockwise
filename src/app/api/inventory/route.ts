@@ -3,6 +3,7 @@ import { orgHasFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireRole } from '@/lib/api-auth'
 import { movementRefusal } from '@/lib/movement-errors'
+import { resolveJobCode } from '@/lib/job-codes'
 import { createNotification } from '@/lib/notify'
 
 /**
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
     to_location_id, from_location_id,
     unit_cost, reference_no, customer_id, notes,
     expiration_date, batch_no, job_order_id,
-    cost_center_id, job_code,
+    cost_center_id, job_code: jobCodeTyped,
     draft, related_po_id, price_review,
   } = body
 
@@ -112,6 +113,12 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServiceClient()
+
+  // A mistyped code becomes a second job in the cost reports, so it has to be
+  // one the company has set up (when it keeps a list at all).
+  const jobMatch = await resolveJobCode(supabase, auth.orgId, jobCodeTyped)
+  if (!jobMatch.ok) return NextResponse.json({ error: jobMatch.error }, { status: 422 })
+  const job_code = jobMatch.code
 
   // Org policy: require a cost centre or job code when consuming stock, so
   // job-costing spend is fully attributed (no "Unassigned" leakage). Opt-in

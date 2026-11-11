@@ -212,6 +212,7 @@ function NewRequestDialog({
   const [locationId, setLocationId] = useState('')
   const [costCenterId, setCcId]       = useState('')
   const [jobCode, setJobCode]         = useState('')
+  const [jobCodes, setJobCodes]       = useState<any[]>([])
   const [costCenters, setCCs]         = useState<any[]>([])
   const [submitting, setSubmitting]   = useState(false)
   const [error, setError]             = useState('')
@@ -223,6 +224,7 @@ function NewRequestDialog({
         fetch('/api/locations').then(r => r.json()).then(j => setLocations(j.data ?? []))
       }
       fetch('/api/cost-centers').then(r => r.json()).then(j => setCCs(j.data ?? []))
+      fetch('/api/job-codes?active=true').then(r => r.json()).then(j => setJobCodes(j.data ?? [])).catch(() => {})
     }
   }, [open, type])
 
@@ -504,12 +506,23 @@ function NewRequestDialog({
                 <label className="text-xs font-medium text-slate-600 block mb-1.5">
                   Job Code <span className="text-red-500">*</span>
                 </label>
-                <input
-                  value={jobCode}
-                  onChange={e => setJobCode(e.target.value)}
-                  placeholder="e.g. JOB-2026-0042"
-                  className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+                {jobCodes.length > 0 ? (
+                  <select
+                    value={jobCode}
+                    onChange={e => setJobCode(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">— Select a job code —</option>
+                    {jobCodes.map((j: any) => <option key={j.id} value={j.code}>{j.code} — {j.name}</option>)}
+                  </select>
+                ) : (
+                  <input
+                    value={jobCode}
+                    onChange={e => setJobCode(e.target.value)}
+                    placeholder="e.g. JOB-2026-0042"
+                    className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                )}
               </div>
 
               <div>
