@@ -1216,7 +1216,7 @@ function SetupInner() {
   const [active, setActive] = useState(TABS.some(t => t.id === tabParam) ? tabParam : 'start')
   const [bannerDismissed, setBannerDismissed] = useState(false)
 
-  const { data: orgData } = useApi<{ data: any }>('/api/organization')
+  const { data: orgData } = useApi<{ data: any }>('/api/org')
   const createdAt   = orgData?.data?.created_at ? new Date(orgData.data.created_at) : null
   const daysSince   = createdAt ? Math.floor((Date.now() - createdAt.getTime()) / 86_400_000) : 999
   const inSetupWindow = daysSince <= 30

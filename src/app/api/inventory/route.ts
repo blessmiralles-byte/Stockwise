@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { orgHasFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireRole } from '@/lib/api-auth'
+import { movementRefusal } from '@/lib/movement-errors'
 import { createNotification } from '@/lib/notify'
 
 /**
@@ -95,6 +96,19 @@ export async function POST(req: NextRequest) {
   // M-1: Transfer same-location check
   if (transaction_type === 'transfer' && from_location_id && to_location_id && from_location_id === to_location_id) {
     return NextResponse.json({ error: 'Source and destination must be different' }, { status: 422 })
+  }
+
+  // A posted movement has to say where the stock is. Without a location the
+  // database function recorded the transaction and changed no balance — an
+  // issue on the ledger with the stock still on the shelf. Drafts are only
+  // notes until posted, so they may be incomplete.
+  if (draft !== true) {
+    const needs =
+      transaction_type === 'purchase'                                    ? (!to_location_id ? 'Choose the location the stock is going into.' : null)
+      : transaction_type === 'consumption' || transaction_type === 'sale' ? (!from_location_id ? 'Choose the location the stock is coming from.' : null)
+      : transaction_type === 'transfer'                                   ? (!from_location_id || !to_location_id ? 'A transfer needs both a source and a destination.' : null)
+      : (!from_location_id && !to_location_id ? 'Choose the location being adjusted.' : null)
+    if (needs) return NextResponse.json({ error: needs }, { status: 422 })
   }
 
   const supabase = createServiceClient()
@@ -194,10 +208,17 @@ export async function POST(req: NextRequest) {
   }
 
   // RPC not yet deployed (function does not exist) — fall back to manual logic
-  const isRpcMissing = rpcError.message?.includes('function') || rpcError.code === 'PGRST202'
+  const isRpcMissing = rpcError.code === 'PGRST202' ||
+    /function .*record_inventory_movement.* does not exist|could not find the function/i.test(rpcError.message ?? '')
   if (!isRpcMissing) {
+    // The function refuses some movements on purpose — not enough stock, a
+    // closed period, an item that isn't theirs. Those are answers, not
+    // failures: say so with a 4xx, and keep 500 (and the error log) for
+    // things that are actually broken.
+    const refusal = movementRefusal(rpcError.message ?? '')
+    if (refusal) return NextResponse.json({ error: refusal.error }, { status: refusal.status })
     console.error('[POST /api/inventory] RPC error', rpcError)
-    return NextResponse.json({ error: rpcError.message ?? 'Failed to record movement' }, { status: 500 })
+    return NextResponse.json({ error: 'Could not record that movement. Please try again.' }, { status: 500 })
   }
 
   // ── Fallback: manual multi-step (run rpc_record_movement.sql to upgrade) ──

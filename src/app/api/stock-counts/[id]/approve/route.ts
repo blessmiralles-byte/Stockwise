@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
 import { logAudit } from '@/lib/audit'
+import { movementRefusal } from '@/lib/movement-errors'
 
 /**
  * POST /api/stock-counts/:id/approve
@@ -30,22 +31,49 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Can only approve a count in "reviewing" status' }, { status: 400 })
   }
 
-  // M-2: SOD — the person who created the count cannot also approve it
+  // M-2: SOD — the person who created the count cannot also approve it…
+  // …unless there is nobody else who could. The rule had no exception, so a
+  // one-person company could start a count and never finish it. When the
+  // creator is the only person able to approve, they may — and the audit
+  // entry says that is what happened.
+  let soleApprover = false
   if (sc.created_by === auth.userId) {
-    return NextResponse.json(
-      { error: 'Segregation of duties: you cannot approve a stock count you created' },
-      { status: 403 }
-    )
+    const { count: others } = await supabase
+      .from('user_profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', auth.orgId)
+      .in('role', ['owner', 'admin', 'operations'])
+      .neq('is_active', false)
+      .neq('id', auth.userId)
+    if (others) {
+      return NextResponse.json(
+        { error: 'Segregation of duties: you cannot approve a stock count you created. Ask another owner or operations manager to approve it.' },
+        { status: 403 }
+      )
+    }
+    soleApprover = true
   }
 
   const lines = (sc.lines ?? []) as any[]
   const variantLines = lines.filter((l: any) => l.counted_qty !== null && Number(l.variance) !== 0)
+
+  // Adjustments are posted one at a time. If one fails the count stays in
+  // review, and approving again used to post the earlier ones a second time —
+  // doubling them. So find what this count has already posted and skip it.
+  const { data: posted } = await supabase
+    .from('inventory_transactions')
+    .select('product_id, to_location_id, from_location_id')
+    .eq('org_id', auth.orgId)
+    .eq('transaction_type', 'adjustment')
+    .eq('reference_no', sc.count_number)
+  const done = new Set((posted ?? []).map((t: any) => `${t.product_id}|${t.to_location_id ?? t.from_location_id}`))
 
   const errors: string[] = []
 
   for (const line of variantLines) {
     const variance = Number(line.variance)
     if (variance === 0) continue
+    if (done.has(`${line.product_id}|${line.location_id}`)) continue
 
     // The RPC's adjustment branch takes a SIGNED quantity at a single location —
     // a shortage (negative variance) must decrease stock, not add it back.
@@ -69,12 +97,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     })
 
     if (txErr) {
-      errors.push(`product ${line.product_id}: ${txErr.message}`)
+      console.error('[stock count approve]', sc.count_number, line.product_id, txErr.message)
+      errors.push(movementRefusal(txErr.message ?? '')?.error ?? 'an adjustment could not be posted')
     }
   }
 
   if (errors.length > 0) {
-    return NextResponse.json({ error: 'Some adjustments failed: ' + errors.join('; ') }, { status: 500 })
+    // Whatever did post stays posted and is skipped next time, so approving
+    // again finishes the job rather than repeating it.
+    return NextResponse.json(
+      { error: `${errors.length} adjustment${errors.length > 1 ? 's' : ''} could not be posted (${[...new Set(errors)].join('; ')}). The count is still in review — approve again once resolved.` },
+      { status: 409 },
+    )
   }
 
   const { data, error: approveErr } = await supabase
@@ -85,6 +119,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       approved_at: new Date().toISOString(),
     })
     .eq('id', id)
+    .eq('org_id', auth.orgId)
     .select()
     .single()
 
@@ -103,6 +138,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       count_number:       sc.count_number,
       adjustments_posted: variantLines.length,
       approved_at:        new Date().toISOString(),
+      // No second person existed to approve it.
+      ...(soleApprover ? { approved_by_creator: true } : {}),
     },
   })
 

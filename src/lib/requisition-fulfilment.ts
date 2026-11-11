@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/service'
+import { movementRefusal } from '@/lib/movement-errors'
 
 type Svc = ReturnType<typeof createServiceClient>
 
@@ -98,11 +99,12 @@ export async function applyRequisitionApproval(sb: Svc, r: any, opts: { orgId: s
     if (rpcErr) {
       // Only fall back to manual posting when the RPC isn't deployed. A real
       // rejection (insufficient stock, closed period) must not be force-posted.
-      const isRpcMissing =
-        rpcErr.message?.toLowerCase().includes('function') || (rpcErr as any).code === 'PGRST202'
+      const isRpcMissing = (rpcErr as any).code === 'PGRST202' ||
+        /function .*record_inventory_movement.* does not exist|could not find the function/i.test(rpcErr.message ?? '')
       if (!isRpcMissing) {
         console.error(`[requisition ${r.req_number}] consumption rejected:`, rpcErr.message)
-        warnings.push(rpcErr.message)
+        // Plain words for a refusal; never the raw database text.
+        warnings.push(movementRefusal(rpcErr.message ?? '')?.error ?? 'The stock could not be issued.')
         continue
       }
 

@@ -3,8 +3,10 @@ import { createServiceClient } from '@/lib/supabase/service'
 /**
  * Fetch a supplier's still-open POs (with their lines), earliest first.
  *
- * "Open" = not draft / received / cancelled — i.e. actually issued to the
- * supplier and not yet fully received. Shared by the goods-receipt cascade and
+ * "Open" = placed with the supplier and not yet fully received: approved, sent
+ * or part-received. An order still awaiting approval is NOT open — it was
+ * included once (the filter only excluded draft/received/cancelled), which let
+ * a delivery spill onto it and mark it part-received before anyone approved it. Shared by the goods-receipt cascade and
  * the receive-alternates endpoint so both agree on what counts as open and in
  * what order. Ordering: order_date asc (nulls last), then created_at asc.
  */
@@ -21,7 +23,7 @@ export async function fetchOpenSupplierPOs(
     `)
     .eq('org_id', orgId)
     .eq('supplier_id', supplierId)
-    .not('status', 'in', '(draft,received,cancelled)')
+    .in('status', ['approved', 'sent', 'partial'])
     .order('order_date', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: true })
 

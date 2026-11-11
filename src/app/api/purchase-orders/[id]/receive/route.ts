@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
 import { fetchOpenSupplierPOs } from '@/lib/purchase-orders'
 import { receivableCap } from '@/lib/utils'
+import { receiveBlock } from '@/lib/po-status'
 
 /**
  * POST /api/purchase-orders/:id/receive
@@ -38,9 +39,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 })
   }
 
-  if (po.status === 'cancelled' || po.status === 'received') {
-    return NextResponse.json({ error: `Cannot receive against a ${po.status} PO` }, { status: 400 })
-  }
+  // Only against an order that has actually been placed. Receiving against a
+  // draft used to be allowed, and moved it to "partial" — skipping approval.
+  const blocked = receiveBlock(po.status)
+  if (blocked) return NextResponse.json({ error: blocked }, { status: 400 })
 
   // Supplier over-receipt tolerance (percentage; 0 = strict). Same supplier
   // governs any earlier PO the receiver chooses to allocate to.

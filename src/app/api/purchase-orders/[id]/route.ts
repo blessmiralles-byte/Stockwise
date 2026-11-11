@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireRole } from '@/lib/api-auth'
+import { poStatusMove } from '@/lib/po-status'
 import { sumLineValue } from '@/lib/approvals'
 import { orgHasFeature } from '@/lib/entitlements-server'
 import {
@@ -93,7 +94,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const to = updates.status as string | undefined
   const from = po.status as string
 
-  if (approvalsOn && to && Object.keys(updates).length === 1) {
+  // Every status change is checked against the written-down moves
+  // (lib/po-status.ts). It used to be that whatever the branches below didn't
+  // mention fell through to a plain update — including draft → approved.
+  let move: ReturnType<typeof poStatusMove> | null = null
+  if (to !== undefined) {
+    // On its own, so a status change can't ride in beside an edit and skip
+    // the checks (which is exactly how the approval step used to be bypassed).
+    if (Object.keys(updates).length > 1) {
+      return NextResponse.json({ error: 'Change the status on its own, separately from other edits.' }, { status: 400 })
+    }
+    move = poStatusMove(from, to, approvalsOn)
+    if (!move.ok) return NextResponse.json({ error: move.error }, { status: 409 })
+  }
+
+  if (approvalsOn && to && move?.ok && move.kind === 'workflow') {
     const amount = sumLineValue(po.lines as any[], 'quantity_ordered', 'unit_cost')
     const submitterId: string | null = (po as any).submitted_by ?? (po as any).created_by ?? null
     const chainArgs = { orgId: auth.orgId, docType: 'purchase_order' as const, docId: id, ref: po.po_number, amount }

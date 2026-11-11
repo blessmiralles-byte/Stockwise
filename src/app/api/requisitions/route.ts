@@ -99,6 +99,11 @@ export async function POST(req: NextRequest) {
   if (!Array.isArray(items) || items.length === 0) {
     return NextResponse.json({ error: 'At least one item is required' }, { status: 400 })
   }
+  // Checked here, not left to the database: an unknown type used to surface as
+  // a 500 "Failed to save requisition items".
+  if ((items as any[]).some(i => !['asset', 'product', 'new'].includes(i?.item_type))) {
+    return NextResponse.json({ error: 'Each item must be an asset, a product, or a new purchase.' }, { status: 400 })
+  }
   if (!cost_center_id) {
     return NextResponse.json({ error: 'A cost center is required' }, { status: 400 })
   }
@@ -173,8 +178,12 @@ export async function POST(req: NextRequest) {
       submitterId: auth.userId, amount,
     })
     if (result.outcome === 'approved') {
-      await applyRequisitionApproval(supabase, full, { orgId: auth.orgId, actorId: auth.userId })
-      approvalMessage = 'Approved.'
+      // Approved is not the same as issued: if the stock isn't there, the
+      // requester has to hear it, or they wait for materials that aren't coming.
+      const notIssued = await applyRequisitionApproval(supabase, full, { orgId: auth.orgId, actorId: auth.userId })
+      approvalMessage = notIssued.length
+        ? `Approved, but not issued: ${[...new Set(notIssued)].join(' ')}`
+        : 'Approved.'
     } else if (result.outcome === 'pending') {
       approvalMessage = `Sent to ${result.approver.name} for approval.`
     }

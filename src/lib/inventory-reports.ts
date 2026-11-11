@@ -106,10 +106,10 @@ export interface AdjustmentRow extends AdjustmentTx {
   source: 'Stock count' | 'Manual'
 }
 
-/** Stock count adjustments carry the count's number (SC-…) as their reference. */
+/** Stock count adjustments carry the count's number (CC-…) as their reference, and say so in their note. */
 function sourceOf(tx: AdjustmentTx): AdjustmentRow['source'] {
   const text = `${tx.reference_no ?? ''} ${tx.notes ?? ''}`
-  return /\bSC-|stock count/i.test(text) ? 'Stock count' : 'Manual'
+  return /\b[CS]C-\d|stock count/i.test(text) ? 'Stock count' : 'Manual'
 }
 
 export function stockAdjustments(txs: AdjustmentTx[]): {
