@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
 import { sendRetentionWarning } from '@/lib/email'
+import { purgeOrganization } from '@/lib/org-purge'
 import { retentionAction, daysUntilPurge, inactiveFrom, RETENTION, type RetentionOrg } from '@/lib/retention'
 
 /**
@@ -83,13 +84,13 @@ async function run(dryRun: boolean) {
       if (!purgeEnabled()) { wouldPurge.push(org.name ?? org.id); continue }
       if (dryRun) { wouldPurge.push(org.name ?? org.id); continue }
 
-      // Same path as a customer deleting their own account: the organization
-      // row cascades its data, then each member's login goes.
-      const { data: members } = await supabase
-        .from('user_profiles').select('id').eq('org_id', org.id)
-      await supabase.from('organizations').delete().eq('id', org.id)
-      for (const m of (members ?? []) as any[]) {
-        await supabase.auth.admin.deleteUser(m.id).catch(() => {})
+      // Same path as a customer deleting their own account.
+      const result = await purgeOrganization(supabase, org.id)
+      if (!result.ok) {
+        // Left exactly as it was; it will be tried again on the next run.
+        console.error(`[retention] could not purge org ${org.id}: ${result.error}`)
+        failures.push(org.id)
+        continue
       }
       console.warn(`[retention] purged org ${org.id} (${org.name ?? 'unnamed'})`)
       purged.push(org.name ?? org.id)

@@ -10,8 +10,10 @@ import { Input } from '@/components/ui/input'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/lib/use-api'
 import {
-  TrendingUp, AlertTriangle, Search, Info, ShoppingCart, BarChart2, RefreshCw,
+  TrendingUp, TrendingDown, AlertTriangle, Search, Info, ShoppingCart, BarChart2, RefreshCw, Truck,
 } from 'lucide-react'
+import { ExportButtons } from '@/components/reports/export-buttons'
+import { formatDate } from '@/lib/utils'
 
 // ── Status config ─────────────────────────────────────────────────────────────
 const statusConfig = {
@@ -52,6 +54,30 @@ function DaysBar({ days, forecastDays, leadTime }: { days: number | null; foreca
   )
 }
 
+// ── Projected balance, week by week ───────────────────────────────────────────
+function BalanceLine({ start, points }: { start: number; points: { date: string; balance: number }[] }) {
+  const values = [start, ...points.map(p => p.balance)]
+  if (values.length < 2) return null
+  const max = Math.max(...values, 1)
+  const W = 72, H = 22
+  const xy = values.map((v, i) => `${(i / (values.length - 1)) * W},${H - 2 - (v / max) * (H - 4)}`).join(' ')
+  const end = values[values.length - 1]
+  const stroke = end <= 0 ? '#dc2626' : end < start * 0.25 ? '#d97706' : '#4f46e5'
+  return (
+    <svg width={W} height={H} className="inline-block" role="img"
+      aria-label={`Projected balance from ${start} to ${end}`}>
+      <line x1="0" y1={H - 2} x2={W} y2={H - 2} stroke="#e2e8f0" strokeWidth="1" />
+      <polyline points={xy} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function TrendMark({ trend, pct }: { trend: string | null; pct: number | null }) {
+  if (trend === 'rising')  return <span className="inline-flex items-center gap-0.5 text-xs text-red-600" title="Usage is rising"><TrendingUp className="w-3 h-3" />{pct != null ? `+${pct}%` : 'new'}</span>
+  if (trend === 'falling') return <span className="inline-flex items-center gap-0.5 text-xs text-blue-600" title="Usage is falling"><TrendingDown className="w-3 h-3" />{pct}%</span>
+  return null
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 const LOOKBACK_OPTIONS  = [{ value: 30, label: '30 days' }, { value: 60, label: '60 days' }, { value: 90, label: '90 days' }, { value: 180, label: '6 months' }]
 const FORECAST_OPTIONS  = [{ value: 14, label: '2 weeks' }, { value: 30, label: '30 days' }, { value: 60, label: '60 days' }, { value: 90, label: '90 days' }]
@@ -80,7 +106,24 @@ export default function ForecastingPage() {
     return matchStatus && matchSearch
   }), [rows, statusFilter, search])
 
+  const today = new Date().toISOString().slice(0, 10)
   const needsReorder = filtered.filter(r => r.suggested_reorder > 0)
+
+  const buildSheets = () => [{
+    name: 'Forecast',
+    rows: [
+      ['Item', 'Code', 'Category', 'Status', 'Usage / day', 'Trend %', `${forecastDays}d demand`, 'On hand', 'On order',
+        `Balance in ${forecastDays}d`, 'Short', 'Runs out', 'Order by', 'Order qty', 'Lead days', 'Safety stock', 'Reorder point'],
+      ...filtered.map(r => [
+        r.product?.name ?? '', r.product?.sku ?? '', r.product?.category?.name ?? '',
+        statusConfig[r.forecast_status as keyof typeof statusConfig]?.label ?? r.forecast_status,
+        r.forecast_daily, r.trend_pct ?? '', r.projected_qty, r.current_stock, r.on_order,
+        r.projected_balance, r.projected_shortfall, r.stockout_date ?? '', r.order_by ?? '',
+        r.suggested_reorder, r.lead_time_days, r.safety_stock, r.reorder_point,
+      ]),
+    ],
+    notes: [`Demand forecast — learned from the last ${daysBack} days, projected ${forecastDays} days ahead`],
+  }]
 
   async function runAbcXyz() {
     setClassifying(true); setClassifyMsg('')
@@ -139,6 +182,7 @@ export default function ForecastingPage() {
             <RefreshCw className={`w-3.5 h-3.5 ${classifying ? 'animate-spin' : ''}`} />
             {classifyMsg || (classifying ? 'Classifying…' : 'Run ABC/XYZ')}
           </Button>
+          <ExportButtons filename="Demand forecast" build={buildSheets} disabled={filtered.length === 0} />
         </div>
 
         {/* ── Summary cards ─────────────────────────────────────── */}
@@ -151,17 +195,17 @@ export default function ForecastingPage() {
                   <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Critical</span>
                 </div>
                 <p className="text-3xl font-bold text-red-600">{summary.critical_count ?? 0}</p>
-                <p className="text-xs text-slate-400 mt-0.5">Stock ≤ lead time</p>
+                <p className="text-xs text-slate-400 mt-0.5">Runs out before an order could arrive</p>
               </CardContent>
             </Card>
             <Card className="border-yellow-100">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-1">
                   <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                  <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">At Reorder Point</span>
+                  <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Order This Week</span>
                 </div>
                 <p className="text-3xl font-bold text-yellow-600">{summary.low_count ?? 0}</p>
-                <p className="text-xs text-slate-400 mt-0.5">Below lead-time reorder pt</p>
+                <p className="text-xs text-slate-400 mt-0.5">Order-by date within 7 days</p>
               </CardContent>
             </Card>
             <Card>
@@ -181,7 +225,10 @@ export default function ForecastingPage() {
                   <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Reorder Value</span>
                 </div>
                 <p className="text-2xl font-bold text-green-700">{money(summary.total_reorder_value ?? 0)}</p>
-                <p className="text-xs text-slate-400 mt-0.5">{needsReorder.length} items need restocking</p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {needsReorder.length} items to order
+                  {summary.on_order_value > 0 && <> · {money(summary.on_order_value)} already on order</>}
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -220,7 +267,7 @@ export default function ForecastingPage() {
         <Card>
           <CardContent className="p-0">
             {loading ? (
-              <TableSkeleton rows={8} cols={8} />
+              <TableSkeleton rows={8} cols={10} />
             ) : error ? (
               <p className="text-center py-10 text-red-500">{error}</p>
             ) : filtered.length === 0 ? (
@@ -242,14 +289,13 @@ export default function ForecastingPage() {
                     <tr className="border-b-2 border-slate-100 bg-slate-50">
                       <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide">Item</th>
                       <th className="text-center px-3 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide hidden xl:table-cell">Class</th>
-                      <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide hidden md:table-cell">Avg / Day</th>
-                      <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide">
-                        {forecastDays}d Forecast
-                      </th>
+                      <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide hidden md:table-cell">Usage / Day</th>
+                      <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide hidden lg:table-cell">{forecastDays}d Demand</th>
                       <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide">On Hand</th>
-                      <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide hidden lg:table-cell">Reorder Pt</th>
-                      <th className="px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide">Days Left</th>
-                      <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide hidden lg:table-cell">Reorder Qty</th>
+                      <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide">In {forecastDays}d</th>
+                      <th className="px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide">Runs Out</th>
+                      <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide hidden md:table-cell">Order By</th>
+                      <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide hidden lg:table-cell">Order Qty</th>
                       <th className="text-center px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wide">Status</th>
                     </tr>
                   </thead>
@@ -259,6 +305,7 @@ export default function ForecastingPage() {
                       const isUrgent = r.forecast_status === 'critical' || r.forecast_status === 'low'
                       const abc = r.product?.abc_class
                       const xyz = r.product?.xyz_class
+                      const orderNow = r.order_by && r.order_by <= today
                       return (
                         <tr
                           key={r.product?.id}
@@ -284,38 +331,66 @@ export default function ForecastingPage() {
                             </div>
                           </td>
 
-                          {/* Avg daily */}
+                          {/* Forecast rate, with the trend */}
                           <td className="px-4 py-3 text-right hidden md:table-cell">
-                            <span className="font-semibold text-slate-800 tabular-nums">{r.avg_daily}</span>
-                            <span className="text-xs text-slate-400 ml-1">{r.product?.unit_of_measure}/day</span>
+                            <span className="font-semibold text-slate-800 tabular-nums">{r.forecast_daily}</span>
+                            <span className="text-xs text-slate-400 ml-1">{r.product?.unit_of_measure}</span>
+                            <span className="block"><TrendMark trend={r.trend} pct={r.trend_pct} /></span>
                           </td>
 
                           {/* Projected demand */}
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-3 text-right hidden lg:table-cell">
                             <span className="font-semibold text-indigo-700 tabular-nums">{r.projected_qty.toLocaleString()}</span>
                             <span className="block text-xs text-slate-400 tabular-nums">{money(r.projected_value)}</span>
                           </td>
 
-                          {/* Current stock */}
+                          {/* On hand, and what is on its way */}
                           <td className="px-4 py-3 text-right">
                             <span className={`font-bold tabular-nums ${r.current_stock <= 0 ? 'text-red-600' : 'text-slate-900'}`}>
                               {r.current_stock.toLocaleString()}
                             </span>
                             <span className="text-xs text-slate-400 ml-1">{r.product?.unit_of_measure}</span>
+                            {r.on_order > 0 && (
+                              <span className="flex items-center justify-end gap-1 text-xs text-emerald-700">
+                                <Truck className="w-3 h-3" />+{r.on_order.toLocaleString()} on order
+                              </span>
+                            )}
                           </td>
 
-                          {/* Reorder point */}
-                          <td className="px-4 py-3 text-right hidden lg:table-cell">
-                            <span className="tabular-nums text-slate-600">{r.reorder_point.toLocaleString()}</span>
-                            <span className="block text-xs text-slate-400">{r.lead_time_days}d lead</span>
+                          {/* Projected balance at the end of the horizon */}
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <span className="hidden xl:inline"><BalanceLine start={r.current_stock} points={r.weekly_balance ?? []} /></span>
+                              <span className={`font-semibold tabular-nums ${r.projected_balance <= 0 ? 'text-red-600' : 'text-slate-800'}`}>
+                                {Math.round(r.projected_balance).toLocaleString()}
+                              </span>
+                            </div>
+                            {r.projected_shortfall > 0 && (
+                              <span className="block text-xs text-red-600">short {r.projected_shortfall.toLocaleString()}</span>
+                            )}
                           </td>
 
-                          {/* Days remaining bar */}
-                          <td className="px-4 py-3 min-w-[120px]">
+                          {/* Run-out date */}
+                          <td className="px-4 py-3 min-w-[130px]">
                             <DaysBar days={r.days_remaining} forecastDays={forecastDays} leadTime={r.lead_time_days} />
+                            <span className="block text-xs text-slate-400 mt-0.5">
+                              {r.stockout_date ? formatDate(r.stockout_date) : r.forecast_status === 'no_movement' ? '' : 'Over a year'}
+                            </span>
                           </td>
 
-                          {/* Suggested reorder */}
+                          {/* Order-by date */}
+                          <td className="px-4 py-3 hidden md:table-cell whitespace-nowrap">
+                            {r.order_by ? (
+                              <>
+                                <span className={`text-sm ${orderNow ? 'font-semibold text-red-600' : 'text-slate-700'}`}>
+                                  {orderNow ? 'Now' : formatDate(r.order_by)}
+                                </span>
+                                <span className="block text-xs text-slate-400">{r.lead_time_days}d lead</span>
+                              </>
+                            ) : <span className="text-slate-300">—</span>}
+                          </td>
+
+                          {/* Suggested order */}
                           <td className="px-4 py-3 text-right hidden lg:table-cell">
                             {r.suggested_reorder > 0 ? (
                               <span className="font-semibold text-orange-600 tabular-nums">
@@ -345,11 +420,12 @@ export default function ForecastingPage() {
           <div className="flex items-start gap-2 text-xs text-slate-400 bg-slate-50 rounded-lg px-4 py-3">
             <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
             <p>
-              Forecast uses a <strong>simple moving average</strong> over the last <strong>{daysBack} days</strong>.
-              Reorder point = avg_daily × (lead_time + review_period) + safety_stock.
-              "Critical" = stock will run out before the vendor can deliver.
-              "At Reorder Point" = stock is below the lead-time-aware threshold.
-              <strong> Run ABC/XYZ</strong> to classify items by consumption value and demand variability.
+              Usage is learned from the last <strong>{daysBack} days</strong>, in weekly totals, with recent weeks
+              counting for more — so an item whose use is climbing is forecast higher than its plain average.
+              Deliveries on open purchase orders are counted on their expected date; an overdue or undated one is
+              assumed a lead time away. <strong>Order by</strong> is the last day an order can go in and still arrive
+              before stock dips into its safety margin, which is sized from how unevenly the item is used unless
+              you set one on the item. <strong>Run ABC/XYZ</strong> to classify items by value and variability.
             </p>
           </div>
         )}

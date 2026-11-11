@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
+import { fetchAllPaged } from '@/lib/fetch-paged'
 
 /**
  * GET /api/reports/valuation?from=YYYY-MM-DD&to=YYYY-MM-DD
@@ -28,12 +29,22 @@ export async function GET(req: NextRequest) {
 
   const supabase = createServiceClient()
 
-  // Helper: resolve cost from a transaction row (handles legacy NULL total_cost)
+  // The SIZE of a transaction's value (handles legacy NULL total_cost).
+  // total_cost is a generated column, quantity × unit_cost, so it is negative
+  // on a write-down. Returning it raw meant the adjustment branches below —
+  // which apply the sign themselves — flipped a write-down into a gain: a
+  // shrinkage of 6 was added to closing stock as +6. Direction is decided from
+  // the quantity, in one place; this only ever returns a magnitude.
   const txCost = (tx: any) =>
-    Number(tx.total_cost ?? (Math.abs(Number(tx.quantity)) * Number(tx.unit_cost ?? 0)))
+    Math.abs(Number(tx.total_cost ?? (Number(tx.quantity) * Number(tx.unit_cost ?? 0))))
+
+  // Both reads are paged. Left as single selects they were capped by the
+  // database API's own row ceiling, and the opening balance — rebuilt from
+  // every transaction before the period — is the first figure to go quietly
+  // wrong as a customer's history grows.
 
   // Transactions in the period
-  const { data: txs, error: txErr } = await supabase
+  const { rows: txs, error: txErr, truncated: txTruncated } = await fetchAllPaged<any>((pageFrom, pageTo) => supabase
     .from('inventory_transactions')
     .select(`
       transaction_type, product_id, quantity, unit_cost, total_cost,
@@ -43,17 +54,21 @@ export async function GET(req: NextRequest) {
     .gte('created_at', fromDate.toISOString())
     .lte('created_at', toDate.toISOString())
     .in('transaction_type', ['purchase', 'consumption', 'sale', 'adjustment'])
+    .order('id')
+    .range(pageFrom, pageTo))
 
   if (txErr) {
     return NextResponse.json({ error: 'Failed to fetch transactions' }, { status: 500 })
   }
 
   // All transactions BEFORE the period — to reconstruct opening balance per product
-  const { data: openingTxs, error: openErr } = await supabase
+  const { rows: openingTxs, error: openErr, truncated: openTruncated } = await fetchAllPaged<any>((pageFrom, pageTo) => supabase
     .from('inventory_transactions')
     .select('product_id, quantity, unit_cost, total_cost, transaction_type')
     .eq('org_id', auth.orgId)
     .lt('created_at', fromDate.toISOString())
+    .order('id')
+    .range(pageFrom, pageTo))
 
   if (openErr) {
     return NextResponse.json({ error: 'Failed to compute opening stock' }, { status: 500 })
@@ -70,10 +85,10 @@ export async function GET(req: NextRequest) {
     if (!openingMap[pid]) openingMap[pid] = { qty: 0, value: 0 }
 
     if (tx.transaction_type === 'purchase') {
-      openingMap[pid].qty   += qty
+      openingMap[pid].qty   += Math.abs(qty)
       openingMap[pid].value += cost
     } else if (tx.transaction_type === 'consumption' || tx.transaction_type === 'sale') {
-      openingMap[pid].qty   -= qty
+      openingMap[pid].qty   -= Math.abs(qty)
       openingMap[pid].value -= cost
     } else if (tx.transaction_type === 'adjustment') {
       openingMap[pid].qty   += qty   // signed qty
@@ -146,14 +161,14 @@ export async function GET(req: NextRequest) {
     ensureLine(pid, tx.product)
 
     if (tx.transaction_type === 'purchase') {
-      lineMap[pid].purchases_qty   += qty
+      lineMap[pid].purchases_qty   += Math.abs(qty)
       lineMap[pid].purchases_value += cost
-      lineMap[pid].closing_qty     += qty
+      lineMap[pid].closing_qty     += Math.abs(qty)
       lineMap[pid].closing_value   += cost
     } else if (tx.transaction_type === 'consumption' || tx.transaction_type === 'sale') {
-      lineMap[pid].issues_qty   += qty
+      lineMap[pid].issues_qty   += Math.abs(qty)
       lineMap[pid].issues_value += cost
-      lineMap[pid].closing_qty  -= qty
+      lineMap[pid].closing_qty  -= Math.abs(qty)
       lineMap[pid].closing_value -= cost
     } else if (tx.transaction_type === 'adjustment') {
       const adjCost = qty >= 0 ? cost : -cost
@@ -193,5 +208,7 @@ export async function GET(req: NextRequest) {
       },
       lines,
     },
+    // More history than one pass can read: the figures above are incomplete.
+    truncated: txTruncated || openTruncated || undefined,
   })
 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
 import { claimTrialEmail } from '@/lib/trial-claims'
+import { purgeOrganization } from '@/lib/org-purge'
 
 /**
  * DELETE /api/account
@@ -39,19 +40,17 @@ export async function DELETE() {
       // another one. Only a hash is stored.
       if (me.email) await claimTrialEmail(supabase, me.email, me.org_id)
 
-      // Collect every member before we remove the org.
-      const { data: members } = await supabase
-        .from('user_profiles')
-        .select('id')
-        .eq('org_id', me.org_id)
-
-      // Deleting the organization cascades all org-scoped data
-      // (org_id … ON DELETE CASCADE across the tenant tables).
-      await supabase.from('organizations').delete().eq('id', me.org_id)
-
-      // Remove each member's auth login (cascades their user_profiles row).
-      for (const m of members ?? []) {
-        await supabase.auth.admin.deleteUser(m.id).catch(() => {})
+      // Removes the organization's data, then — only once that is confirmed
+      // gone — each member's login. Scoped to the caller's own org_id.
+      const purged = await purgeOrganization(supabase, me.org_id)
+      if (!purged.ok) {
+        // Nothing has been removed and nobody is locked out. Say so plainly
+        // rather than report a deletion that did not happen.
+        console.error('[DELETE /api/account] purge failed for org', me.org_id, '-', purged.error)
+        return NextResponse.json(
+          { error: 'We could not delete your account. Nothing has been removed. Please contact support.' },
+          { status: 500 },
+        )
       }
     } else {
       // Member: delete only this login.
