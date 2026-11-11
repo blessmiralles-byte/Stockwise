@@ -90,7 +90,7 @@ export const PLAN_CONFIG = {
       'Up to 15 users, everything in Starter',
       'Approval limits & reporting lines',
       'Job costing by cost center & job code',
-      'Syncs with QuickBooks Online and Xero',
+      'Accounting feed (API), set up with us',
       'Recurring preventive maintenance',
       'Demand forecasting',
       'Priority support — same-day response',

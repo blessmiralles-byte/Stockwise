@@ -77,9 +77,12 @@ export const FEATURES: Record<Feature, { label: string; minPlan: TierPlan; descr
     description: 'Projected usage, reorder points and suggested order quantities from your real consumption.',
   },
   accounting_sync: {
-    label: 'Syncs with QuickBooks Online and Xero',
+    // Not "syncs with QuickBooks and Xero": there is no connector to either.
+    // What Pro adds is a journal feed another system can read, which we help
+    // set up. The CSV/Excel journal export is on every plan.
+    label: 'Accounting feed (API)',
     minPlan: 'pro',
-    description: 'Journal entries land in your bookkeeping app on their own — no CSV files to import.',
+    description: 'A journal feed your bookkeeping system or integrator can read, set up with our help. The journal export file is on every plan.',
   },
   integrations: {
     label: 'JobLedger & POS integrations',

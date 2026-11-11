@@ -283,8 +283,10 @@ Available under **Reports**:
     authority (requisitions, approval limits, reporting lines, PO approval
     workflow, tool check-out approvals), job costing (cost centers, job codes,
     Expenses and Cost Analysis reports, requiring a cost center/job code),
-    recurring preventive maintenance, demand forecasting, and a
-    live bookkeeping connection (journal feed API instead of CSV imports).
+    recurring preventive maintenance, demand forecasting, and an accounting
+    feed (a journal API another system can read, which we help set up). There
+    is NO built-in QuickBooks or Xero connector — do not say Stocked "syncs"
+    with either; the journal export file (every plan) is imported by hand.
     Philippines & ASEAN: $99/mo or $990/yr. Everywhere else: $149/mo or $1,490/yr.
   - Only Starter and Pro are offered publicly. Teams that need more than 15
     users should email hello@stocked.tech.
@@ -345,7 +347,7 @@ Available under **Reports**:
 ## Accounting & the journal export
 - Stocked produces a **double-entry general journal** from inventory and
   fixed-asset activity, downloadable from **Reports → Accounting Export** as CSV
-  for QuickBooks, Xero, MYOB, Wave, or any journal import.
+  for QuickBooks, Xero, or any journal import.
 - **Scope:** inventory and fixed assets only. It does **not** post sales revenue
   (revenue is invoiced/journaled in JobLedger — the Sale entry here is the cost
   side, COGS, only) and does **not** calculate sales tax / VAT.

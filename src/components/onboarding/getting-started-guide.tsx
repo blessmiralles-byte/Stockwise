@@ -91,7 +91,7 @@ const NEXT_STEPS = [
   { icon: Smartphone,  title: 'Put it in your crew’s hands', body: 'They log materials, receive deliveries and check out tools from their phone.', href: '/field', cta: 'Open field view' },
   { icon: ShoppingCart, title: 'Let stock ask for itself', body: 'Reorder points email procurement and draft the purchase order, grouped by vendor.', href: '/reorder', cta: 'See reorder list' },
   { icon: ShieldCheck,  title: 'Keep tools in date', body: 'Inspection and calibration certificates live with the tool, flagged before they lapse.', href: '/maintenance', cta: 'Schedule a check' },
-  { icon: BookOpen,     title: 'Hand your accountant a journal', body: 'Double-entry lines for QuickBooks, Xero or MYOB - Excel or CSV.', href: '/reports/accounting-export', cta: 'Open export' },
+  { icon: BookOpen,     title: 'Hand your accountant a journal', body: 'Double-entry lines to import into QuickBooks or Xero - Excel or CSV.', href: '/reports/accounting-export', cta: 'Open export' },
 ]
 
 /**

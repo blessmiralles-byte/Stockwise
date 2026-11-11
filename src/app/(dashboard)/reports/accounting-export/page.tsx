@@ -136,7 +136,7 @@ export default function AccountingExportPage() {
             <p className="font-semibold mb-0.5">General Journal — double-entry format</p>
             <p className="text-xs text-indigo-600">
               Every inventory movement and depreciation run is shown as a Dr/Cr entry.
-              Download as CSV to import directly into QuickBooks, Xero, MYOB, Wave, or any
+              Download as CSV to import into QuickBooks, Xero, or any
               accounting system that accepts a journal import.
             </p>
           </div>
