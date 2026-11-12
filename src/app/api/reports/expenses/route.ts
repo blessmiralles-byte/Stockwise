@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { JOB_COST_TYPES, jobCostOf, jobQtyOf } from '@/lib/stock-direction'
 import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
@@ -58,7 +59,7 @@ export async function GET(req: NextRequest) {
       location:locations!from_location_id(id, name)
     `)
     .eq('org_id', auth.orgId)
-    .in('transaction_type', ['consumption', 'sale'])
+    .in('transaction_type', JOB_COST_TYPES)
     .gte('created_at', fromDate.toISOString())
     .lte('created_at', toDate.toISOString())
     .order('created_at', { ascending: false }).order('id')
@@ -97,7 +98,8 @@ export async function GET(req: NextRequest) {
   const groups: Record<string, Group> = {}
 
   for (const tx of transactions) {
-    const cost = Number(tx.total_cost ?? (tx.quantity * tx.unit_cost))
+    // Positive for an issue, negative for material returned from the job.
+    const cost = jobCostOf(tx)
 
     // Determine group key
     let key:   string
@@ -125,7 +127,7 @@ export async function GET(req: NextRequest) {
     if (!g.products[productKey]) {
       g.products[productKey] = { product: tx.product, quantity: 0, total_cost: 0, transactions: 0 }
     }
-    g.products[productKey].quantity     += Number(tx.quantity)
+    g.products[productKey].quantity     += jobQtyOf(tx)
     g.products[productKey].total_cost   += cost
     g.products[productKey].transactions += 1
   }

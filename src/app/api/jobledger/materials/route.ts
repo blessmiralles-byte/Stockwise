@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { jobQtyOf } from '@/lib/stock-direction'
 import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 
@@ -43,13 +44,14 @@ export async function GET(req: NextRequest) {
     .from('inventory_transactions')
     .select(`
       id,
+      transaction_type,
       quantity,
       unit_cost,
       created_at,
       product:products(id, sku, name, unit_of_measure)
     `)
     .eq('org_id', orgId)
-    .eq('transaction_type', 'consumption')
+    .in('transaction_type', ['consumption', 'return'])
     .eq('job_order_id', jobId)
     .order('created_at', { ascending: true })
     .limit(limit)
@@ -64,7 +66,7 @@ export async function GET(req: NextRequest) {
 
   const rows = (data ?? []).map((row: any) => {
     const p = Array.isArray(row.product) ? row.product[0] : row.product
-    const qty  = Number(row.quantity)
+    const qty  = jobQtyOf(row)   // negative when material came back from the job
     const cost = Number(row.unit_cost)
     return {
       transactionId:   row.id,

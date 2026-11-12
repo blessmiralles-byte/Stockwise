@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { movementEffect } from '@/lib/stock-direction'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
 import { fetchAllPaged } from '@/lib/fetch-paged'
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
     .eq('org_id', auth.orgId)
     .gte('created_at', fromDate.toISOString())
     .lte('created_at', toDate.toISOString())
-    .in('transaction_type', ['purchase', 'consumption', 'sale', 'adjustment'])
+    .in('transaction_type', ['purchase', 'consumption', 'sale', 'adjustment', 'return', 'vendor_return'])
     .order('id')
     .range(pageFrom, pageTo))
 
@@ -84,18 +85,10 @@ export async function GET(req: NextRequest) {
     const qty  = Number(tx.quantity)
     if (!openingMap[pid]) openingMap[pid] = { qty: 0, value: 0 }
 
-    if (tx.transaction_type === 'purchase') {
-      openingMap[pid].qty   += Math.abs(qty)
-      openingMap[pid].value += cost
-    } else if (tx.transaction_type === 'consumption' || tx.transaction_type === 'sale') {
-      openingMap[pid].qty   -= Math.abs(qty)
-      openingMap[pid].value -= cost
-    } else if (tx.transaction_type === 'adjustment') {
-      openingMap[pid].qty   += qty   // signed qty
-      openingMap[pid].value += qty >= 0 ? cost : -cost
-    } else if (tx.transaction_type === 'transfer') {
-      // transfers don't change total inventory value — no-op for valuation
-    }
+    // In or out is decided in one place (lib/stock-direction); transfers are 0.
+    const eff = movementEffect(tx.transaction_type, qty)
+    openingMap[pid].qty   += eff.stock * Math.abs(qty)
+    openingMap[pid].value += eff.stock * cost
   }
 
   const openingValue = Math.max(0,
@@ -110,13 +103,11 @@ export async function GET(req: NextRequest) {
   for (const tx of txs ?? []) {
     const cost = txCost(tx)
     const qty  = Number(tx.quantity)
-    if (tx.transaction_type === 'purchase') {
-      purchasesValue += cost
-    } else if (tx.transaction_type === 'consumption' || tx.transaction_type === 'sale') {
-      issuesValue += cost
-    } else if (tx.transaction_type === 'adjustment') {
-      adjustmentsValue += qty >= 0 ? cost : -cost
-    }
+    // A return to the vendor reduces purchases; a return from a job reduces issues.
+    const eff = movementEffect(tx.transaction_type, qty)
+    if (eff.bucket === 'purchases')        purchasesValue   += eff.sign * cost
+    else if (eff.bucket === 'issues')      issuesValue      += eff.sign * cost
+    else if (eff.bucket === 'adjustments') adjustmentsValue += eff.sign * cost
   }
 
   // Closing = Opening + Purchases - Issues ± Adjustments
@@ -160,21 +151,16 @@ export async function GET(req: NextRequest) {
     const qty  = Number(tx.quantity)
     ensureLine(pid, tx.product)
 
-    if (tx.transaction_type === 'purchase') {
-      lineMap[pid].purchases_qty   += Math.abs(qty)
-      lineMap[pid].purchases_value += cost
-      lineMap[pid].closing_qty     += Math.abs(qty)
-      lineMap[pid].closing_value   += cost
-    } else if (tx.transaction_type === 'consumption' || tx.transaction_type === 'sale') {
-      lineMap[pid].issues_qty   += Math.abs(qty)
-      lineMap[pid].issues_value += cost
-      lineMap[pid].closing_qty  -= Math.abs(qty)
-      lineMap[pid].closing_value -= cost
-    } else if (tx.transaction_type === 'adjustment') {
-      const adjCost = qty >= 0 ? cost : -cost
-      lineMap[pid].closing_qty   += qty
-      lineMap[pid].closing_value += adjCost
+    const eff = movementEffect(tx.transaction_type, qty)
+    if (eff.bucket === 'purchases') {
+      lineMap[pid].purchases_qty   += eff.sign * Math.abs(qty)
+      lineMap[pid].purchases_value += eff.sign * cost
+    } else if (eff.bucket === 'issues') {
+      lineMap[pid].issues_qty   += eff.sign * Math.abs(qty)
+      lineMap[pid].issues_value += eff.sign * cost
     }
+    lineMap[pid].closing_qty   += eff.stock * Math.abs(qty)
+    lineMap[pid].closing_value += eff.stock * cost
   }
 
   // Also seed lines for products that had opening stock but no period activity

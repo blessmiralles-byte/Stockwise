@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { JOB_COST_TYPES, jobCostOf } from '@/lib/stock-direction'
 import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
@@ -51,11 +52,11 @@ export async function GET(req: NextRequest) {
   const { rows: txs, truncated, error } = await fetchAllPaged<any>((a, b) => supabase
     .from('inventory_transactions')
     .select(`
-      quantity, unit_cost, total_cost, job_code,
+      transaction_type, quantity, unit_cost, total_cost, job_code,
       cost_center:cost_centers(id, code, name)
     `)
     .eq('org_id', auth.orgId)
-    .in('transaction_type', ['consumption', 'sale'])
+    .in('transaction_type', JOB_COST_TYPES)
     .gte('created_at', fromDate.toISOString())
     .lte('created_at', toDate.toISOString())
     .order('created_at').order('id')
@@ -79,7 +80,7 @@ export async function GET(req: NextRequest) {
   let grandTotal = 0
 
   for (const tx of transactions) {
-    const cost   = Number(tx.total_cost ?? (tx.quantity * tx.unit_cost)) || 0
+    const cost   = jobCostOf(tx)   // negative for material returned from the job
     const ccKey  = tx.cost_center?.id ?? NONE
     const jobKey = tx.job_code ?? NONE
 

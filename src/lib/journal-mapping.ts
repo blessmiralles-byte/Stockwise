@@ -65,6 +65,13 @@ export function inventoryPosting(tx: {
       return { type: 'Sale', debit_account: ACCOUNTS.cogs, credit_account: ACCOUNTS.inventory }
     case 'consumption':
       return { type: 'Consumption', debit_account: ACCOUNTS.operatingExpense, credit_account: ACCOUNTS.inventory }
+    case 'return':
+      // Unused material back from a job: the exact reverse of the issue.
+      return { type: 'Return from Job', debit_account: ACCOUNTS.inventory, credit_account: ACCOUNTS.operatingExpense }
+    case 'vendor_return':
+      // Goods sent back: reverses the receipt. If the vendor has already been
+      // paid or invoiced, the GR/IR balance left behind is the credit they owe.
+      return { type: 'Return to Vendor', debit_account: ACCOUNTS.grIrClearing, credit_account: ACCOUNTS.inventory }
     case 'adjustment':
       return tx.quantity >= 0
         ? { type: 'Adjustment (+)', debit_account: ACCOUNTS.inventory,          credit_account: ACCOUNTS.inventoryShrinkage }
@@ -158,6 +165,8 @@ export function postingReference(): PostingRef[] {
   const purchase = inv('purchase')
   const sale     = inv('sale')
   const consume  = inv('consumption')
+  const jobRet   = inv('return')
+  const venRet   = inv('vendor_return')
   const adjUp    = inv('adjustment', 1)
   const adjDown  = inv('adjustment', -1)
   const transfer = inv('transfer')
@@ -174,6 +183,8 @@ export function postingReference(): PostingRef[] {
     { event: invRec.type,   trigger: 'Vendor invoice recorded against a PO — clears the GR/IR accrual into Accounts Payable', debit: invRec.debit_account, credit: invRec.credit_account },
     { event: sale.type,     trigger: 'Item sold — records the cost side (COGS) only',        debit: sale.debit_account,     credit: sale.credit_account },
     { event: consume.type,  trigger: 'Materials issued / consumed',                          debit: consume.debit_account,  credit: consume.credit_account },
+    { event: jobRet.type,   trigger: 'Unused material returned from a job — reverses the issue',  debit: jobRet.debit_account,   credit: jobRet.credit_account },
+    { event: venRet.type,   trigger: 'Received goods sent back to the vendor — reverses the receipt; a leftover GR/IR balance is the credit the vendor owes', debit: venRet.debit_account, credit: venRet.credit_account },
     { event: adjUp.type,    trigger: 'Positive stock adjustment (overage / found stock)',    debit: adjUp.debit_account,    credit: adjUp.credit_account },
     { event: adjDown.type,  trigger: 'Negative stock adjustment (shrinkage / loss)',         debit: adjDown.debit_account,  credit: adjDown.credit_account },
     { event: transfer.type, trigger: 'Stock moved between locations',                        debit: transfer.debit_account, credit: transfer.credit_account },

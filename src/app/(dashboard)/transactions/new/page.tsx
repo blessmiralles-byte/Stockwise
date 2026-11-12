@@ -19,6 +19,8 @@ const transactionTypes = [
   { value: 'consumption', label: 'Consumption', description: 'Issue to internal use or a job',    icon: '⚙️' },
   { value: 'sale',        label: 'Sale',        description: 'Sell or charge items to a customer', icon: '🛒' },
   { value: 'adjustment',  label: 'Adjustment',  description: 'Correct a stock discrepancy',        icon: '✏️' },
+  { value: 'return',        label: 'Return from job',  description: 'Unused materials back into stock — credits the job', icon: '↩️' },
+  { value: 'vendor_return', label: 'Return to vendor', description: 'Send received goods back to the vendor',             icon: '📤' },
 ]
 
 // ── Product search ────────────────────────────────────────────────────────────
@@ -121,12 +123,21 @@ export default function NewTransactionPage() {
   const [selectedPO, setSelectedPO]   = useState<any | null>(null)
   const [selectedLine, setSelectedLine] = useState<any | null>(null)
 
+  // Returns: what this item can be returned from (jobs) or against (purchase orders)
+  const [returnOptions, setReturnOptions] = useState<{ from_jobs: any[]; to_vendors: any[] } | null>(null)
+  const [returnJob, setReturnJob]         = useState<number | null>(null)
+  const [returnPO, setReturnPO]           = useState('')
+  const [outcome, setOutcome]             = useState<'replacement' | 'credit'>('replacement')
+
   const [inputMode, setInputMode]   = useState<InputMode>('search')
   const [scanLookup, setScanLookup] = useState(false)
   const [scanError, setScanError]   = useState('')
 
-  const needsFrom   = ['transfer', 'consumption', 'sale'].includes(type)
-  const needsTo     = ['purchase', 'transfer', 'adjustment'].includes(type)
+  const needsFrom   = ['transfer', 'consumption', 'sale', 'vendor_return'].includes(type)
+  const needsTo     = ['purchase', 'transfer', 'adjustment', 'return'].includes(type)
+  const isJobReturn    = type === 'return'
+  const isVendorReturn = type === 'vendor_return'
+  const isReturn       = isJobReturn || isVendorReturn
   const canChargeTo = ['consumption', 'sale'].includes(type)
   const isPurchase  = type === 'purchase'
 
@@ -146,6 +157,18 @@ export default function NewTransactionPage() {
       .then(j => setPendingPOs(j.data ?? []))
       .catch(() => {})
   }, [isPurchase])
+
+  // For a return, look up where this item can come back from or go back to
+  useEffect(() => {
+    setReturnOptions(null); setReturnJob(null); setReturnPO('')
+    if (!isReturn || !product?.id) return
+    let live = true
+    fetch(`/api/returns?product_id=${product.id}`)
+      .then(r => r.json())
+      .then(j => { if (live) setReturnOptions(j.data ?? { from_jobs: [], to_vendors: [] }) })
+      .catch(() => { if (live) setReturnOptions({ from_jobs: [], to_vendors: [] }) })
+    return () => { live = false }
+  }, [isReturn, product?.id])
 
   // When a PO line is selected, pre-fill item + cost
   function handlePOLineSelect(po: any, line: any) {
@@ -181,9 +204,43 @@ export default function NewTransactionPage() {
     e.preventDefault()
     if (!product) { setErrorMsg('Please select an item first.'); return }
 
-    setSaveMode(mode)
+    if (isJobReturn && returnJob == null) { setErrorMsg('Choose which job the material is coming back from.'); return }
+
+    setSaveMode(isReturn ? 'post' : mode)
     setStatus('submitting')
     setErrorMsg('')
+
+    // Returns have their own rules (what was issued, what was received), so
+    // they go to their own endpoint and are always posted, never drafted.
+    if (isReturn) {
+      const from = isJobReturn ? returnOptions?.from_jobs?.[returnJob as number] : null
+      const rbody: Record<string, any> = {
+        kind:         isJobReturn ? 'job' : 'vendor',
+        product_id:   product.id,
+        quantity:     Number(qty),
+        location_id:  (isJobReturn ? toLocationId : fromLocationId) || undefined,
+        reference_no: refNo.trim() || undefined,
+        notes:        notes.trim() || undefined,
+      }
+      if (isJobReturn) {
+        rbody.job_code       = from?.job_code ?? null
+        rbody.cost_center_id = from?.cost_center_id ?? null
+      } else if (returnPO) {
+        rbody.purchase_order_id = returnPO
+        rbody.outcome           = outcome
+      }
+      try {
+        const res  = await fetch('/api/returns', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rbody) })
+        const json = await res.json()
+        if (!res.ok) { setErrorMsg(json.error ?? 'Something went wrong'); setStatus('error'); return }
+        setStatus('success')
+        setTimeout(() => router.push('/transactions'), 1500)
+      } catch {
+        setErrorMsg('Network error — please try again.')
+        setStatus('error')
+      }
+      return
+    }
 
     const body: Record<string, any> = {
       transaction_type: type,
@@ -423,13 +480,93 @@ export default function NewTransactionPage() {
                 </div>
               )}
 
+              {/* Return from job: which job it is coming back from */}
+              {isJobReturn && product && (
+                <div>
+                  <label className="text-sm font-medium text-slate-700 block mb-2">
+                    Returning from <span className="text-red-500">*</span>
+                  </label>
+                  {!returnOptions ? (
+                    <p className="text-xs text-slate-400 py-2">Checking where this item was issued…</p>
+                  ) : returnOptions.from_jobs.length === 0 ? (
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      Nothing of this item is out on a job, so there is nothing to return. If you found extra stock, use an Adjustment.
+                    </p>
+                  ) : (
+                    <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                      {returnOptions.from_jobs.map((b: any, i: number) => (
+                        <button
+                          key={i} type="button" onClick={() => setReturnJob(i)}
+                          className={`w-full text-left px-3 py-2 rounded-lg border text-sm flex items-center justify-between transition-colors ${
+                            returnJob === i ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span>
+                            <span className="font-medium text-slate-900">
+                              {b.job_code ? `${b.job_code}${b.job_name ? ' — ' + b.job_name : ''}` : (b.cost_center ?? 'No job or cost center')}
+                            </span>
+                            {b.job_code && b.cost_center && <span className="block text-xs text-slate-500">{b.cost_center}</span>}
+                          </span>
+                          <span className="text-xs text-slate-500 whitespace-nowrap ml-3">
+                            {b.net_qty} out · {Number(b.unit_cost).toFixed(2)} each
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-xs text-slate-400 mt-1.5">The job is credited at the cost the material was issued at.</p>
+                </div>
+              )}
+
+              {/* Return to vendor: against which purchase order, and what the vendor will do */}
+              {isVendorReturn && product && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 block mb-1">Purchase Order</label>
+                    <select
+                      value={returnPO}
+                      onChange={e => setReturnPO(e.target.value)}
+                      className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="">— No purchase order —</option>
+                      {(returnOptions?.to_vendors ?? []).map((v: any) => (
+                        <option key={v.purchase_order_id} value={v.purchase_order_id}>
+                          {v.po_number} · {v.vendor} · {v.received_qty} received
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {returnPO && (
+                    <div>
+                      <label className="text-sm font-medium text-slate-700 block mb-1.5">The vendor will</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {([
+                          ['replacement', 'Send a replacement', 'The order reopens for this quantity'],
+                          ['credit',      'Give a credit or refund', 'The order is reduced by this quantity'],
+                        ] as const).map(([v, label, hint]) => (
+                          <button
+                            key={v} type="button" onClick={() => setOutcome(v)}
+                            className={`text-left px-3 py-2 rounded-lg border transition-colors ${
+                              outcome === v ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'
+                            }`}
+                          >
+                            <p className="text-sm font-medium text-slate-900">{label}</p>
+                            <p className="text-xs text-slate-500">{hint}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Qty — cost hidden for purchase (comes from PO) */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-sm font-medium text-slate-700 block mb-1">Quantity <span className="text-red-500">*</span></label>
                   <Input type="number" min="1" value={qty} onChange={e => setQty(e.target.value)} required />
                 </div>
-                {!isPurchase && (
+                {!isPurchase && !isReturn && (
                   <div>
                     <label className="text-sm font-medium text-slate-700 block mb-1">Unit Cost</label>
                     <Input type="number" min="0" step="0.01" placeholder="0.00" value={unitCost} onChange={e => setUnitCost(e.target.value)} />
@@ -559,7 +696,7 @@ export default function NewTransactionPage() {
               )}
 
               <div className="flex gap-2 pt-1">
-                <Button
+                {!isReturn && <Button
                   type="button"
                   disabled={status === 'submitting'}
                   className="gap-2 flex-1"
@@ -570,7 +707,7 @@ export default function NewTransactionPage() {
                     : <Save className="w-4 h-4" />
                   }
                   Save Draft
-                </Button>
+                </Button>}
                 <Button
                   type="button"
                   variant="outline"
@@ -582,14 +719,14 @@ export default function NewTransactionPage() {
                     ? <Loader2 className="w-4 h-4 animate-spin" />
                     : <FileCheck className="w-4 h-4" />
                   }
-                  Post Now
+                  {isReturn ? 'Post Return' : 'Post Now'}
                 </Button>
                 <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
               </div>
 
-              <p className="text-xs text-slate-400 text-center">
+              {!isReturn && <p className="text-xs text-slate-400 text-center">
                 <strong>Save Draft</strong> stores the transaction without updating stock. <strong>Post Now</strong> commits it immediately.
-              </p>
+              </p>}
 
             </form>
           </CardContent>

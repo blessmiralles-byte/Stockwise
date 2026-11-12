@@ -1,5 +1,5 @@
 export type CostMethod = 'fifo' | 'average'
-export type TransactionType = 'purchase' | 'transfer' | 'consumption' | 'sale' | 'adjustment'
+export type TransactionType = 'purchase' | 'transfer' | 'consumption' | 'sale' | 'adjustment' | 'return' | 'vendor_return'
 export type AssetStatus = 'active' | 'inactive' | 'maintenance' | 'lost' | 'stolen' | 'disposed' | 'retired' | 'sold'
 export type MaintenanceStatus = 'scheduled' | 'completed' | 'overdue'
 

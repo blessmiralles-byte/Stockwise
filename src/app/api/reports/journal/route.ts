@@ -76,13 +76,15 @@ export async function GET(req: NextRequest) {
   const include     = (t: string) => includeAll || types.includes(t)
 
   // ── Inventory transactions ──────────────────────────────────────────────────
-  if (include('purchase') || include('sale') || include('consumption') || include('adjustment') || include('transfer')) {
+  if (include('purchase') || include('sale') || include('consumption') || include('adjustment') || include('transfer') || include('return') || include('vendor_return')) {
     const txTypes: string[] = []
     if (include('purchase'))    txTypes.push('purchase')
     if (include('sale'))        txTypes.push('sale')
     if (include('consumption')) txTypes.push('consumption')
     if (include('adjustment'))  txTypes.push('adjustment')
     if (include('transfer'))    txTypes.push('transfer')
+    if (include('return'))        txTypes.push('return')
+    if (include('vendor_return')) txTypes.push('vendor_return')
 
     const { data: txs } = await supabase
       .from('inventory_transactions')

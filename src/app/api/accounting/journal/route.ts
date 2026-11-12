@@ -93,6 +93,8 @@ export async function GET(req: NextRequest) {
   if (inc('consumption')) txTypes.push('consumption')
   if (inc('adjustment'))  txTypes.push('adjustment')
   if (inc('transfer'))    txTypes.push('transfer')
+  if (inc('return'))        txTypes.push('return')
+  if (inc('vendor_return')) txTypes.push('vendor_return')
 
   if (txTypes.length > 0) {
     let q = supabase

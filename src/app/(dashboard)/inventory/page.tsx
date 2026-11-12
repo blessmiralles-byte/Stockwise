@@ -30,7 +30,9 @@ const typeConfig: Record<string, { label: string; variant: any }> = {
   transfer:    { label: 'Transfer',    variant: 'default'   },
   sale:        { label: 'Sale',        variant: 'warning'   },
   consumption: { label: 'Consumption', variant: 'secondary' },
-  adjustment:  { label: 'Adjustment',  variant: 'outline'   },
+  adjustment:  { label: 'Adjustment',  variant: 'outline' },
+  return:        { label: 'Return from job',  variant: 'secondary' },
+  vendor_return: { label: 'Return to vendor', variant: 'warning' },
 }
 
 function AttrChips({ attrs }: { attrs?: Record<string, string> }) {
@@ -585,7 +587,7 @@ function LedgerTab() {
 
         {selectedProduct && (
           <div className="flex flex-wrap gap-1">
-            {['all', 'purchase', 'transfer', 'sale', 'consumption', 'adjustment'].map(t => (
+            {['all', 'purchase', 'transfer', 'sale', 'consumption', 'adjustment', 'return', 'vendor_return'].map(t => (
               <Button
                 key={t} size="sm"
                 variant={typeFilter === t ? 'default' : 'outline'}

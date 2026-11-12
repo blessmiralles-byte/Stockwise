@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { movementEffect } from '@/lib/stock-direction'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
 
@@ -32,25 +33,28 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to fetch ledger' }, { status: 500 })
   }
 
-  const OUTBOUND = new Set(['consumption', 'sale'])
   const runningBalance: Record<string, number> = {}
   const runningValue: Record<string, number> = {}
   const rows = (data ?? []).map((t: any) => {
     const pid: string = t.product?.id ?? 'unknown'
-    const isOut = OUTBOUND.has(t.transaction_type) || t.quantity < 0
+    // In, out or neither comes from one place (lib/stock-direction). A transfer
+    // moves stock between locations and leaves the item's total where it was.
+    const eff = movementEffect(t.transaction_type, t.quantity)
+    const isOut = eff.stock < 0
+    const isIn  = eff.stock > 0
     const absQty = Math.abs(t.quantity)
-    const delta = isOut ? -absQty : absQty
+    const delta = eff.stock * absQty
     // total_cost is signed (quantity * unit_cost) and quantity can be negative
     // for adjustments — take the magnitude so an outbound never *adds* value.
     const txValue = Math.abs(Number(t.total_cost ?? (t.quantity * (t.unit_cost ?? 0))))
-    const valueDelta = isOut ? -txValue : txValue
+    const valueDelta = eff.stock * txValue
     runningBalance[pid] = (runningBalance[pid] ?? 0) + delta
     runningValue[pid] = Math.max(0, (runningValue[pid] ?? 0) + valueDelta)
     return {
       ...t,
-      qty_in:          isOut ? 0 : absQty,
+      qty_in:          isIn ? absQty : 0,
       qty_out:         isOut ? absQty : 0,
-      value_in:        isOut ? 0 : txValue,
+      value_in:        isIn ? txValue : 0,
       value_out:       isOut ? txValue : 0,
       running_balance: runningBalance[pid],
       running_value:   runningValue[pid],
