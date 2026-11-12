@@ -1,4 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/service'
+import { loadOpenCounts } from '@/lib/count-freeze-server'
+import { frozenBy, freezeMessage } from '@/lib/count-freeze'
 import { movementRefusal } from '@/lib/movement-errors'
 
 type Svc = ReturnType<typeof createServiceClient>
@@ -55,6 +57,9 @@ export async function applyRequisitionApproval(sb: Svc, r: any, opts: { orgId: s
 
   if (r.type !== 'inventory') return warnings
 
+  // Locations being counted can't issue (lib/count-freeze).
+  const openCounts = await loadOpenCounts(sb, orgId)
+
   for (const item of (r.items as any[])) {
     if (item.item_type !== 'product' || !item.product_id) continue
     const qty = Math.abs(Number(item.quantity))
@@ -63,15 +68,23 @@ export async function applyRequisitionApproval(sb: Svc, r: any, opts: { orgId: s
     let fromLocationId: string | null = r.location_id ?? null
     let balanceCost = 0
     if (!fromLocationId) {
-      const { data: balRow } = await sb.from('inventory_balances')
+      // Best-stocked location that isn't mid-count.
+      const { data: balRows } = await sb.from('inventory_balances')
         .select('location_id, quantity, avg_cost')
         .eq('product_id', item.product_id).eq('org_id', orgId)
-        .gt('quantity', 0).order('quantity', { ascending: false }).limit(1).maybeSingle()
+        .gt('quantity', 0).order('quantity', { ascending: false }).limit(20)
+      const rows = (balRows ?? []) as any[]
+      const balRow = rows.find(b => !frozenBy(openCounts, [b.location_id]))
       if (balRow) {
         fromLocationId = balRow.location_id
         balanceCost    = Number(balRow.avg_cost ?? 0)
+      } else if (rows.length) {
+        warnings.push(freezeMessage(frozenBy(openCounts, [rows[0].location_id])!))
+        continue
       }
     } else {
+      const held = frozenBy(openCounts, [fromLocationId])
+      if (held) { warnings.push(freezeMessage(held)); continue }
       const { data: costRow } = await sb.from('inventory_balances')
         .select('avg_cost').eq('product_id', item.product_id).eq('location_id', fromLocationId).maybeSingle()
       balanceCost = Number(costRow?.avg_cost ?? 0)

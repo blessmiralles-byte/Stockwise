@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { countFreezeRefusal } from '@/lib/count-freeze-server'
 import { timingSafeEqual } from 'crypto'
 import { createServiceClient } from '@/lib/supabase/service'
 import { POSSaleRequest } from '@/types'
@@ -63,6 +64,9 @@ export async function POST(req: NextRequest) {
   }
   const gate = await requireFeature(loc.org_id, 'integrations')
   if (gate) return gate
+
+  const frozen = await countFreezeRefusal(supabase, loc.org_id, [location_id])
+  if (frozen) return frozen
 
   const transactionRef = reference_no ?? `POS-${Date.now()}`
   const results: any[] = []

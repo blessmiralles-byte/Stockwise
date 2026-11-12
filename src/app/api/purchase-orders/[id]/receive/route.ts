@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { loadOpenCounts } from '@/lib/count-freeze-server'
+import { frozenBy, freezeMessage } from '@/lib/count-freeze'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
 import { fetchOpenSupplierPOs } from '@/lib/purchase-orders'
@@ -94,6 +96,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const received_by = auth.userId
 
+  // Locations being counted take no deliveries until the count closes.
+  const openCounts = await loadOpenCounts(supabase, auth.orgId)
+
   for (const recv of lines) {
     const { line_id, quantity_received, to_location_id, source_type, from_location_id, unit_cost, batch_no, expiration_date, condition, condition_notes } = recv
 
@@ -123,6 +128,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
     if (quantity_received <= 0) {
       errors.push(`line ${line_id}: quantity must be at least 1`)
+      continue
+    }
+    const held = frozenBy(openCounts, [to_location_id, source_type === 'location' ? from_location_id : null])
+    if (held) {
+      errors.push(freezeMessage(held))
       continue
     }
 

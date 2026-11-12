@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { countFreezeRefusal } from '@/lib/count-freeze-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
 import { canMove, movementDenied } from '@/lib/permissions'
@@ -117,6 +118,9 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServiceClient()
+
+  const frozen = await countFreezeRefusal(supabase, auth.orgId, [location_id])
+  if (frozen) return frozen
 
   const post = (args: Record<string, unknown>) => supabase.rpc('record_inventory_movement', {
     p_product_id:       product_id,

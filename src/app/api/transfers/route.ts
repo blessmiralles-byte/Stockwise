@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { countFreezeRefusal } from '@/lib/count-freeze-server'
 import { movementDenied } from '@/lib/permissions'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireRole } from '@/lib/api-auth'
@@ -71,6 +72,11 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServiceClient()
+
+  // Shipping takes stock out of the source; the destination is checked when
+  // the delivery is received there.
+  const frozen = await countFreezeRefusal(supabase, auth.orgId, [from_location_id])
+  if (frozen) return frozen
 
   try {
     const transitId = await getOrCreateTransitLocation(supabase, auth.orgId)

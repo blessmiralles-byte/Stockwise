@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { countFreezeRefusal } from '@/lib/count-freeze-server'
 import { movementDenied } from '@/lib/permissions'
 import { orgHasFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -120,6 +121,12 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServiceClient()
+
+  // Nothing moves at a location while it is being counted (lib/count-freeze).
+  if (draft !== true) {
+    const frozen = await countFreezeRefusal(supabase, auth.orgId, [from_location_id, to_location_id])
+    if (frozen) return frozen
+  }
 
   // A mistyped code becomes a second job in the cost reports, so it has to be
   // one the company has set up (when it keeps a list at all).

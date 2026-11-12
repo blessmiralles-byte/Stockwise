@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { countFreezeRefusal } from '@/lib/count-freeze-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
 import { getOrCreateTransitLocation, postTransferMovement } from '@/lib/transfers'
@@ -43,6 +44,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (qty > outstanding) {
     return NextResponse.json({ error: `Only ${outstanding} still in transit for this delivery` }, { status: 422 })
   }
+
+  const frozen = await countFreezeRefusal(supabase, auth.orgId, [t.to_location_id])
+  if (frozen) return frozen
 
   try {
     const transitId = await getOrCreateTransitLocation(supabase, auth.orgId)

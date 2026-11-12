@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { findCountFreeze } from '@/lib/count-freeze-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireRole } from '@/lib/api-auth'
 
@@ -42,6 +43,12 @@ export async function POST(req: NextRequest) {
   // Location is required — a count is always scoped to one place
   if (!location_id) {
     return NextResponse.json({ error: 'A location is required' }, { status: 400 })
+  }
+  {
+    const already = await findCountFreeze(createServiceClient(), auth.orgId, [location_id])
+    if (already) {
+      return NextResponse.json({ error: `${already.location_name ?? 'This location'} already has an open count (${already.count_number}). Finish or cancel it first.` }, { status: 409 })
+    }
   }
 
   const supabase = createServiceClient()

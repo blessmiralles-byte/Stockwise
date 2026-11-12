@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { requireRole } from '@/lib/api-auth'
+import { requireAuth, requireRole } from '@/lib/api-auth'
+import { movementDenied } from '@/lib/permissions'
+import { countFreezeRefusal } from '@/lib/count-freeze-server'
 
 // POST /api/transactions/[id]/post — commit a draft transaction to inventory
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const auth = await requireRole('manager')
+  const auth = await requireAuth()
   if (auth.error) return auth.error
 
   const supabase = createServiceClient()
@@ -22,6 +24,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (fetchErr || !tx) {
     return NextResponse.json({ error: 'Draft transaction not found' }, { status: 404 })
   }
+
+  // A draft is checked when it is posted, not when it was saved: otherwise a
+  // write-down saved as a draft by someone who may not adjust stock could be
+  // posted around the rule, and a draft could land on a location mid-count.
+  const denied = movementDenied(auth.role, tx.transaction_type)
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 })
+  const frozen = await countFreezeRefusal(supabase, auth.orgId, [tx.from_location_id, tx.to_location_id])
+  if (frozen) return frozen
 
   // Call canonical RPC to update balances atomically
   const { error: rpcError } = await supabase.rpc('record_inventory_movement', {
@@ -49,7 +59,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   // Mark the original draft as posted (the RPC also inserted a new row, so delete the draft)
-  await supabase.from('inventory_transactions').delete().eq('id', id)
+  await supabase.from('inventory_transactions').delete().eq('id', id).eq('org_id', auth.orgId)
 
   return NextResponse.json({ success: true })
 }
