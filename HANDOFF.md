@@ -10,7 +10,8 @@ only ones blocking anything.
 - Mobile app: `C:\dev\stocked-mobile` (Expo, branch `master`).
 - Everything is pushed to `main` (up to `3626c63`).
 - All SQL scripts have been run in Supabase, including `scripts/migrate-returns.sql`.
-- **Step 1 is DONE (2026-11-12)**: returns tested signed in against the real database, all 11 checks passed, no fixes needed. Start at Step 2.
+- **Step 1 is DONE (2026-11-12)**: returns tested signed in against the real database, all 11 checks passed, no fixes needed.
+- **Step 2 is DONE (2026-11-12)**: every role tested signed in; fixes in `src/lib/permissions.ts` (the single place for who-may-do-what). Rerun after any permission change: start the dev server, then `node scripts/test-roles.js setup`, `node scripts/test-roles.js run`, `node scripts/test-roles.js remove`. Start at Step 3.
 - 811 unit tests pass; `npx next build` compiles.
 
 ## Rules for whoever runs these steps
