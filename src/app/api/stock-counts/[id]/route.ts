@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { can } from '@/lib/permissions'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
 import { createNotification } from '@/lib/notify'
@@ -68,10 +69,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = await req.json()
   const supabase = createServiceClient()
 
+  // Counting is for the people doing it; cancelling is for whoever runs counts.
+  if (!can.countEntry(auth.role)) {
+    return NextResponse.json({ error: 'Your role can view stock counts but not change them.' }, { status: 403 })
+  }
+
   if ('status' in body) {
     const allowed = ['counting', 'reviewing', 'cancelled']
     if (!allowed.includes(body.status)) {
       return NextResponse.json({ error: `Invalid status. Use: ${allowed.join(', ')}` }, { status: 400 })
+    }
+    if (body.status === 'cancelled' && !can.countManage(auth.role)) {
+      return NextResponse.json({ error: 'Only operations, procurement or the owner can cancel a stock count.' }, { status: 403 })
     }
     const { data, error } = await supabase
       .from('stock_counts')

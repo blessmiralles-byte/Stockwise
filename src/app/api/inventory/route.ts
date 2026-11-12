@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { movementDenied } from '@/lib/permissions'
 import { orgHasFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireRole } from '@/lib/api-auth'
@@ -53,7 +54,10 @@ export async function GET(req: NextRequest) {
  * the route will automatically use the RPC when available.
  */
 export async function POST(req: NextRequest) {
-  const auth = await requireRole('manager')
+  // Who may post depends on what kind of movement it is (lib/permissions):
+  // the field officer issues and receives, the buyer can't receive without an
+  // order, only operations adjusts. Checked once the type is known.
+  const auth = await requireAuth()
   if (auth.error) return auth.error
 
   let body: any
@@ -85,6 +89,9 @@ export async function POST(req: NextRequest) {
       { status: 422 }
     )
   }
+
+  const denied = movementDenied(auth.role, transaction_type)
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 })
 
   const qty = Number(quantity)
   if (!Number.isInteger(qty) || qty === 0) {

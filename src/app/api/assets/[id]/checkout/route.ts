@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isReadOnly } from '@/lib/permissions'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
 import { createNotification } from '@/lib/notify'
@@ -17,6 +18,7 @@ import { resolveHolder, approvalNeeded } from '@/lib/checkout-rules'
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth()
   if (auth.error) return auth.error
+  if (isReadOnly(auth.role)) return NextResponse.json({ error: 'Your role is view-only.' }, { status: 403 })
 
   const { id } = await params
   let body: any

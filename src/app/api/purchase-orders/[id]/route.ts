@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { can } from '@/lib/permissions'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireRole } from '@/lib/api-auth'
 import { poStatusMove } from '@/lib/po-status'
@@ -171,6 +172,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   // ── Everything else: edits, sending an approved PO, cancelling ─────────────
+  // Recording the vendor's invoice is accounts payable's job: Finance may do
+  // that (and only that), which the manager-level check below used to refuse.
+  const INVOICE_FIELDS = ['supplier_invoice_no', 'supplier_invoice_date', 'supplier_invoice_amount']
+  const invoiceOnly = Object.keys(updates).every(k => INVOICE_FIELDS.includes(k))
+  if (invoiceOnly) {
+    if (!can.recordInvoice(auth.role)) {
+      return NextResponse.json({ error: 'Only finance, procurement or the owner can record a vendor invoice.' }, { status: 403 })
+    }
+    return respond(supabase, id, auth.orgId, updates)
+  }
   const roleCheck = await requireRole('manager')
   if (roleCheck.error) return roleCheck.error
 

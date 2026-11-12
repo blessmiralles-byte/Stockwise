@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isReadOnly } from '@/lib/permissions'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
 import { toolLimitRefusal } from '@/lib/tool-limit-server'
@@ -45,6 +46,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = await requireAuth()
   if (auth.error) return auth.error
+  if (isReadOnly(auth.role)) return NextResponse.json({ error: 'Your role is view-only.' }, { status: 403 })
 
   let body: any
   try { body = await req.json() } catch {

@@ -174,9 +174,16 @@ export async function requireAuth(): Promise<AuthResult> {
     if (refusal) return { userId, role, orgId, error: refusal }
 
     return { userId, role, orgId, error: null }
-  } catch {
-    // user_profiles table missing (setup not yet run) — grant owner to prevent lockout
-    return { userId, role: 'owner', orgId: '', error: null }
+  } catch (e) {
+    // This used to grant 'owner' "to prevent lockout" — so any unexpected
+    // error while reading the profile signed the caller in as owner. Fail
+    // closed: a moment of "try again" is better than the wrong person deleting
+    // things.
+    console.error('[requireAuth] profile lookup failed', e)
+    return {
+      userId, role: 'viewer', orgId: '',
+      error: NextResponse.json({ error: 'Could not check your account just now. Please try again.' }, { status: 503 }),
+    }
   }
 }
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isReadOnly } from '@/lib/permissions'
 import { orgHasFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
@@ -12,6 +13,7 @@ export async function PATCH(
   // Financial fields (cost) are restricted to operations/finance/owner.
   const auth = await requireAuth()
   if (auth.error) return auth.error
+  if (isReadOnly(auth.role)) return NextResponse.json({ error: 'Your role is view-only.' }, { status: 403 })
 
   const { id } = await params
 

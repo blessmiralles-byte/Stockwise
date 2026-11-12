@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { can } from '@/lib/permissions'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
 import { clampTolerance } from '@/lib/utils'
@@ -33,6 +34,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = await requireAuth()
   if (auth.error) return auth.error
+  if (!can.editVendors(auth.role)) {
+    return NextResponse.json({ error: 'Only procurement, operations, finance or the owner can add vendors.' }, { status: 403 })
+  }
 
   const body = await req.json()
   const { name, contact_name, email, phone, lead_time_days, payment_terms, notes, over_receipt_tolerance_pct } = body

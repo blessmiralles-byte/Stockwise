@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isReadOnly } from '@/lib/permissions'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireAnyRole } from '@/lib/api-auth'
 import { postCatchUpDepreciation } from '@/lib/depreciation'
@@ -11,6 +12,7 @@ export async function PATCH(
 ) {
   const auth = await requireAuth()
   if (auth.error) return auth.error
+  if (isReadOnly(auth.role)) return NextResponse.json({ error: 'Your role is view-only.' }, { status: 403 })
 
   const { id } = await params
   let body: any

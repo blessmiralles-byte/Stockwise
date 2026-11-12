@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { movementDenied } from '@/lib/permissions'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireRole } from '@/lib/api-auth'
 import { getOrCreateTransitLocation, postTransferMovement, locationAvgCost } from '@/lib/transfers'
@@ -46,8 +47,10 @@ export async function GET(req: NextRequest) {
  * Moves stock source → In-Transit and records the delivery manifest.
  */
 export async function POST(req: NextRequest) {
-  const auth = await requireRole('manager')
+  const auth = await requireAuth()
   if (auth.error) return auth.error
+  const denied = movementDenied(auth.role, 'transfer')
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 })
 
   let body: any
   try { body = await req.json() } catch {

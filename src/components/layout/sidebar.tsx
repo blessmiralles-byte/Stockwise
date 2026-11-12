@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils'
 import { useState } from 'react'
 import { type Feature, FEATURES, planHasFeature, isToolsPlan, toolsPageAllowed } from '@/lib/entitlements'
 import { PlanBadge } from '@/components/billing/upgrade-prompt'
+import { canSeePage } from '@/lib/permissions'
 
 const navItems: { href: string; icon: any; label: string; feature?: Feature }[] = [
   { href: '/dashboard',       icon: LayoutDashboard, label: 'Dashboard'       },
@@ -39,16 +40,18 @@ const fieldItems = [
   { href: '/field', icon: ScanBarcode, label: 'Field View' },
 ]
 
-export function Sidebar({ plan }: { plan?: string | null }) {
+export function Sidebar({ plan, role }: { plan?: string | null; role?: string | null }) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
 
   // A Tools account sees only the tool tracker — no locked rows advertising
   // the rest; the upgrade lives in Settings.
   const toolsOnly = isToolsPlan(plan)
-  const items = toolsOnly
+  const forPlan = toolsOnly
     ? navItems.filter(i => toolsPageAllowed(i.href)).map(i => ({ ...i, label: TOOLS_LABELS[i.href] ?? i.label }))
     : navItems
+  // Nor a page the role can't open (lib/permissions): no link to a 403.
+  const items = forPlan.filter(i => canSeePage(role, i.href))
 
   return (
     <aside

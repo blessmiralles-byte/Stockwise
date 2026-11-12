@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isReadOnly } from '@/lib/permissions'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireAnyRole } from '@/lib/api-auth'
 import { logAudit } from '@/lib/audit'
@@ -54,6 +55,7 @@ const KINDS = ['lost', 'stolen', 'damaged'] as const
 export async function POST(req: NextRequest) {
   const auth = await requireAuth()
   if (auth.error) return auth.error
+  if (isReadOnly(auth.role)) return NextResponse.json({ error: 'Your role is view-only.' }, { status: 403 })
 
   let body: any
   try { body = await req.json() } catch {

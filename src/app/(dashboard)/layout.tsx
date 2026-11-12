@@ -17,6 +17,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   let plan: string | null = null
+  let role: string | null = null
   let currency: string | null = null
 
   if (user) {
@@ -26,6 +27,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       .select('org_id, role')
       .eq('id', user.id)
       .single()
+    role = profile?.role ?? null
 
     if (profile?.org_id) {
       const { data: org } = await service
@@ -64,7 +66,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <CurrencyProvider currency={currency}>
       <div className="flex h-screen overflow-hidden bg-slate-50">
-        <Sidebar plan={plan} />
+        <Sidebar plan={plan} role={role} />
         <main className="flex-1 overflow-y-auto bg-slate-50">
           {/* Stocked Tools accounts are kept to the tool tracker's pages. */}
           {isToolsPlan(plan) ? <ToolsGate>{children}</ToolsGate> : children}

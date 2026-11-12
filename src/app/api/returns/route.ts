@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { requireRole } from '@/lib/api-auth'
+import { requireAuth } from '@/lib/api-auth'
+import { canMove, movementDenied } from '@/lib/permissions'
 import { fetchAllPaged } from '@/lib/fetch-paged'
 import { movementRefusal } from '@/lib/movement-errors'
 import { JOB_COST_TYPES, JOB_RETURN, VENDOR_RETURN } from '@/lib/stock-direction'
@@ -32,8 +33,11 @@ async function loadJobMovements(supabase: any, orgId: string, productId: string)
 }
 
 export async function GET(req: NextRequest) {
-  const auth = await requireRole('manager')
+  const auth = await requireAuth()
   if (auth.error) return auth.error
+  if (!canMove(auth.role, 'return') && !canMove(auth.role, 'vendor_return')) {
+    return NextResponse.json({ error: movementDenied(auth.role, 'return') }, { status: 403 })
+  }
 
   const productId = req.nextUrl.searchParams.get('product_id')
   if (!productId) return NextResponse.json({ error: 'product_id is required' }, { status: 400 })
@@ -85,7 +89,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requireRole('manager')
+  const auth = await requireAuth()
   if (auth.error) return auth.error
 
   let body: any
@@ -100,6 +104,8 @@ export async function POST(req: NextRequest) {
   if (kind !== 'job' && kind !== 'vendor') {
     return NextResponse.json({ error: 'Say whether this is a return from a job or to a vendor.' }, { status: 400 })
   }
+  const denied = movementDenied(auth.role, kind === 'job' ? 'return' : 'vendor_return')
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 })
   if (!product_id) return NextResponse.json({ error: 'Choose the item being returned.' }, { status: 400 })
   if (!Number.isInteger(qty) || qty <= 0) {
     return NextResponse.json({ error: 'Quantity must be a whole number above zero.' }, { status: 400 })

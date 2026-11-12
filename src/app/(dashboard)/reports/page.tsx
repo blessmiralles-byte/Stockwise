@@ -10,6 +10,8 @@ import Link from 'next/link'
 import { type Feature, FEATURES, isToolsPlan, toolsPageAllowed } from '@/lib/entitlements'
 import { usePlan } from '@/lib/use-plan'
 import { PlanBadge } from '@/components/billing/upgrade-prompt'
+import { useEffect, useState } from 'react'
+import { canSeePage, PAGE_ROLES } from '@/lib/permissions'
 
 type Report = { href: string; icon: any; color: string; title: string; desc: string; feature?: Feature }
 
@@ -136,8 +138,19 @@ export default function ReportsPage() {
   const { has, plan } = usePlan()
   // A Stocked Tools account sees the tool reports and nothing else.
   const toolsOnly = isToolsPlan(plan)
+  // Only reports this role can open (lib/permissions mirrors the report routes).
+  const [role, setRole] = useState<string | null | undefined>(undefined)
+  useEffect(() => {
+    fetch('/api/user/profile').then(r => r.ok ? r.json() : null).then(d => setRole(d?.role ?? null)).catch(() => setRole(null))
+  }, [])
   const visible = groups
-    .map(g => ({ ...g, reports: toolsOnly ? g.reports.filter(r => toolsPageAllowed(r.href)) : g.reports }))
+    .map(g => ({
+      ...g,
+      reports: g.reports
+        .filter(r => !toolsOnly || toolsPageAllowed(r.href))
+        // Until the role is known, show nothing that might be refused.
+        .filter(r => role !== undefined ? canSeePage(role, r.href) : !PAGE_ROLES[r.href]),
+    }))
     .filter(g => g.reports.length > 0)
 
   return (

@@ -3,6 +3,7 @@ import { resolveJobCode } from '@/lib/job-codes'
 import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
+import { isReadOnly } from '@/lib/permissions'
 import { startChain, loadTrails, loadMember, myAction } from '@/lib/approval-chain'
 import { requisitionAmounts, applyRequisitionApproval } from '@/lib/requisition-fulfilment'
 
@@ -80,6 +81,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = await requireAuth()
   if (auth.error) return auth.error
+  if (isReadOnly(auth.role)) return NextResponse.json({ error: 'Your role is view-only.' }, { status: 403 })
 
   const gate = await requireFeature(auth.orgId, 'approvals')
   if (gate) return gate
