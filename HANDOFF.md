@@ -8,9 +8,9 @@ only ones blocking anything.
 
 - Web app: this folder. Next.js 16 (read `AGENTS.md` first), Supabase, Vercel deploys from `main`.
 - Mobile app: `C:\dev\stocked-mobile` (Expo, branch `master`).
-- **Two commits are on local `main` and NOT pushed** (`d90368e` job codes, `248773b` returns).
+- Everything is pushed to `main` (up to `3626c63`).
 - All SQL scripts have been run in Supabase, including `scripts/migrate-returns.sql`.
-- Returns (from a job, to a vendor) are built and unit-tested but **never tested against the real database**.
+- **Step 1 is DONE (2026-11-12)**: returns tested signed in against the real database, all 11 checks passed, no fixes needed. Start at Step 2.
 - 811 unit tests pass; `npx next build` compiles.
 
 ## Rules for whoever runs these steps
