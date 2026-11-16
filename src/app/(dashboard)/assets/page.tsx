@@ -540,8 +540,47 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons, toolsOnly = false 
   const { data: orgData }    = useApi<{ data: any }>('/api/org')
 
   const categories = catData?.data ?? []
-  const locations  = locData?.data ?? []
+  // Locations made from this form are added here so they show up straight away.
+  const [addedLocs, setAddedLocs] = useState<any[]>([])
+  const locations  = [...(locData?.data ?? []), ...addedLocs]
   const persons    = personData?.data ?? []
+
+  // ── Inline "new location": Stocked Tools has no Locations page in its menu,
+  // so a crew can name a yard, van or site right here.
+  const [newLocOpen,   setNewLocOpen]   = useState(false)
+  const [newLocName,   setNewLocName]   = useState('')
+  const [newLocSaving, setNewLocSaving] = useState(false)
+  const [newLocError,  setNewLocError]  = useState('')
+
+  async function createLocation() {
+    const locName = newLocName.trim()
+    if (!locName) { setNewLocError('Enter a name'); return }
+    setNewLocSaving(true); setNewLocError('')
+    try {
+      // Codes are required and unique per org; nobody here needs to pick one.
+      const base = locName.toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 6) || 'LOC'
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const code = `${base}-${Math.floor(100 + Math.random() * 900)}`
+        const res  = await fetch('/api/locations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: locName, code, type: 'other' }),
+        })
+        const json = await res.json().catch(() => ({}))
+        if (res.status === 409) continue
+        if (!res.ok) { setNewLocError(json.error ?? 'Could not add the location'); return }
+        setAddedLocs(prev => [...prev, json.data])
+        setLocationId(json.data.id)
+        setNewLocOpen(false); setNewLocName('')
+        return
+      }
+      setNewLocError('Could not add the location. Please try again.')
+    } catch {
+      setNewLocError('Network error. Please try again.')
+    } finally {
+      setNewLocSaving(false)
+    }
+  }
 
   const [tab, setTab] = useState<Tab>('info')
 
@@ -727,19 +766,22 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons, toolsOnly = false 
                     className="font-mono"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Category</label>
-                  <select
-                    value={categoryId}
-                    onChange={e => setCategoryId(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-                  >
-                    <option value="">— Select category —</option>
-                    {categories.map((c: any) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
+                {/* Stocked Tools has no categories to manage, so don't ask for one. */}
+                {!toolsOnly && (
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Category</label>
+                    <select
+                      value={categoryId}
+                      onChange={e => setCategoryId(e.target.value)}
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                    >
+                      <option value="">— Select category —</option>
+                      {categories.map((c: any) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Status</label>
                   <select
@@ -754,18 +796,48 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons, toolsOnly = false 
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Location</label>
-                  <select
-                    value={locationId}
-                    onChange={e => setLocationId(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-                  >
-                    <option value="">— Select location —</option>
-                    {locations.map((l: any) => (
-                      <option key={l.id} value={l.id}>
-                        {'  '.repeat(l.level ?? 0)}{l.name} {l.code ? `(${l.code})` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  {newLocOpen ? (
+                    <div className="space-y-1.5">
+                      <div className="flex gap-2">
+                        <Input
+                          value={newLocName}
+                          onChange={e => setNewLocName(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); createLocation() } }}
+                          placeholder="e.g. Main yard, Van 2, Site A"
+                          autoFocus
+                        />
+                        <Button type="button" size="sm" onClick={createLocation} disabled={newLocSaving}>
+                          {newLocSaving ? 'Adding…' : 'Add'}
+                        </Button>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        {newLocError
+                          ? <p className="text-xs text-red-600">{newLocError}</p>
+                          : <span />}
+                        <button type="button" className="text-xs text-slate-500 hover:text-slate-700"
+                          onClick={() => { setNewLocOpen(false); setNewLocName(''); setNewLocError('') }}>
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <select
+                      value={locationId}
+                      onChange={e => {
+                        if (e.target.value === '__new') { setNewLocOpen(true); return }
+                        setLocationId(e.target.value)
+                      }}
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                    >
+                      <option value="">— Select location —</option>
+                      {locations.map((l: any) => (
+                        <option key={l.id} value={l.id}>
+                          {'  '.repeat(l.level ?? 0)}{l.name} {l.code && !toolsOnly ? `(${l.code})` : ''}
+                        </option>
+                      ))}
+                      <option value="__new">+ Add a new location…</option>
+                    </select>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Accountable Person</label>
