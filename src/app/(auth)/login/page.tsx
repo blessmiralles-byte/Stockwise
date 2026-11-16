@@ -51,7 +51,7 @@ function LoginForm() {
         <div className="bg-amber-50 text-amber-800 text-sm px-3 py-2.5 rounded-lg border border-amber-100">
           {searchParams.get('error') === 'reset_link_invalid' ? (
             <>
-              That password reset link has expired or was already used.{' '}
+              That password reset link didn&apos;t work. It may have expired, been used already, or been opened in a different browser from the one that requested it.{' '}
               <Link href="/forgot-password" className="font-semibold underline">Send a new one</Link>
               {' '}and open it on this device.
             </>
