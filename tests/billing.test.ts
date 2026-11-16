@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { billingState } from '@/lib/billing'
+import { billingState, canSwitchToToolsFree } from '@/lib/billing'
 import {
   regionForCountry, isPricingRegion, monthlyPrice, annualPrice, PAID_PLANS, PLAN_CONFIG,
 } from '@/lib/plan-config'
@@ -44,6 +44,36 @@ describe('billing state', () => {
     const s = billingState({ plan: 'starter', plan_status: 'active', trial_ends_at: null })
     expect(s.locked).toBe(false)
     expect(s.reason).toBe(null)
+  })
+
+  it('never locks the free Stocked Tools plan, whatever the old trial date says', () => {
+    const s = billingState({ plan: 'tools_free', plan_status: 'active', trial_ends_at: days(-30) })
+    expect(s.locked).toBe(false)
+  })
+})
+
+describe('switching to Stocked Tools Free', () => {
+  it('is offered once the trial is over or was already used', () => {
+    expect(canSwitchToToolsFree({ plan: 'trial', plan_status: 'active', trial_ends_at: days(-1) })).toBe(true)
+    expect(canSwitchToToolsFree({ plan: 'trial', plan_status: 'active', trial_ends_at: days(10), trial_reused: true })).toBe(true)
+  })
+
+  it('is offered after a paid subscription has ended', () => {
+    expect(canSwitchToToolsFree({ plan: 'starter', plan_status: 'cancelled', trial_ends_at: null })).toBe(true)
+  })
+
+  it('is refused while a trial is still running', () => {
+    expect(canSwitchToToolsFree({ plan: 'trial', plan_status: 'active', trial_ends_at: days(5) })).toBe(false)
+  })
+
+  // Lemon Squeezy would keep charging an org that quietly moved itself to free.
+  it('is refused on a live paid plan, including one past due', () => {
+    expect(canSwitchToToolsFree({ plan: 'pro', plan_status: 'active', trial_ends_at: null })).toBe(false)
+    expect(canSwitchToToolsFree({ plan: 'starter', plan_status: 'past_due', trial_ends_at: null })).toBe(false)
+  })
+
+  it('is a no-op for an org already on it', () => {
+    expect(canSwitchToToolsFree({ plan: 'tools_free', plan_status: 'active', trial_ends_at: null })).toBe(false)
   })
 })
 

@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { PLAN_CONFIG, PAID_PLANS, monthlyPrice, annualPrice, type PaidPlanKey, type PricingRegion } from '@/lib/plan-config'
-import { Lock, CheckCircle2, Loader2 } from 'lucide-react'
+import { PLAN_CONFIG, PAID_PLANS, FREE_TOOL_LIMIT, monthlyPrice, annualPrice, type CheckoutPlanKey, type PricingRegion } from '@/lib/plan-config'
+import { TOOLS_HOME } from '@/lib/entitlements'
+import { Lock, CheckCircle2, Loader2, Wrench } from 'lucide-react'
 import type { BillingReason } from '@/lib/billing'
 
 /**
@@ -35,7 +36,23 @@ export function BillingWall({
     reason === 'trial_used' ? 'The free trial is one per customer, and this email has had one. Choose a plan to start using Stocked — or email support@stocked.tech if you think this is a mistake.' :
     'Choose a plan to keep using Stocked. Your data is safe and waiting.'
 
-  async function checkout(plan: PaidPlanKey) {
+  async function switchToToolsFree() {
+    if (!confirm(
+      `Switch to Stocked Tools Free?\n\n` +
+      `You'll keep tool tracking for up to ${FREE_TOOL_LIMIT} tools and ${PLAN_CONFIG.tools_free.maxUsers} logins. ` +
+      `Inventory, purchasing and the rest are hidden, not deleted — upgrade any time to get them back.`,
+    )) return
+    setBusy('tools_free'); setError('')
+    try {
+      const res = await fetch('/api/billing/tools-free', { method: 'POST' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) { setError(json.error ?? 'Could not switch plans'); return }
+      window.location.href = TOOLS_HOME
+    } catch { setError('Network error — please try again.') }
+    finally { setBusy(null) }
+  }
+
+  async function checkout(plan: CheckoutPlanKey) {
     setBusy(plan); setError('')
     try {
       const res = await fetch('/api/billing/checkout', {
@@ -130,6 +147,37 @@ export function BillingWall({
                   </div>
                 )
               })}
+            </div>
+
+            {/* Not everyone needs full inventory: offer the tool tracker on its own. */}
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+                  <Wrench className="w-5 h-5 text-amber-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-slate-900">Just need to keep track of tools?</p>
+                  <p className="text-sm text-slate-500 mt-0.5">
+                    Stocked Tools is the tool tracker on its own: check-out and check-in, due dates,
+                    QR labels and lost or damaged reports. Free for up to {FREE_TOOL_LIMIT} tools.
+                    Your other data stays saved for if you upgrade later.
+                  </p>
+                  <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                    <button onClick={switchToToolsFree} disabled={!!busy}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-slate-300 text-slate-800 hover:bg-slate-50 disabled:opacity-50 flex items-center justify-center gap-2">
+                      {busy === 'tools_free' ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                      Use Stocked Tools free
+                    </button>
+                    <button onClick={() => checkout('tools')} disabled={!!busy}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 flex items-center justify-center gap-2">
+                      {busy === 'tools' ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                      Unlimited tools · {interval === 'annual'
+                        ? `$${annualPrice('tools', region)}/yr`
+                        : `$${monthlyPrice('tools', region)}/mo`}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {hasSubscription && (

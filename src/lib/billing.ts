@@ -22,6 +22,17 @@ export interface BillingState {
   trialDaysLeft: number | null // when on trial
 }
 
+/**
+ * Whether an org may drop onto the free Stocked Tools plan by itself.
+ * Only from the paywall (trial over, or subscription ended): an org that is
+ * still on an open trial or a live paid plan would otherwise switch to free
+ * while Lemon Squeezy kept charging it — those cancel through billing first.
+ */
+export function canSwitchToToolsFree(org: OrgBilling): boolean {
+  if (org.plan === 'tools_free') return false
+  return billingState(org).locked
+}
+
 export function billingState(org: OrgBilling): BillingState {
   const now       = Date.now()
   const onTrial   = org.plan === 'trial'
