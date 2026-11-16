@@ -47,6 +47,21 @@ function LoginForm() {
           {error}
         </div>
       )}
+      {!error && searchParams.get('error') && (
+        <div className="bg-amber-50 text-amber-800 text-sm px-3 py-2.5 rounded-lg border border-amber-100">
+          {searchParams.get('error') === 'reset_link_invalid' ? (
+            <>
+              That password reset link has expired or was already used.{' '}
+              <Link href="/forgot-password" className="font-semibold underline">Send a new one</Link>
+              {' '}and open it on this device.
+            </>
+          ) : searchParams.get('error') === 'invite_link_invalid' ? (
+            'That invite link has expired or was already used. Ask your admin to resend the invite.'
+          ) : (
+            'That sign-in link has expired or was already used. Please sign in, or request a new link.'
+          )}
+        </div>
+      )}
       {searchParams.get('registered') && (
         <div className="bg-green-50 text-green-700 text-sm px-3 py-2.5 rounded-lg border border-green-100">
           Account created! You can now sign in.

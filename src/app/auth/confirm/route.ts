@@ -28,5 +28,6 @@ export async function GET(request: NextRequest) {
     console.error('[auth/confirm] verifyOtp', error.message)
   }
 
-  return NextResponse.redirect(`${origin}/login?error=invite_link_invalid`)
+  const reason = type === 'recovery' ? 'reset_link_invalid' : 'invite_link_invalid'
+  return NextResponse.redirect(`${origin}/login?error=${reason}`)
 }

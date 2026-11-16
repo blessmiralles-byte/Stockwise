@@ -35,5 +35,8 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`)
+  // A PKCE code only works in the browser that asked for it, and only once —
+  // opening the email on another device, or a second time, lands here.
+  const reason = type === 'recovery' ? 'reset_link_invalid' : 'auth_callback_failed'
+  return NextResponse.redirect(`${origin}/login?error=${reason}`)
 }
