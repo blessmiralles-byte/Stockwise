@@ -17,7 +17,8 @@ only ones blocking anything.
 - 838 unit tests pass; `npm run build` passes (2026-11-17, at `b333bcf`).
 - **Step 4 is PARTLY done (2026-11-16)**: all 12 test-mode checkouts open with the right product and price. Not yet done: one paid test checkout → webhook → plan change, then upgrade, downgrade, cancel, expiry. The owner pays with the Lemon Squeezy test card; the throwaway company is in the session scratchpad (`walk-creds.json`) and must be purged at the end.
 - Also shipped 2026-11-16: sign-up rejects an already-registered email; reset-password email works from any browser (Supabase template now links to `/auth/confirm?token_hash=…`, copy in `docs/email-templates/reset-password.html`); the paywall offers Stocked Tools free or paid (`/api/billing/tools-free`); Add Tool hides Category and adds locations inline for Tools plans; a tool's current certificate can be entered when scheduling an inspection or calibration.
-- **A launch-readiness audit was run 2026-11-17. Its findings are the "Launch audit" section below. Do A1 before anything else.**
+- **A launch-readiness audit was run 2026-11-17. Its findings are the "Launch audit" section below.**
+- **A1 is DONE (2026-11-17)**: `scripts/migrate-rls-lockdown.sql` was run in Supabase. Signed-in users can only read their own company's rows and write nothing directly; anon reaches nothing; only the policy helper functions are callable with the public key. `node scripts/test-rls.js` passes (it failed 39 checks before). **Rerun it after any database change**, and give any new table an `org_read` policy (the script's step 4 pattern). Functions created later are not callable with the public key unless granted. `scripts/test-roles.js` was fixed for the one-open-count-per-location rule and passes; to rerun use `remove`, `setup`, `run`, `remove`. Start at A2.
 
 ## Rules for whoever runs these steps
 
@@ -44,7 +45,13 @@ Each item says what was observed, where, and how to prove the fix. Items marked 
 must be done before any real customer signs up. Nothing here depends on Lemon Squeezy going
 live or on business registration.
 
-### A1 — BLOCKER: any signed-in customer can read and change other companies' data
+### A1 — DONE 2026-11-17 (kept for the record): any signed-in customer could read and change other companies' data
+
+> Also found while fixing: company A could edit and delete company B's rows, move its own
+> login into company B by updating its own `user_profiles` row, and stock functions
+> (`record_inventory_movement`, `deduct_inventory_balance`, `upsert_inventory_balance`,
+> `fifo_consume_batches`, `recompute_fifo_balance_cost`, `next_ref_number`,
+> `record_migration`) could be called with no login. All closed by the lockdown script.
 
 > Observed: signed in as a throwaway owner with only the public anon key, a direct Supabase
 > query (`supabase.from('products').select('*')`, no API route) returned other organizations'

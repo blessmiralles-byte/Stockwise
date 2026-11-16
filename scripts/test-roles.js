@@ -154,6 +154,9 @@ async function run() {
   for (const role of ROLES) {
     const r = await newCount(role)
     rec('counts', 'Start a stock count', role, r)
+    // Only one open count per location is allowed (src/lib/count-freeze.ts), so close it
+    // before the owner starts the next one.
+    if (r.b?.data?.id) await call('owner', 'PATCH', '/api/stock-counts/' + r.b.data.id, { status: 'cancelled' })
     // Someone else's count: owner starts one, this role enters a figure and moves it to review.
     const oc = await newCount('owner')
     const id = oc.b?.data?.id
@@ -161,6 +164,8 @@ async function run() {
     const line = full?.lines?.[0]
     rec('counts', 'Enter counted quantities', role, await call(role, 'PATCH', '/api/stock-counts/' + id, { lines: [{ line_id: line?.id, counted_qty: 1 }] }))
     rec('counts', 'Cancel a count', role, await call(role, 'PATCH', '/api/stock-counts/' + id, { status: 'cancelled' }))
+    // If this role wasn't allowed to cancel it, the owner does, so the location is free again.
+    await call('owner', 'PATCH', '/api/stock-counts/' + id, { status: 'cancelled' })
     // A count in review, made by owner, approved by this role.
     const oc2 = await newCount('owner'); const id2 = oc2.b?.data?.id
     await call('owner', 'PATCH', '/api/stock-counts/' + id2, { status: 'reviewing' })
