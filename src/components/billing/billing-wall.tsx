@@ -169,7 +169,7 @@ export function BillingWall({
                       Use Stocked Tools free
                     </button>
                     <button onClick={() => checkout('tools')} disabled={!!busy}
-                      className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 flex items-center justify-center gap-2">
+                      className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2">
                       {busy === 'tools' ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                       Unlimited tools · {interval === 'annual'
                         ? `$${annualPrice('tools', region)}/yr`
