@@ -99,9 +99,12 @@ export default function RegisterPage() {
     }
 
     // Supabase obscures existing emails to prevent enumeration: signUp for an
-    // already-registered address returns a user with an EMPTY identities array
-    // (and sends no email). Detect that and tell them to sign in instead.
-    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+    // already-registered address sends no email and returns no error. Older
+    // versions returned a user with an EMPTY identities array; current ones
+    // return no user at all. A genuinely new sign-up always returns a user with
+    // an identity, so treat either shape as "already registered".
+    const identities = data.user?.identities
+    if (!data.user || (Array.isArray(identities) && identities.length === 0)) {
       setEmailExists(true)
       setLoading(false)
       return
