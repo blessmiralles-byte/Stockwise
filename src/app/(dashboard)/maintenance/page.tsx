@@ -1,7 +1,7 @@
 'use client'
 
 import { useMoney } from '@/lib/use-currency'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -17,7 +17,7 @@ import {
   AlertCircle, Calendar, Loader2, X, Repeat, UserCheck, ShieldCheck,
 } from 'lucide-react'
 import { RECURRENCE_PRESETS, describeRecurrence } from '@/lib/maintenance-recurrence'
-import { SCHEDULE_KINDS, KIND_LABEL, producesCertificate, certificateState, type ScheduleKind } from '@/lib/asset-compliance'
+import { SCHEDULE_KINDS, KIND_LABEL, producesCertificate, certificateState, isScheduleKind, type ScheduleKind } from '@/lib/asset-compliance'
 
 const statusConfig: Record<string, { label: string; variant: any; icon: any; color: string }> = {
   scheduled: { label: 'Scheduled', variant: 'default',     icon: Clock,        color: 'text-indigo-600 bg-indigo-50' },
@@ -26,16 +26,24 @@ const statusConfig: Record<string, { label: string; variant: any; icon: any; col
 }
 
 // ── Schedule Maintenance Dialog ───────────────────────────────────────────────
-function ScheduleDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function ScheduleDialog({ onClose, onSaved, initialKind = 'maintenance' }: {
+  onClose: () => void; onSaved: () => void; initialKind?: ScheduleKind
+}) {
   const { data: assetsData } = useApi<{ data: any[] }>('/api/assets')
   const assets = (assetsData?.data ?? []).filter((a: any) => a.status !== 'disposed')
 
-  const [kind,           setKind]           = useState<ScheduleKind>('maintenance')
+  const [kind,           setKind]           = useState<ScheduleKind>(initialKind)
   const [assetId,        setAssetId]        = useState('')
   const [title,          setTitle]          = useState('')
   const [description,    setDescription]    = useState('')
   const [scheduledDate,  setScheduledDate]  = useState(new Date().toISOString().split('T')[0])
   const [notifyBefore,   setNotifyBefore]   = useState('3')
+  // A tool usually arrives with a certificate already (new, or inspected last
+  // month). Recording it here is what the compliance report reads; otherwise
+  // the only way in was to finish a check first.
+  const [certNo,         setCertNo]         = useState('')
+  const [certUntil,      setCertUntil]      = useState('')
+  const needsCert = producesCertificate(kind)
   const [recurrenceIdx,  setRecurrenceIdx]  = useState(0)   // index into RECURRENCE_PRESETS
   const canRepeat = usePlan().has('recurring_maintenance')
   const [saving,         setSaving]         = useState(false)
@@ -75,6 +83,8 @@ function ScheduleDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
           // when this one is completed.
           recurrence_every:   RECURRENCE_PRESETS[recurrenceIdx].every || undefined,
           recurrence_unit:    RECURRENCE_PRESETS[recurrenceIdx].unit  || undefined,
+          certificate_no:     needsCert ? (certNo.trim() || undefined) : undefined,
+          certified_until:    needsCert ? (certUntil     || undefined) : undefined,
         }),
       })
       const json = await res.json()
@@ -90,11 +100,32 @@ function ScheduleDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
 
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-slate-900">Schedule Maintenance</h2>
+          <h2 className="text-base font-semibold text-slate-900">
+            {kind === 'maintenance' ? 'Schedule Maintenance' : `Schedule ${KIND_LABEL[kind]}`}
+          </h2>
           <Button variant="ghost" size="icon" onClick={onClose}><X className="w-4 h-4" /></Button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+
+          {/* What kind of check: first, because it changes the rest of the form */}
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Type</label>
+            <div className="grid grid-cols-3 gap-2">
+              {SCHEDULE_KINDS.map(k => (
+                <button
+                  key={k.value}
+                  type="button"
+                  onClick={() => setKind(k.value)}
+                  className={`rounded-lg border px-2 py-2 text-left transition-colors ${
+                    kind === k.value ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-slate-300'}`}
+                >
+                  <span className="block text-xs font-semibold text-slate-800">{k.label}</span>
+                  <span className="block text-[10px] text-slate-500 leading-tight mt-0.5">{k.blurb}</span>
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Asset */}
           <div>
@@ -144,7 +175,7 @@ function ScheduleDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
           {/* Scheduled date */}
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">
-              Scheduled Date <span className="text-red-500">*</span>
+              {needsCert ? `Next ${kind} due` : 'Scheduled Date'} <span className="text-red-500">*</span>
             </label>
             <Input
               type="date"
@@ -191,24 +222,28 @@ function ScheduleDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
             </div>
           </div>
 
-          {/* What kind of check */}
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Type</label>
-            <div className="grid grid-cols-3 gap-2">
-              {SCHEDULE_KINDS.map(k => (
-                <button
-                  key={k.value}
-                  type="button"
-                  onClick={() => setKind(k.value)}
-                  className={`rounded-lg border px-2 py-2 text-left transition-colors ${
-                    kind === k.value ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-slate-300'}`}
-                >
-                  <span className="block text-xs font-semibold text-slate-800">{k.label}</span>
-                  <span className="block text-[10px] text-slate-500 leading-tight mt-0.5">{k.blurb}</span>
-                </button>
-              ))}
+          {needsCert && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+              <div>
+                <p className="text-xs font-semibold text-slate-700">Current certificate</p>
+                <p className="text-[11px] text-slate-500">
+                  If this tool already has one, enter it so the compliance report shows it as valid.
+                  Leave blank if it has never been {kind === 'calibration' ? 'calibrated' : 'inspected'}.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Certificate no.</label>
+                  <Input value={certNo} onChange={e => setCertNo(e.target.value)}
+                    placeholder={kind === 'calibration' ? 'e.g. CAL-2026-014' : 'e.g. INS-2026-031'} className="bg-white" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Valid until</label>
+                  <Input type="date" value={certUntil} onChange={e => setCertUntil(e.target.value)} className="bg-white" />
+                </div>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Repeat (preventive maintenance) */}
           <div>
@@ -384,7 +419,15 @@ export default function MaintenancePage() {
   // Set after completing a recurring task, to confirm the next one was created.
   const [nextScheduled, setNextScheduled] = useState<string | null>(null)
   const [showSchedule, setShowSchedule] = useState(false)
+  const [scheduleKind, setScheduleKind] = useState<ScheduleKind>('maintenance')
   const [markingDone,  setMarkingDone]  = useState<any | null>(null)
+
+  // /maintenance?schedule=inspection (from the compliance report) opens the
+  // form ready for that kind of check.
+  useEffect(() => {
+    const k = new URLSearchParams(window.location.search).get('schedule')
+    if (isScheduleKind(k)) { setScheduleKind(k); setShowSchedule(true) }
+  }, [])
 
   const { data, loading, error, refetch } = useApi<{ data: any[] }>('/api/maintenance')
   const schedules = data?.data ?? []
@@ -474,7 +517,7 @@ export default function MaintenancePage() {
               ))}
             </div>
           </div>
-          <Button className="gap-2" onClick={() => setShowSchedule(true)}>
+          <Button className="gap-2" onClick={() => { setScheduleKind('maintenance'); setShowSchedule(true) }}>
             <Plus className="w-4 h-4" /> Schedule
           </Button>
         </div>
@@ -598,6 +641,7 @@ export default function MaintenancePage() {
 
       {showSchedule && (
         <ScheduleDialog
+          initialKind={scheduleKind}
           onClose={() => setShowSchedule(false)}
           onSaved={() => { setShowSchedule(false); refetch?.() }}
         />

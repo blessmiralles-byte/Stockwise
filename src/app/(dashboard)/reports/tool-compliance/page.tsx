@@ -2,6 +2,7 @@
 
 import { useMoney } from '@/lib/use-currency'
 import { useState, useMemo } from 'react'
+import Link from 'next/link'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent } from '@/components/ui/card'
 import { useApi } from '@/lib/use-api'
@@ -197,9 +198,16 @@ feature="tool_reports"
           <div className="flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-slate-400" /></div>
         ) : tab === 'checks' ? (
           shownTools.length === 0 ? (
-            <Card><CardContent className="p-8 text-center text-sm text-slate-400">
-              No inspection or calibration schedules yet. Add one from <span className="font-medium">Maintenance → Schedule</span> and
-              pick Inspection or Calibration.
+            <Card><CardContent className="p-8 text-center text-sm text-slate-500 space-y-3">
+              <p>
+                No inspections or calibrations yet. In <span className="font-medium">Maintenance</span>, click
+                {' '}<span className="font-medium">Schedule</span>, choose Inspection or Calibration, and enter the tool&apos;s
+                current certificate number and expiry date if it has one.
+              </p>
+              <Link href="/maintenance?schedule=inspection"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
+                Add an inspection
+              </Link>
             </CardContent></Card>
           ) : (
             <Card><CardContent className="p-0 overflow-x-auto">
