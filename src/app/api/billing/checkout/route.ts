@@ -98,6 +98,9 @@ export async function POST(req: NextRequest) {
       error: 'Could not start checkout. Please try again.',
       detail: lemonSqueezyReason(err.message),
       variant_key: variantEnvKey(plan, interval, region),
+      // Variant ids aren't secret, and the env var holding it can't be read
+      // back in Vercel once saved as Sensitive — this is how to compare.
+      variant_id: variantId,
     }, { status: 502 })
   }
 }
