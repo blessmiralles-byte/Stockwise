@@ -90,6 +90,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url })
   } catch (err: any) {
     console.error('[checkout] lemonsqueezy error:', err.message)
-    return NextResponse.json({ error: 'Could not start checkout. Please try again.' }, { status: 502 })
+    // Only the owner gets here (see the role check above), and the reason Lemon
+    // Squeezy gives is about our own setup ("variant not found", "not
+    // published"), not about anyone's data. Without it, a misconfigured
+    // variant could only be diagnosed from the server logs.
+    return NextResponse.json({
+      error: 'Could not start checkout. Please try again.',
+      detail: lemonSqueezyReason(err.message),
+      variant_key: variantEnvKey(plan, interval, region),
+    }, { status: 502 })
   }
+}
+
+/** The human part of a Lemon Squeezy JSON:API error, e.g. "The selected variant is invalid." */
+function lemonSqueezyReason(message: string): string {
+  const json = message.slice(message.indexOf('{'))
+  try {
+    const errs = JSON.parse(json)?.errors
+    if (Array.isArray(errs) && errs.length) {
+      return errs.map((e: any) => [e.title, e.detail].filter(Boolean).join(': ')).join('; ').slice(0, 300)
+    }
+  } catch { /* not JSON */ }
+  return message.replace(/^Lemon Squeezy checkout failed /, '').slice(0, 300)
 }
