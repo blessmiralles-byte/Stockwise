@@ -152,8 +152,8 @@ export function BillingWall({
             {/* Not everyone needs full inventory: offer the tool tracker on its own. */}
             <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5">
               <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
-                  <Wrench className="w-5 h-5 text-amber-600" />
+                <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                  <Wrench className="w-5 h-5 text-indigo-600" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-slate-900">Just need to keep track of tools?</p>
