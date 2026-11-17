@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { jobQtyOf } from '@/lib/stock-direction'
-import { requireFeature } from '@/lib/entitlements-server'
+import { authenticateApiKey } from '@/lib/api-keys-server'
 import { createServiceClient } from '@/lib/supabase/service'
 
 /**
@@ -10,33 +10,24 @@ import { createServiceClient } from '@/lib/supabase/service'
  * Response shape mirrors the old direct-Supabase query in JobLedger's
  * stockedClient.ts so the migration is a drop-in swap.
  *
- * Auth: Authorization: Bearer {JOBLEDGER_API_KEY}
+ * Auth: per-organization API key (Settings → API keys, scope "jobledger"):
+ *   Authorization: Bearer stk_jobledger_…   org_id is optional; if sent it must match the key.
  *
  * Supports cursor-based incremental sync: pass the `transactionDate` of the
  * last received entry as `cursor` to fetch only newer records.
  */
 export async function GET(req: NextRequest) {
-  // ── API key auth ────────────────────────────────────────────────────────────
-  const apiKey = process.env.JOBLEDGER_API_KEY
-  if (!apiKey) {
-    return NextResponse.json({ error: 'JOBLEDGER_API_KEY is not configured on Stocked' }, { status: 503 })
-  }
-  const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${apiKey}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
+  // ── Per-organization API key: the key decides the company ───────────────────
   const { searchParams } = req.nextUrl
+  const key = await authenticateApiKey(req.headers.get('authorization'), 'jobledger', searchParams.get('org_id'))
+  if (!key.ok) return key.error
+  const orgId = key.orgId
+
   const jobId  = searchParams.get('job_id')?.trim()
   const cursor = searchParams.get('cursor')
   const limit  = Math.min(Number(searchParams.get('limit') ?? '200'), 500)
-  const orgId  = searchParams.get('org_id')  // required for multi-tenant
 
   if (!jobId)  return NextResponse.json({ error: 'job_id is required' }, { status: 400 })
-  if (!orgId)  return NextResponse.json({ error: 'org_id is required' }, { status: 400 })
-
-  const gate = await requireFeature(orgId, 'integrations')
-  if (gate) return gate
 
   const supabase = createServiceClient()
 

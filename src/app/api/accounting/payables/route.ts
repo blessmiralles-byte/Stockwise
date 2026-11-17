@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
+import { apiKeyFromHeader } from '@/lib/api-keys'
+import { authenticateApiKey } from '@/lib/api-keys-server'
 
 /**
  * GET /api/accounting/payables
@@ -8,7 +10,8 @@ import { requireAuth } from '@/lib/api-auth'
  * Accounts Payable feed — open and partially-received purchase orders
  * with three-way match status: PO ordered vs GRN received vs AP invoice.
  *
- * Auth: session cookie OR Authorization: Bearer {ACCOUNTING_API_KEY}
+ * Auth: session cookie OR a per-organization API key (Settings → API keys,
+ * scope "accounting"): Authorization: Bearer stk_accounting_…
  *
  * Query params:
  *   status   all | open | matched | disputed   (default: all)
@@ -24,14 +27,14 @@ import { requireAuth } from '@/lib/api-auth'
  *   no_invoice — goods received but no invoice recorded yet
  */
 export async function GET(req: NextRequest) {
-  const apiKey    = process.env.ACCOUNTING_API_KEY
-  const authHeader = req.headers.get('authorization') ?? ''
+  const authHeader = req.headers.get('authorization')
   let orgId: string | null = null
 
-  if (apiKey && authHeader === `Bearer ${apiKey}`) {
-    const qOrgId = req.nextUrl.searchParams.get('org_id')
-    if (!qOrgId) return NextResponse.json({ error: 'org_id required' }, { status: 400 })
-    orgId = qOrgId
+  if (apiKeyFromHeader(authHeader)) {
+    // The key decides the company; the plan must include the accounting feed.
+    const key = await authenticateApiKey(authHeader, 'accounting', req.nextUrl.searchParams.get('org_id'))
+    if (!key.ok) return key.error
+    orgId = key.orgId
   } else {
     const auth = await requireAuth()
     if (auth.error) return auth.error

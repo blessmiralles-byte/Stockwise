@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { apiKeyFromHeader } from '@/lib/api-keys'
+import { authenticateApiKey } from '@/lib/api-keys-server'
 import { requireAuth } from '@/lib/api-auth'
 import {
   inventoryPosting, depreciationPosting, assetPurchasePosting,
@@ -13,7 +14,8 @@ import {
  * Machine-readable journal feed for accounting system integrations.
  * Supports two auth modes:
  *   1. Session cookie (browser / same-origin)
- *   2. API key header: Authorization: Bearer {ACCOUNTING_API_KEY}
+ *   2. Per-organization API key (Settings → API keys, scope "accounting"):
+ *      Authorization: Bearer stk_accounting_…   (the key decides the company)
  *
  * SCOPE: entries cover INVENTORY and FIXED ASSETS only — no revenue entries
  * (sales are invoiced and journaled in JobLedger) and no sales tax / VAT.
@@ -39,26 +41,18 @@ import {
  * cursor-scoped, so they can reappear across cursor polls).
  */
 export async function GET(req: NextRequest) {
-  // ── Auth: API key or session ───────────────────────────────────────────────
-  const apiKey = process.env.ACCOUNTING_API_KEY
-  const authHeader = req.headers.get('authorization') ?? ''
+  // ── Auth: per-organization API key or session ──────────────────────────────
+  const authHeader = req.headers.get('authorization')
 
   let orgId: string | null = null
 
-  if (apiKey && authHeader === `Bearer ${apiKey}`) {
-    // API key auth: read org_id from query param or default to first org
-    const qOrgId = req.nextUrl.searchParams.get('org_id')
-    if (!qOrgId) {
-      return NextResponse.json(
-        { error: 'org_id query param is required when using API key auth' },
-        { status: 400 }
-      )
-    }
-    orgId = qOrgId
-    // A live bookkeeping connection is a paid feature; the CSV export (session
-    // auth, below) stays available on every plan.
-    const gate = await requireFeature(orgId, 'accounting_sync')
-    if (gate) return gate
+  if (apiKeyFromHeader(authHeader)) {
+    // The key decides the company. A live bookkeeping connection is a paid
+    // feature (checked in authenticateApiKey); the CSV export (session auth,
+    // below) stays available on every plan.
+    const key = await authenticateApiKey(authHeader, 'accounting', req.nextUrl.searchParams.get('org_id'))
+    if (!key.ok) return key.error
+    orgId = key.orgId
   } else {
     // Session auth
     const auth = await requireAuth()

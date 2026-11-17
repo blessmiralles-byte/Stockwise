@@ -69,7 +69,8 @@ describe('service-client routes authenticate the caller', () => {
 
   // An API-key integration or a webhook authenticates differently; everything
   // else must identify the caller before touching privileged data.
-  const KEY_AUTH = ['API_KEY', 'WEBHOOK_SECRET', 'CRON_SECRET', 'timingSafeEqual', 'ADMIN_SECRET']
+  // authenticateApiKey = per-organization keys (src/lib/api-keys-server.ts).
+  const KEY_AUTH = ['authenticateApiKey', 'WEBHOOK_SECRET', 'CRON_SECRET', 'timingSafeEqual', 'ADMIN_SECRET']
 
   it.each(files.map(f => [relative(join(process.cwd(), 'src', 'app', 'api'), f).replaceAll('\\', '/'), f]))(
     '%s', (rel, full) => {

@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { countFreezeRefusal } from '@/lib/count-freeze-server'
-import { timingSafeEqual } from 'crypto'
 import { createServiceClient } from '@/lib/supabase/service'
 import { POSSaleRequest } from '@/types'
-import { requireFeature } from '@/lib/entitlements-server'
+import { authenticateApiKey } from '@/lib/api-keys-server'
 
 /**
  * POST /api/pos/sale
@@ -13,19 +12,11 @@ import { requireFeature } from '@/lib/entitlements-server'
  * Falls back to a checked two-step write if the RPC hasn't been deployed yet.
  */
 export async function POST(req: NextRequest) {
-  // M-3: Use constant-time comparison to prevent timing-based API key inference
-  const authHeader = req.headers.get('authorization')
-  const providedKey = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : ''
-  const expectedKey = process.env.POS_API_KEY ?? ''
-  let keyValid = false
-  try {
-    keyValid = providedKey.length > 0 &&
-      providedKey.length === expectedKey.length &&
-      timingSafeEqual(Buffer.from(providedKey), Buffer.from(expectedKey))
-  } catch { keyValid = false }
-  if (!keyValid) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  // Per-organization key (Settings → API keys, scope "pos"). The key decides
+  // the company; the plan gate is checked there too.
+  const auth = await authenticateApiKey(req.headers.get('authorization'), 'pos')
+  if (!auth.ok) return auth.error
+  const orgId = auth.orgId
 
   let body: POSSaleRequest
   try { body = await req.json() } catch {
@@ -52,20 +43,29 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServiceClient()
 
-  // The POS key is not org-specific, so the org is the one that owns the
-  // selling location. Needed for the plan gate and to tag the transactions.
+  // The location and every item must belong to the key's company.
   const { data: loc } = await supabase
     .from('locations')
-    .select('org_id')
+    .select('id')
     .eq('id', location_id)
+    .eq('org_id', orgId)
     .maybeSingle()
-  if (!loc?.org_id) {
+  if (!loc) {
     return NextResponse.json({ error: 'Unknown location_id' }, { status: 422 })
   }
-  const gate = await requireFeature(loc.org_id, 'integrations')
-  if (gate) return gate
+  const productIds = [...new Set(items.map(i => i.product_id))]
+  const { data: owned } = await supabase
+    .from('products')
+    .select('id')
+    .eq('org_id', orgId)
+    .in('id', productIds)
+  const ownedIds = new Set((owned ?? []).map((p: any) => p.id))
+  const unknown = productIds.filter(id => !ownedIds.has(id))
+  if (unknown.length) {
+    return NextResponse.json({ error: 'Unknown product_id', product_ids: unknown }, { status: 422 })
+  }
 
-  const frozen = await countFreezeRefusal(supabase, loc.org_id, [location_id])
+  const frozen = await countFreezeRefusal(supabase, orgId, [location_id])
   if (frozen) return frozen
 
   const transactionRef = reference_no ?? `POS-${Date.now()}`
@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
     const { data: tx, error: txError } = await supabase
       .from('inventory_transactions')
       .insert({
-        org_id:           loc.org_id,
+        org_id:           orgId,
         transaction_type: 'sale',
         product_id:       item.product_id,
         from_location_id: location_id,

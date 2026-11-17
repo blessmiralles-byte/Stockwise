@@ -21,7 +21,7 @@ const asA  = createClient(URL_, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, opts)
 // Functions a signed-in user is meant to be able to call (used inside policies).
 const USER_CALLABLE = new Set(['current_user_org_id', 'current_user_role', 'is_period_open', 'is_period_open_for'])
 // Server-only tables with no read policy at all.
-const SERVER_ONLY = new Set(['trial_claims', 'schema_migrations', 'barcode_cache', 'job_orders', 'support_kb_articles'])
+const SERVER_ONLY = new Set(['trial_claims', 'schema_migrations', 'barcode_cache', 'job_orders', 'support_kb_articles', 'api_keys'])
 
 let failures = 0
 const pass = m => console.log('  PASS ', m)

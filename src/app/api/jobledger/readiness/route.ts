@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireFeature } from '@/lib/entitlements-server'
+import { authenticateApiKey } from '@/lib/api-keys-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { fetchAllPaged } from '@/lib/fetch-paged'
 
@@ -26,27 +26,22 @@ const RELIABILITY_WINDOW_DAYS = 365
  *
  * Response: { materials: ReadinessLine[] }
  *
- * Auth: Authorization: Bearer {JOBLEDGER_API_KEY}
+ * Auth: per-organization API key (Settings → API keys, scope "jobledger"):
+ *   Authorization: Bearer stk_jobledger_…   org_id is optional; if sent it must match the key.
  */
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.JOBLEDGER_API_KEY
-  if (!apiKey) {
-    return NextResponse.json({ error: 'JOBLEDGER_API_KEY is not configured' }, { status: 503 })
-  }
-  if (req.headers.get('authorization') !== `Bearer ${apiKey}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
   let body: any
   try { body = await req.json() } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { org_id, job_id, materials } = body
-  if (!org_id)                       return NextResponse.json({ error: 'org_id is required' },    { status: 400 })
+  // Per-organization API key: the key decides the company. A body org_id is
+  // optional and must match the key if sent.
+  const key = await authenticateApiKey(req.headers.get('authorization'), 'jobledger', body?.org_id)
+  if (!key.ok) return key.error
+  const org_id = key.orgId
 
-  const gate = await requireFeature(org_id, 'integrations')
-  if (gate) return gate
+  const { job_id, materials } = body
   if (!Array.isArray(materials) || materials.length === 0) {
     return NextResponse.json({ error: 'materials array is required' }, { status: 400 })
   }

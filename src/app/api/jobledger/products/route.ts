@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireFeature } from '@/lib/entitlements-server'
+import { authenticateApiKey } from '@/lib/api-keys-server'
 import { createServiceClient } from '@/lib/supabase/service'
 
 /**
@@ -9,26 +9,17 @@ import { createServiceClient } from '@/lib/supabase/service'
  * Used by JobLedger's BOM (Bill of Materials) planning screen.
  *
  * Response shape matches StockedProduct in JobLedger's stockedClient.ts.
- * Auth: Authorization: Bearer {JOBLEDGER_API_KEY}
+ * Auth: per-organization API key (Settings → API keys, scope "jobledger"):
+ *   Authorization: Bearer stk_jobledger_…   org_id is optional; if sent it must match the key.
  */
 export async function GET(req: NextRequest) {
-  const apiKey = process.env.JOBLEDGER_API_KEY
-  if (!apiKey) {
-    return NextResponse.json({ error: 'JOBLEDGER_API_KEY is not configured' }, { status: 503 })
-  }
-  if (req.headers.get('authorization') !== `Bearer ${apiKey}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
+  // Per-organization API key: the key decides the company.
   const { searchParams } = req.nextUrl
-  const orgId  = searchParams.get('org_id')
+  const key = await authenticateApiKey(req.headers.get('authorization'), 'jobledger', searchParams.get('org_id'))
+  if (!key.ok) return key.error
+  const orgId  = key.orgId
   const search = searchParams.get('q')?.trim()
   const limit  = Math.min(Number(searchParams.get('limit') ?? '50'), 200)
-
-  if (!orgId) return NextResponse.json({ error: 'org_id is required' }, { status: 400 })
-
-  const gate = await requireFeature(orgId, 'integrations')
-  if (gate) return gate
 
   const supabase = createServiceClient()
 

@@ -27,6 +27,8 @@ export type AuditAction =
   | 'cost_center.create'
   | 'cost_center.update'
   | 'product.code_change'
+  | 'api_key.create'
+  | 'api_key.revoke'
 
 export async function logAudit(params: {
   actorId: string

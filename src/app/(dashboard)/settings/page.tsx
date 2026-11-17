@@ -17,6 +17,7 @@ import { Settings, Bell, Shield, Key, Send, CheckCircle2, AlertCircle, Loader2,
 import { PLAN_CONFIG, PAID_PLANS, FREE_TOOL_LIMIT, isPaidPlan, isPricingRegion, monthlyPrice, annualPrice, type PlanKey, type PricingRegion } from '@/lib/plan-config'
 import { isToolsPlan } from '@/lib/entitlements'
 import { createClient } from '@/lib/supabase/client'
+import { ApiKeysSection } from '@/components/settings/api-keys-section'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Role = 'owner' | 'procurement' | 'operations' | 'receiver' | 'finance' | 'viewer'
@@ -1385,6 +1386,8 @@ function SettingsInner() {
     // Job costing and period close belong to full Stocked, not Stocked Tools.
     ...(isFinance && !toolsOnly ? [{ id: 'costcenters', label: 'Cost Centers',     icon: Briefcase     }] : []),
     ...(isFinance && !toolsOnly ? [{ id: 'periods',     label: 'Acct. Periods',    icon: CalendarRange }] : []),
+    // Integrations (POS, accounting feed, JobLedger) belong to full Stocked.
+    ...(isAdmin && !toolsOnly   ? [{ id: 'apikeys',     label: 'API keys',         icon: Key           }] : []),
   ]
 
   const checkoutStatus = searchParams.get('checkout')
@@ -1460,6 +1463,13 @@ function SettingsInner() {
           </Section>
         )}
 
+        {/* API keys tab — owner only */}
+        {activeTab === 'apikeys' && isAdmin && !toolsOnly && (
+          <Section icon={Key} title="API keys" description="Connect a point of sale, your bookkeeping app or JobLedger">
+            <ApiKeysSection />
+          </Section>
+        )}
+
         {/* General tab */}
         {activeTab === 'general' && <div className="space-y-5">
 
@@ -1524,26 +1534,6 @@ function SettingsInner() {
                 to preview what that email contains right now.
               </p>
             </div>
-          </div>
-        </Section>
-
-        {/* POS Integration */}
-        <Section
-          icon={Key}
-          title="POS Integration"
-          description="API key for connecting an external point-of-sale system"
-        >
-          <div className="space-y-3">
-            <div>
-              <label className="text-sm font-medium text-slate-700 block mb-1">API Key</label>
-              <Input defaultValue="••••••••••••••••" type="password" disabled />
-            </div>
-            <div className="bg-slate-50 rounded-lg p-3 text-xs text-slate-500 space-y-1.5">
-              <p><span className="font-medium">Endpoint:</span> <code className="bg-white px-1 rounded border">POST /api/pos/sale</code></p>
-              <p><span className="font-medium">Auth:</span> <code className="bg-white px-1 rounded border">Authorization: Bearer {'{POS_API_KEY}'}</code></p>
-              <p><span className="font-medium">Set in:</span> <code className="bg-white px-1 rounded border">.env.local → POS_API_KEY</code></p>
-            </div>
-            {isAdmin && <Button variant="outline" size="sm">Regenerate Key</Button>}
           </div>
         </Section>
 
