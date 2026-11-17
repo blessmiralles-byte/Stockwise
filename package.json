@@ -33,7 +33,7 @@
     "date-fns": "^4.2.1",
     "html5-qrcode": "^2.3.8",
     "lucide-react": "^1.16.0",
-    "next": "16.2.6",
+    "next": "16.4.6",
     "papaparse": "^5.5.3",
     "qrcode": "^1.5.4",
     "react": "19.2.4",
@@ -42,7 +42,7 @@
     "resend": "^6.12.3",
     "stripe": "^22.2.0",
     "tailwind-merge": "^3.6.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -55,7 +55,7 @@
     "@types/xlsx": "^0.0.35",
     "dotenv": "^17.4.2",
     "eslint": "^9",
-    "eslint-config-next": "16.2.6",
+    "eslint-config-next": "16.4.6",
     "pdfkit": "^0.18.0",
     "tailwindcss": "^4",
     "tsx": "^4.22.3",
