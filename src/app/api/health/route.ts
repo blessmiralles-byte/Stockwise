@@ -15,6 +15,9 @@ import { createServiceClient } from '@/lib/supabase/service'
 
 export const dynamic = 'force-dynamic'
 
+// A monitor must see the live state, never a cached copy.
+const NO_STORE = { 'Cache-Control': 'no-store' }
+
 export async function GET() {
   const start = Date.now()
 
@@ -28,18 +31,15 @@ export async function GET() {
 
     const latencyMs = Date.now() - start
 
+    // Public endpoint: log the database's reason, never return it.
     if (error) {
-      return NextResponse.json(
-        { status: 'degraded', db: 'error', error: error.message, latencyMs },
-        { status: 503 }
-      )
+      console.error('[health] database ping failed:', error.message)
+      return NextResponse.json({ status: 'degraded', db: 'error', latencyMs }, { status: 503, headers: NO_STORE })
     }
 
-    return NextResponse.json({ status: 'ok', db: 'ok', latencyMs, time: new Date().toISOString() })
+    return NextResponse.json({ status: 'ok', db: 'ok', latencyMs, time: new Date().toISOString() }, { headers: NO_STORE })
   } catch (e) {
-    return NextResponse.json(
-      { status: 'error', db: 'unreachable', error: String(e), latencyMs: Date.now() - start },
-      { status: 503 }
-    )
+    console.error('[health] database unreachable:', e)
+    return NextResponse.json({ status: 'error', db: 'unreachable', latencyMs: Date.now() - start }, { status: 503, headers: NO_STORE })
   }
 }

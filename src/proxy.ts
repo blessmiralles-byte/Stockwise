@@ -1,18 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
-
-const PUBLIC_PATHS = [
-  '/', '/login', '/register', '/auth/callback', '/auth/confirm', '/forgot-password', '/reset-password',
-  '/onboarding', '/privacy', '/terms', '/one-pager', '/getting-started', '/delete-account',
-  // Stocked Tools landing page
-  '/tools',
-  // Public SEO / social-share assets — must be reachable by unauthenticated
-  // crawlers (Slackbot, LinkedIn, Twitterbot, Googlebot), not redirected to login.
-  '/opengraph-image', '/twitter-image', '/robots.txt', '/sitemap.xml',
-]
+import { isPublicPath, isProtectedPath } from '@/lib/route-access'
 
 // API routes that use their own non-session auth (API key or cron secret).
 const API_EXEMPT_PATHS = [
+  // Uptime monitors: liveness + database ping, no data (src/app/api/health).
+  '/api/health',
   '/api/pos/sale',
   '/api/notifications/maintenance',
   '/api/auth/',
@@ -72,7 +65,7 @@ export async function proxy(request: NextRequest) {
   if (
     pathname.startsWith('/_next/') ||
     pathname === '/favicon.ico' ||
-    PUBLIC_PATHS.some(p => pathname === p || (p !== '/' && pathname.startsWith(p)))
+    isPublicPath(pathname)
   ) {
     return pass()
   }
@@ -117,8 +110,12 @@ export async function proxy(request: NextRequest) {
     return response
   }
 
-  // Page routes — redirect unauthenticated users to login
+  // Page routes — redirect unauthenticated users to login, but only for real
+  // signed-in pages. Anything else is an unknown URL: let it reach the 404 page.
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user && !isProtectedPath(pathname)) {
+    return pass()
+  }
   if (!user) {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('next', pathname)
