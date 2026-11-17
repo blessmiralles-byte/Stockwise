@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, Suspense, Fragment } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -1338,11 +1337,18 @@ const roleConfig: Record<string, { variant: any; label: string }> = Object.fromE
 )
 
 function SettingsInner() {
-  const searchParams = useSearchParams()
-  const tabParam = searchParams.get('tab')
-  const [activeTab, setActiveTab] = useState(
-    ['users', 'billing', 'people', 'costcenters', 'periods'].includes(tabParam ?? '') ? tabParam! : 'general'
-  )
+  // Read ?tab= and ?checkout= after mount rather than with useSearchParams:
+  // useSearchParams needs a <Suspense> boundary, and that boundary never
+  // hydrated when /settings was opened directly (reload, link, or the return
+  // from Lemon Squeezy checkout), leaving a dead page.
+  const [activeTab, setActiveTab] = useState('general')
+  const [checkoutStatus, setCheckoutStatus] = useState<string | null>(null)
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search)
+    const t = q.get('tab')
+    if (t && ['users', 'billing', 'people', 'costcenters', 'periods', 'apikeys'].includes(t)) setActiveTab(t)
+    setCheckoutStatus(q.get('checkout'))
+  }, [])
 
   const { data: profile } = useApi<any>('/api/user/profile')
   const isAdmin = profile?.role === 'owner' || profile?.role === 'admin'
@@ -1390,7 +1396,6 @@ function SettingsInner() {
     ...(isAdmin && !toolsOnly   ? [{ id: 'apikeys',     label: 'API keys',         icon: Key           }] : []),
   ]
 
-  const checkoutStatus = searchParams.get('checkout')
 
   return (
     <div>
@@ -1691,8 +1696,6 @@ function DeleteAccountSection({ role }: { role?: string }) {
 
 export default function SettingsPage() {
   return (
-    <Suspense>
-      <SettingsInner />
-    </Suspense>
+    <SettingsInner />
   )
 }

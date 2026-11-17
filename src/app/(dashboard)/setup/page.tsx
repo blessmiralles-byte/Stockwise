@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { Topbar } from '@/components/layout/topbar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -1211,9 +1210,14 @@ const TABS = [
 ]
 
 function SetupInner() {
-  const searchParams = useSearchParams()
-  const tabParam = searchParams.get('tab') ?? ''
-  const [active, setActive] = useState(TABS.some(t => t.id === tabParam) ? tabParam : 'start')
+  // Read ?tab= after mount, not with useSearchParams: that hook needs a
+  // <Suspense> boundary, and the boundary never hydrated when /setup was
+  // opened directly, leaving a dead page (same fix as /settings).
+  const [active, setActive] = useState('start')
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get('tab') ?? ''
+    if (TABS.some(x => x.id === t)) setActive(t)
+  }, [])
   const [bannerDismissed, setBannerDismissed] = useState(false)
 
   const { data: orgData } = useApi<{ data: any }>('/api/org')
@@ -1275,5 +1279,5 @@ function SetupInner() {
 }
 
 export default function SetupPage() {
-  return <Suspense><SetupInner /></Suspense>
+  return <SetupInner />
 }
