@@ -8,6 +8,7 @@ import {
   TrendingDown, AlertTriangle, Printer,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { localToday } from '@/lib/dates'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface DeprLine {
@@ -45,7 +46,7 @@ const METHOD_LABELS: Record<string, string> = {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function DepreciationPage() {
-  const today    = new Date().toISOString().slice(0, 10)
+  const today    = localToday()
   const firstDom = today.slice(0, 8) + '01'
 
   const [from, setFrom]       = useState(firstDom)

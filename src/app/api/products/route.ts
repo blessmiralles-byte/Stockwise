@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireAnyRole } from '@/lib/api-auth'
 import { generateItemCode, normaliseItemCode, validateItemCode } from '@/lib/item-code'
+import { getOrgTimeZone } from '@/lib/org-timezone'
 import { findCodeHolder, clashedField, clashMessage } from '@/lib/item-code-server'
 
 export async function GET(req: NextRequest) {
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
 
   // Their own code if they gave one; otherwise a placeholder they can replace
   // later from the product list.
-  sku = normaliseItemCode(sku) || generateItemCode()
+  sku = normaliseItemCode(sku) || generateItemCode(new Date(), Math.random, await getOrgTimeZone(createServiceClient(), auth.orgId))
   const invalidCode = validateItemCode(sku)
   if (invalidCode) return NextResponse.json({ error: invalidCode }, { status: 422 })
 

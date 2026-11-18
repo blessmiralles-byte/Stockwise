@@ -13,6 +13,8 @@
  * Pure: the route supplies the catalog and applies the result.
  */
 
+import { dayInZone } from '@/lib/dates'
+
 export const ITEM_CODE_MAX = 50
 
 /**
@@ -21,9 +23,12 @@ export const ITEM_CODE_MAX = 50
  */
 export const RECODE_PARKING_PREFIX = '__recode__'
 
-/** A placeholder for items created without a code. Readable, dated, unique enough. */
-export function generateItemCode(now: Date = new Date(), rand: () => number = Math.random): string {
-  const datePart = now.toISOString().slice(0, 10).replace(/-/g, '')
+/**
+ * A placeholder for items created without a code. Readable, dated, unique enough.
+ * Pass the company's time zone so the date part is their day, not UTC's.
+ */
+export function generateItemCode(now: Date = new Date(), rand: () => number = Math.random, timeZone?: string | null): string {
+  const datePart = dayInZone(now, timeZone).replace(/-/g, '')
   const suffix   = rand().toString(36).slice(2, 6).toUpperCase().padEnd(4, '0')
   return `ITM-${datePart}-${suffix}`
 }

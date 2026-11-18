@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllPaged } from '@/lib/fetch-paged'
 import type { Po, Receipt } from '@/lib/procurement-reports'
+import { addDays, dayRangeInZone, isIsoDay, todayInZone } from '@/lib/dates'
 
 /**
  * Loading the rows the purchasing, payables and stock reports are built from.
@@ -10,16 +11,17 @@ import type { Po, Receipt } from '@/lib/procurement-reports'
  * paged, so a report is never quietly built on the first thousand rows.
  */
 
-const isDate = (v: string | null): v is string => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v)
-const isoDay = (d: Date) => d.toISOString().slice(0, 10)
-
-/** ?from=&to= as dates, defaulting to the last `defaultDays` days up to today. */
-export function parseRange(req: NextRequest, defaultDays: number): { from: string; to: string; fromTs: string; toTs: string } {
+/**
+ * ?from=&to= as dates, defaulting to the last `defaultDays` days up to today.
+ * Days are the company's (`timeZone`): the timestamps run from midnight on
+ * `from` to the last moment of `to` on their clock, not UTC's.
+ */
+export function parseRange(req: NextRequest, defaultDays: number, timeZone: string | null): { from: string; to: string; fromTs: string; toTs: string } {
   const sp = req.nextUrl.searchParams
-  const today = new Date()
-  const to   = isDate(sp.get('to'))   ? sp.get('to')!   : isoDay(today)
-  const from = isDate(sp.get('from')) ? sp.get('from')! : isoDay(new Date(today.getTime() - defaultDays * 86_400_000))
-  return { from, to, fromTs: `${from}T00:00:00.000Z`, toTs: `${to}T23:59:59.999Z` }
+  const today = todayInZone(timeZone)
+  const to   = isIsoDay(sp.get('to'))   ? sp.get('to')!   : today
+  const from = isIsoDay(sp.get('from')) ? sp.get('from')! : addDays(today, -defaultDays)
+  return { from, to, ...dayRangeInZone(from, to, timeZone) }
 }
 
 const PO_SELECT = `

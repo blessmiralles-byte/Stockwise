@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
 import { fetchAllPaged } from '@/lib/fetch-paged'
 import { parseRange } from '@/lib/report-data'
+import { getOrgTimeZone } from '@/lib/org-timezone'
 import { stockAdjustments, type AdjustmentTx } from '@/lib/inventory-reports'
 
 /**
@@ -16,8 +17,8 @@ export async function GET(req: NextRequest) {
   const auth = await requireAnyRole('owner', 'finance', 'operations', 'manager')
   if (auth.error) return auth.error
 
-  const range = parseRange(req, 90)
   const supabase = createServiceClient()
+  const range = parseRange(req, 90, await getOrgTimeZone(supabase, auth.orgId))
 
   const { rows, truncated, error } = await fetchAllPaged<any>((from, to) =>
     supabase

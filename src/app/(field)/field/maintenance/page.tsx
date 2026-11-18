@@ -9,15 +9,14 @@ import {
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { formatDate } from '@/lib/utils'
+import { localToday, daysFromLocalToday } from '@/lib/dates'
 
 // ── Urgency helpers ───────────────────────────────────────────────────────────
 function getUrgency(s: any): 'overdue' | 'today' | 'soon' | 'upcoming' {
   if (s.status === 'overdue') return 'overdue'
   if (s.status === 'completed') return 'upcoming'
-  const d = new Date(s.scheduled_date)
-  const t = new Date()
-  const days = Math.ceil((d.getTime() - t.getTime()) / 86400000)
-  if (d.toDateString() === t.toDateString()) return 'today'
+  const days = daysFromLocalToday(s.scheduled_date)
+  if (days === 0) return 'today'
   if (days <= 5) return 'soon'
   return 'upcoming'
 }
@@ -54,7 +53,7 @@ function MarkDoneSheet({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: 'completed',
-          completed_date: new Date().toISOString().split('T')[0],
+          completed_date: localToday(),
           performed_by: performedBy.trim() || undefined,
           notes: notes.trim() || undefined,
           cost: cost ? Number(cost) : undefined,
@@ -144,7 +143,7 @@ function NewTaskSheet({ onClose, onDone }: { onClose: () => void; onDone: () => 
   const [assetId, setAssetId]   = useState('')
   const [title, setTitle]       = useState('')
   const [notes, setNotes]       = useState('')
-  const [date, setDate]         = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate]         = useState(localToday())
   const [saving, setSaving]     = useState(false)
   const [error, setError]       = useState('')
 
@@ -352,7 +351,7 @@ export default function FieldMaintenancePage() {
             const urgency = getUrgency(s)
             const cfg = URGENCY_CFG[urgency]
             const UIcon = cfg.icon
-            const daysLeft = Math.ceil((new Date(s.scheduled_date).getTime() - Date.now()) / 86400000)
+            const daysLeft = daysFromLocalToday(s.scheduled_date)
 
             return (
               <div

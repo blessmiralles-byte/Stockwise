@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { dayRangeInZone, isIsoDay } from '@/lib/dates'
+import { getOrgTimeZone } from '@/lib/org-timezone'
 import { requireAnyRole } from '@/lib/api-auth'
 
 /**
@@ -29,6 +31,7 @@ export async function GET(req: NextRequest) {
   const actorId  = sp.get('actor_id') ?? ''
 
   const supabase = createServiceClient()
+  const tz = await getOrgTimeZone(supabase, auth.orgId)
   const offset   = (page - 1) * limit
 
   let query = supabase
@@ -42,8 +45,8 @@ export async function GET(req: NextRequest) {
 
   if (action)  query = query.ilike('action', `${action}%`)
   if (actorId) query = query.eq('actor_id', actorId)
-  if (from)    query = query.gte('created_at', `${from}T00:00:00`)
-  if (to)      query = query.lte('created_at', `${to}T23:59:59`)
+  if (isIsoDay(from)) query = query.gte('created_at', dayRangeInZone(from, from, tz).fromTs)
+  if (isIsoDay(to))   query = query.lte('created_at', dayRangeInZone(to, to, tz).toTs)
 
   const { data, error, count } = await query
 

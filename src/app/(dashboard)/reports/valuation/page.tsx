@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useApi } from '@/lib/use-api'
 import { BarChart2, TrendingUp, TrendingDown, Package, AlertTriangle, Printer } from 'lucide-react'
+import { localDay } from '@/lib/dates'
 
 function SummaryCard({ label, value, sub, color, icon: Icon }: {
   label: string; value: string; sub?: string; color: string; icon: any
@@ -32,7 +33,7 @@ export default function ValuationReportPage() {
   // Default to current month
   const now = new Date()
   const firstDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-  const lastDay  = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10)
+  const lastDay  = localDay(new Date(now.getFullYear(), now.getMonth() + 1, 0))
 
   const [from, setFrom] = useState(firstDay)
   const [to,   setTo]   = useState(lastDay)

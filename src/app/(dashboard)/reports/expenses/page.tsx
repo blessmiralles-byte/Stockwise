@@ -8,6 +8,7 @@ import {
   Briefcase, Tag, AlertCircle, BarChart3, Printer,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { localToday } from '@/lib/dates'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface ProductLine {
@@ -127,7 +128,7 @@ function GroupCard({ group, grandTotal }: { group: ExpenseGroup; grandTotal: num
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function ExpensesReportPage() {
-  const today   = new Date().toISOString().slice(0, 10)
+  const today   = localToday()
   const firstDom = today.slice(0, 8) + '01'
 
   const [from, setFrom]       = useState(firstDom)

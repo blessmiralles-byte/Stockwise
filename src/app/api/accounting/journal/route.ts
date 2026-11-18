@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { dayRangeInZone, isIsoDay } from '@/lib/dates'
+import { getOrgTimeZone } from '@/lib/org-timezone'
 import { apiKeyFromHeader } from '@/lib/api-keys'
 import { authenticateApiKey } from '@/lib/api-keys-server'
 import { requireAuth } from '@/lib/api-auth'
@@ -70,11 +72,13 @@ export async function GET(req: NextRequest) {
   const types  = searchParams.get('types')?.split(',').filter(Boolean) ?? []
   const limit  = Math.min(Number(searchParams.get('limit') ?? '200'), 500)
 
-  if (!from || !to) {
+  if (!isIsoDay(from) || !isIsoDay(to)) {
     return NextResponse.json({ error: 'from and to params required (YYYY-MM-DD)' }, { status: 400 })
   }
 
   const supabase   = createServiceClient()
+  // The company's days, so an early-morning entry lands on the day it happened.
+  const days       = dayRangeInZone(from, to, await getOrgTimeZone(supabase, orgId))
   const entries: any[] = []
 
   const includeAll = types.length === 0
@@ -103,8 +107,8 @@ export async function GET(req: NextRequest) {
       `)
       .eq('org_id', orgId)
       .in('transaction_type', txTypes)
-      .gte('created_at', `${from}T00:00:00.000Z`)
-      .lte('created_at', `${to}T23:59:59.999Z`)
+      .gte('created_at', days.fromTs)
+      .lte('created_at', days.toTs)
       .order('created_at', { ascending: true })
       .limit(limit)
 

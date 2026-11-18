@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { localDay } from '@/lib/dates'
 
 /**
  * The shared parts of a report screen: a headline figure, a date range, and
@@ -10,7 +11,7 @@ import { cn } from '@/lib/utils'
  * purchasing, payables and stock reports looking and behaving alike.
  */
 
-const isoDay = (d: Date) => d.toISOString().slice(0, 10)
+const isoDay = (d: Date) => localDay(d)
 
 /** A from/to pair, starting at the last `days` days. */
 export function useDateRange(days: number) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, Fragment } from 'react'
+import { useState, useEffect, useRef, useMemo, Fragment } from 'react'
 import { Topbar } from '@/components/layout/topbar'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { useApi } from '@/lib/use-api'
 import { usePlan } from '@/lib/use-plan'
 import { CURRENCIES, formatMoney, currencySymbol } from '@/lib/currency'
+import { deviceTimeZone, todayInZone } from '@/lib/dates'
 import { UpgradePrompt, PlanBadge } from '@/components/billing/upgrade-prompt'
 import { Settings, Bell, Shield, Key, Send, CheckCircle2, AlertCircle, Loader2,
   ToggleLeft, ToggleRight, Briefcase, CalendarRange, Plus, X, Lock, Unlock, Download,
@@ -978,6 +979,14 @@ function OrgSettingsSection({ isAdmin }: { isAdmin: boolean }) {
   const requireCostDim = costDimOverride ?? !!data?.data?.require_cost_dimension
   const blockOverdue   = blockOverdueOverride ?? !!data?.data?.block_checkout_when_overdue
   const currency       = currencyOverride ?? data?.data?.currency ?? 'USD'
+  // Time zone: what "today" and report days mean for this company.
+  const [tzOverride, setTzOverride] = useState<string | null>(null)
+  const timezone = tzOverride ?? data?.data?.timezone ?? deviceTimeZone() ?? 'UTC'
+  const tzOptions = useMemo(() => {
+    let all: string[] = []
+    try { all = (Intl as any).supportedValuesOf?.('timeZone') ?? [] } catch { /* older browser */ }
+    return Array.from(new Set(['UTC', ...all, timezone])).sort()
+  }, [timezone])
   const selfOnly       = selfOnlyOverride ?? !!data?.data?.restrict_checkout_to_self
   const approvalOver   = approvalOverOverride ?? (data?.data?.checkout_approval_over != null ? String(data.data.checkout_approval_over) : '')
 
@@ -1001,6 +1010,9 @@ function OrgSettingsSection({ isAdmin }: { isAdmin: boolean }) {
         restrict_checkout_to_self:   selfOnly,
         checkout_approval_over:      approvalOver === '' ? null : Number(approvalOver),
         currency,
+        // Only when there's a zone to keep or change (the automatic fill-in
+        // covers the rest), so saving never depends on it.
+        ...(tzOverride !== null || data?.data?.timezone ? { timezone } : {}),
       }),
     })
     const json = await res.json()
@@ -1051,6 +1063,30 @@ function OrgSettingsSection({ isAdmin }: { isAdmin: boolean }) {
               The currency you buy and sell in. Stocked labels your figures with it — it never
               converts between currencies, so changing this does not restate anything you have
               already recorded. Remember to save.
+            </p>
+          </div>
+        )}
+
+        {data?.data && (
+          <div>
+            <label className="text-sm font-medium text-slate-700 block mb-1">Time zone</label>
+            <div className="flex items-center gap-3 flex-wrap">
+              <select
+                value={timezone}
+                onChange={e => setTzOverride(e.target.value)}
+                disabled={!isAdmin}
+                className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+              >
+                {tzOptions.map(z => <option key={z} value={z}>{z.replace(/_/g, ' ')}</option>)}
+              </select>
+              <span className="text-xs text-slate-500">
+                Today&apos;s date there: <span className="font-medium text-slate-700">{todayInZone(timezone)}</span>
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1.5">
+              Decides when your day starts and ends: default dates, what is due or overdue, and
+              which day an entry falls on in reports. Set automatically from your browser.
+              Remember to save.
             </p>
           </div>
         )}

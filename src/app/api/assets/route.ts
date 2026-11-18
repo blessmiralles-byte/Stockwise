@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isReadOnly } from '@/lib/permissions'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
+import { orgToday } from '@/lib/org-timezone'
 import { toolLimitRefusal } from '@/lib/tool-limit-server'
 
 const ASSET_SELECT = `
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
   // H-3: Auto-generate asset_tag using atomic DB sequence (no race condition)
   let tag = asset_tag?.trim()
   if (!tag) {
-    const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    const datePart = (await orgToday(auth.orgId)).replace(/-/g, '')
     const { data: seqVal, error: seqErr } = await supabase
       .rpc('next_ref_number', { p_seq: 'public.asset_seq' })
     if (seqErr || seqVal == null) {
@@ -138,7 +139,7 @@ export async function POST(req: NextRequest) {
   // date as today.
   insert.purchase_cost ??= 0
   insert.current_value ??= insert.purchase_cost
-  insert.purchase_date ??= new Date().toISOString().slice(0, 10)
+  insert.purchase_date ??= (await orgToday(auth.orgId))
 
   const { data, error } = await supabase
     .from('fixed_assets')

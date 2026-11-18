@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
+import { orgToday } from '@/lib/org-timezone'
 import { rateLimit } from '@/lib/rate-limit'
 import {
   EXPORT_TABLES, EXPORT_ROW_LIMIT, toSheetRows, summarySheet,
@@ -71,7 +72,7 @@ export async function GET() {
     XLSX.utils.book_append_sheet(book, sheet, spec.sheet)
   }
 
-  const generatedAt = new Date().toISOString().slice(0, 10)
+  const generatedAt = (await orgToday(auth.orgId))
   book.Sheets[summaryIndex] = XLSX.utils.aoa_to_sheet(
     summarySheet({ orgName, generatedAt, counts, truncated }),
   )

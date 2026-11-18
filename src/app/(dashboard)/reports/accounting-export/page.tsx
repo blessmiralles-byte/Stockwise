@@ -10,6 +10,7 @@ import {
   AlertCircle, CheckCircle2, Info,
 } from 'lucide-react'
 import { postingReference, JOURNAL_SCOPE, JOURNAL_IMPORT_STEPS } from '@/lib/journal-mapping'
+import { localDay } from '@/lib/dates'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface JournalEntry {
@@ -58,8 +59,8 @@ function typeBadgeColor(type: string) {
 // ── Default date range: current month ─────────────────────────────────────────
 function defaultDates() {
   const now   = new Date()
-  const from  = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
-  const to    = now.toISOString().slice(0, 10)
+  const from  = localDay(new Date(now.getFullYear(), now.getMonth(), 1))
+  const to    = localDay(now)
   return { from, to }
 }
 
@@ -200,9 +201,9 @@ export default function AccountingExportPage() {
             {/* Quick ranges */}
             <div className="flex gap-1.5">
               {[
-                { label: 'This month',  fn: () => { const n = new Date(); setFrom(new Date(n.getFullYear(), n.getMonth(), 1).toISOString().slice(0, 10)); setTo(n.toISOString().slice(0, 10)) } },
-                { label: 'Last month',  fn: () => { const n = new Date(); const f = new Date(n.getFullYear(), n.getMonth() - 1, 1); const t = new Date(n.getFullYear(), n.getMonth(), 0); setFrom(f.toISOString().slice(0, 10)); setTo(t.toISOString().slice(0, 10)) } },
-                { label: 'This year',   fn: () => { const n = new Date(); setFrom(`${n.getFullYear()}-01-01`); setTo(n.toISOString().slice(0, 10)) } },
+                { label: 'This month',  fn: () => { const n = new Date(); setFrom(localDay(new Date(n.getFullYear(), n.getMonth(), 1))); setTo(localDay(n)) } },
+                { label: 'Last month',  fn: () => { const n = new Date(); const f = new Date(n.getFullYear(), n.getMonth() - 1, 1); const t = new Date(n.getFullYear(), n.getMonth(), 0); setFrom(localDay(f)); setTo(localDay(t)) } },
+                { label: 'This year',   fn: () => { const n = new Date(); setFrom(`${n.getFullYear()}-01-01`); setTo(localDay(n)) } },
               ].map(r => (
                 <button key={r.label} onClick={r.fn} className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-600 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-600 transition-colors">
                   {r.label}

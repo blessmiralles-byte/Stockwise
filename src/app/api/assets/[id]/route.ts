@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isReadOnly } from '@/lib/permissions'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireAnyRole } from '@/lib/api-auth'
+import { orgToday } from '@/lib/org-timezone'
 import { postCatchUpDepreciation } from '@/lib/depreciation'
 
 // M-5: Role-split PATCH — field workers can update status/notes only;
@@ -126,7 +127,7 @@ export async function PATCH(
   // stamping, so accumulated depreciation (and the disposal journal entry
   // derived from current_value) is complete to the date of disposal.
   if (['disposed', 'retired', 'sold'].includes(update.status)) {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = (await orgToday(auth.orgId))
     await postCatchUpDepreciation(supabase, auth.orgId, auth.userId, id, today)
   }
 

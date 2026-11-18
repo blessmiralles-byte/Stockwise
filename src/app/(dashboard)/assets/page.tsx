@@ -24,6 +24,7 @@ import {
 import { ToolHistoryDialog } from '@/components/assets/tool-history-dialog'
 import Link from 'next/link'
 import { PrintLabelsDialog, type LabelAsset } from '@/components/print-labels'
+import { localToday, daysFromLocalToday } from '@/lib/dates'
 
 // ── Status config ─────────────────────────────────────────────────────────────
 const statusConfig: Record<string, { label: string; variant: any }> = {
@@ -262,7 +263,7 @@ function RetireSellDialog({
   onSaved: () => void
 }) {
   const { money } = useMoney()
-  const [date,   setDate]   = useState(new Date().toISOString().split('T')[0])
+  const [date,   setDate]   = useState(localToday())
   const [reason, setReason] = useState('')
   const [buyer,  setBuyer]  = useState('')
   const [price,  setPrice]  = useState('')
@@ -598,7 +599,7 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons, toolsOnly = false 
   const requiresApproval = reqApproval ?? !!orgData?.data?.require_checkout_approval
 
   // ── Financials / Depreciation ───────────────────────────────
-  const [purchaseDate,     setPurchaseDate]     = useState(new Date().toISOString().split('T')[0])
+  const [purchaseDate,     setPurchaseDate]     = useState(localToday())
   const [purchaseCost,     setPurchaseCost]     = useState('')
   const [deprMethod,       setDeprMethod]       = useState('straight_line')
   const [usefulLifeYears,  setUsefulLifeYears]  = useState('')
@@ -1012,7 +1013,7 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons, toolsOnly = false 
                         onChange={e => setWExpires(e.target.value)}
                       />
                       {wExpires && (() => {
-                        const daysLeft = Math.ceil((new Date(wExpires).getTime() - Date.now()) / 86400000)
+                        const daysLeft = daysFromLocalToday(wExpires)
                         if (daysLeft < 0)   return <p className="text-xs text-red-600 mt-1">Warranty has expired</p>
                         if (daysLeft < 30)  return <p className="text-xs text-amber-600 mt-1">Expires in {daysLeft} days</p>
                         const months = Math.round(daysLeft / 30)
@@ -1362,7 +1363,7 @@ function CheckoutDialog({ asset, onClose, onDone }: { asset: any; onClose: () =>
 // Reports → Tool Compliance.
 function IncidentDialog({ asset, onClose, onDone }: { asset: any; onClose: () => void; onDone: (msg: string) => void }) {
   const [kind, setKind]         = useState<'lost' | 'stolen' | 'damaged'>('lost')
-  const [occurred, setOccurred] = useState(new Date().toISOString().slice(0, 10))
+  const [occurred, setOccurred] = useState(localToday())
   const [lastSeen, setLastSeen] = useState(asset.checked_out_job ?? '')
   const [desc, setDesc]         = useState('')
   const [police, setPolice]     = useState('')
@@ -1643,7 +1644,7 @@ export default function AssetsPage() {
   // Warranty expiry warnings
   const expiringWarranties = useMemo(() => assets.filter((a: any) => {
     if (!a.warranty_expires) return false
-    const days = Math.ceil((new Date(a.warranty_expires).getTime() - Date.now()) / 86400000)
+    const days = daysFromLocalToday(a.warranty_expires)
     return days >= 0 && days <= 30
   }), [assets])
 
@@ -1749,7 +1750,7 @@ export default function AssetsPage() {
               // Warranty status
               let warrantyChip = null
               if (asset.warranty_expires) {
-                const days = Math.ceil((new Date(asset.warranty_expires).getTime() - Date.now()) / 86400000)
+                const days = daysFromLocalToday(asset.warranty_expires)
                 if (days < 0) {
                   warrantyChip = <span className="text-xs text-red-500 flex items-center gap-0.5"><Shield className="w-3 h-3" /> Warranty expired</span>
                 } else if (days <= 30) {

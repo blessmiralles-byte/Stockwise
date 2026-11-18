@@ -14,6 +14,7 @@ import {
   ClipboardList, ShoppingCart, ShieldAlert, CheckCircle2, Circle, X, ArrowRight,
 } from 'lucide-react'
 import Link from 'next/link'
+import { daysFromLocalToday } from '@/lib/dates'
 
 const typeColors: Record<string, string> = {
   purchase:    'success',
@@ -319,7 +320,7 @@ export default function DashboardPage() {
                 <CardContent className="pt-0">
                   <div className="space-y-2">
                     {(data?.expiring_warranties ?? []).slice(0, 3).map((a: any) => {
-                      const daysLeft = Math.ceil((new Date(a.warranty_expires).getTime() - Date.now()) / 86400000)
+                      const daysLeft = daysFromLocalToday(a.warranty_expires)
                       return (
                         <div key={a.id} className="flex items-center gap-2.5 p-2.5 bg-amber-50/60 rounded-lg">
                           <ShieldAlert className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />

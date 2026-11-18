@@ -9,6 +9,7 @@ import { formatDate } from '@/lib/utils'
 import { Search, History, AlertTriangle } from 'lucide-react'
 import { usePlan } from '@/lib/use-plan'
 import { UpgradePrompt } from '@/components/billing/upgrade-prompt'
+import { localDay } from '@/lib/dates'
 
 interface Checkout {
   id:               string
@@ -26,7 +27,7 @@ interface Checkout {
   requester?:       { id: string; full_name?: string } | null
 }
 
-const isoDay = (d: Date) => d.toISOString().slice(0, 10)
+const isoDay = (d: Date) => localDay(d)
 
 /** How the checkout ended, in a word — the column people scan. */
 function outcome(c: Checkout): { label: string; tone: string } {

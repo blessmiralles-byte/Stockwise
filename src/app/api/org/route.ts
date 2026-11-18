@@ -5,6 +5,7 @@ import { requireAuth, requireAnyRole } from '@/lib/api-auth'
 import { logAudit } from '@/lib/audit'
 import { resolveOrgPricingRegion } from '@/lib/pricing-region-server'
 import { isSupportedCurrency } from '@/lib/currency'
+import { isValidTimeZone } from '@/lib/dates'
 
 /**
  * GET /api/org — return the current user's organization details
@@ -31,7 +32,11 @@ export async function GET() {
   // Billing UI prices in the org's locked region (set on first sight).
   const pricing_region = await resolveOrgPricingRegion(data.id, (data as any).pricing_region)
 
-  return NextResponse.json({ data: { ...data, pricing_region } })
+  // Separate read: null (never an error) if the column isn't there yet.
+  const { data: tzRow } = await supabase.from('organizations').select('timezone').eq('id', auth.orgId).maybeSingle()
+  const timezone = (tzRow as any)?.timezone ?? null
+
+  return NextResponse.json({ data: { ...data, pricing_region, timezone } })
 }
 
 /**
@@ -50,7 +55,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const allowed = ['name', 'require_checkout_approval', 'require_cost_dimension', 'block_checkout_when_overdue', 'restrict_checkout_to_self', 'checkout_approval_over', 'currency']
+  const allowed = ['name', 'require_checkout_approval', 'require_cost_dimension', 'block_checkout_when_overdue', 'restrict_checkout_to_self', 'checkout_approval_over', 'currency', 'timezone']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]
@@ -85,6 +90,9 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'That currency is not one we support yet' }, { status: 422 })
     }
     updates.currency = String(updates.currency).toUpperCase()
+  }
+  if ('timezone' in updates && !isValidTimeZone(updates.timezone)) {
+    return NextResponse.json({ error: 'That time zone is not recognised' }, { status: 422 })
   }
 
   // Plan gates: these policies can't be switched ON without the feature.

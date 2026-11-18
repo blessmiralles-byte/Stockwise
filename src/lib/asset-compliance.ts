@@ -9,6 +9,8 @@
  * Pure date logic, no database: everything here is unit-tested.
  */
 
+import { localDay } from '@/lib/dates'
+
 export type ScheduleKind = 'maintenance' | 'inspection' | 'calibration'
 
 export const SCHEDULE_KINDS: { value: ScheduleKind; label: string; blurb: string }[] = [
@@ -35,8 +37,10 @@ export type CertificateState = 'valid' | 'expiring' | 'expired' | 'none'
 /** Days before expiry that a certificate starts being flagged. */
 export const CERT_WARNING_DAYS = 30
 
+// A Date means "this moment on this device" (the browser's own day). Server
+// code passes the company's day as a 'YYYY-MM-DD' string (orgToday).
 function toDay(d: string | Date): string {
-  return (typeof d === 'string' ? d : d.toISOString()).slice(0, 10)
+  return typeof d === 'string' ? d.slice(0, 10) : localDay(d)
 }
 
 export function daysBetween(from: string | Date, to: string | Date): number {

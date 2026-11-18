@@ -6,6 +6,8 @@ import * as XLSX from 'xlsx'
 import { fetchAllPaged } from '@/lib/fetch-paged'
 import { toolLimitRefusal } from '@/lib/tool-limit-server'
 import { generateItemCode, normaliseItemCode, validateItemCode } from '@/lib/item-code'
+import { dayInZone, todayInZone } from '@/lib/dates'
+import { getOrgTimeZone } from '@/lib/org-timezone'
 
 /**
  * POST /api/import/[entity]
@@ -42,7 +44,7 @@ function parseDate(v: any): string | null {
     if (d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`
   }
   const d = new Date(v)
-  return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10)
+  return isNaN(d.getTime()) ? null : dayInZone(d, 'UTC')
 }
 
 // ── Per-entity row transformers ───────────────────────────────────────────────
@@ -84,7 +86,7 @@ function transformAsset(row: Record<string, any>) {
     purchase_cost:       parseNumber(r.purchase_cost ?? r.cost ?? 0),
     current_value:       parseNumber(r.current_value ?? r.book_value ?? r.purchase_cost ?? r.cost ?? 0),
     // Required by the table; a tool list often has no purchase dates.
-    purchase_date:       parseDate(r.purchase_date ?? r.date_purchased) ?? new Date().toISOString().slice(0, 10),
+    purchase_date:       parseDate(r.purchase_date ?? r.date_purchased),
     useful_life_years:   parseNumber(r.useful_life_years ?? r.useful_life ?? 0),
     salvage_value:       parseNumber(r.salvage_value ?? 0),
     depreciation_method: method,
@@ -206,13 +208,14 @@ async function screenProductRows(
     .order('id')
     .range(from, to))
 
+  const timeZone      = await getOrgTimeZone(supabase, orgId)
   const skuHolder     = new Map(existing.map(p => [p.sku, p.name]))
   const barcodeHolder = new Map(existing.filter(p => p.barcode).map(p => [p.barcode as string, p.name]))
 
   const kept: any[] = []
   rows.forEach(row => {
     const line = row.__line
-    row.sku = normaliseItemCode(row.sku) || generateItemCode()
+    row.sku = normaliseItemCode(row.sku) || generateItemCode(new Date(), Math.random, timeZone)
     const invalid = validateItemCode(row.sku)
     if (invalid) { errors.push(`Row ${line}: ${invalid} — skipped.`); return }
 
@@ -294,6 +297,8 @@ export async function POST(
 
   const errors:   string[] = []
   const toInsert: any[]    = []
+  // Required by the assets table; a tool list often has no purchase dates.
+  const today = entity === 'assets' ? todayInZone(await getOrgTimeZone(supabase, auth.orgId)) : null
 
   rows.forEach((row, i) => {
     try {
@@ -303,6 +308,7 @@ export async function POST(
         return
       }
       // __line is the spreadsheet row, for messages; stripped before insert.
+      if (today && 'purchase_date' in transformed && !transformed.purchase_date) transformed.purchase_date = today
       toInsert.push({ ...transformed, org_id: auth.orgId, __line: i + 2 })
     } catch (err: any) {
       errors.push(`Row ${i + 2}: ${err.message}`)

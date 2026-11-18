@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { dayInZone } from '@/lib/dates'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -478,10 +479,13 @@ export async function sendToolsOverdue({
   to,
   businessName,
   tools,
+  timeZone,
 }: {
   to: string | string[]
   businessName: string
   tools: OverdueTool[]
+  /** The company's time zone, so "due" shows their calendar date. */
+  timeZone?: string | null
 }) {
   const subject = `${tools.length} tool${tools.length > 1 ? 's' : ''} overdue — ${businessName}`
   const esc = (s: string | null) => (s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
@@ -493,7 +497,7 @@ export async function sendToolsOverdue({
         <div style="font-size:12px;color:#6b7280;">${esc([t.asset_tag, t.job].filter(Boolean).join(' · ')) || '&nbsp;'}</div>
       </td>
       <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#111;">${esc(t.holder) || '—'}</td>
-      <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#6b7280;">${new Date(t.due_at).toISOString().slice(0, 10)}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#6b7280;">${dayInZone(t.due_at, timeZone)}</td>
       <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#b91c1c;font-weight:600;">${t.days_overdue} day${t.days_overdue > 1 ? 's' : ''}</td>
     </tr>`
 

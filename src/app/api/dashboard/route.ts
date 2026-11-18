@@ -1,16 +1,20 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
+import { todayInZone, addDays } from '@/lib/dates'
+import { getOrgTimeZone } from '@/lib/org-timezone'
 
 export async function GET() {
   const auth = await requireAuth()
   if (auth.error) return auth.error
 
   const supabase  = createServiceClient()
-  const today     = new Date()
-  const in30Days  = new Date(today); in30Days.setDate(today.getDate() + 30)
-  const todayStr  = today.toISOString().slice(0, 10)
-  const in30Str   = in30Days.toISOString().slice(0, 10)
+  // "Today" is the company's calendar day, not the server's (UTC).
+  const todayStr  = todayInZone(await getOrgTimeZone(supabase, auth.orgId))
+  const in30Str   = addDays(todayStr, 30)
+  const in60Str   = addDays(todayStr, 60)
+  // Whole days from today to a 'YYYY-MM-DD' date (negative = in the past).
+  const daysFromToday = (d: string) => Math.round((Date.parse(d.slice(0, 10) + 'T00:00:00Z') - Date.parse(todayStr + 'T00:00:00Z')) / 86400000)
 
   const [
     { data: balances },
@@ -87,7 +91,7 @@ export async function GET() {
       .eq('org_id', auth.orgId)
       .eq('status', 'active')
       .not('warranty_expires', 'is', null)
-      .lte('warranty_expires', new Date(today.getTime() + 60 * 86400000).toISOString().slice(0, 10))
+      .lte('warranty_expires', in60Str)
       .gte('warranty_expires', todayStr)
       .order('warranty_expires', { ascending: true })
       .limit(5),
@@ -115,12 +119,12 @@ export async function GET() {
   // Maintenance with days-remaining calculation
   const maintWithDays = (upcomingMaint ?? []).map((m: any) => ({
     ...m,
-    daysLeft: Math.ceil((new Date(m.scheduled_date).getTime() - today.getTime()) / 86400000),
+    daysLeft: daysFromToday(m.scheduled_date),
   }))
 
   const overdueMaint = (overdueMaintenanceRaw ?? []).map((m: any) => ({
     ...m,
-    daysOverdue: Math.floor((today.getTime() - new Date(m.scheduled_date).getTime()) / 86400000),
+    daysOverdue: -daysFromToday(m.scheduled_date),
   }))
 
   return NextResponse.json({

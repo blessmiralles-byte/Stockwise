@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { RECURRENCE_PRESETS, describeRecurrence } from '@/lib/maintenance-recurrence'
 import { SCHEDULE_KINDS, KIND_LABEL, producesCertificate, certificateState, isScheduleKind, type ScheduleKind } from '@/lib/asset-compliance'
+import { localToday, daysFromLocalToday } from '@/lib/dates'
 
 const statusConfig: Record<string, { label: string; variant: any; icon: any; color: string }> = {
   scheduled: { label: 'Scheduled', variant: 'default',     icon: Clock,        color: 'text-indigo-600 bg-indigo-50' },
@@ -36,7 +37,7 @@ function ScheduleDialog({ onClose, onSaved, initialKind = 'maintenance' }: {
   const [assetId,        setAssetId]        = useState('')
   const [title,          setTitle]          = useState('')
   const [description,    setDescription]    = useState('')
-  const [scheduledDate,  setScheduledDate]  = useState(new Date().toISOString().split('T')[0])
+  const [scheduledDate,  setScheduledDate]  = useState(localToday())
   const [notifyBefore,   setNotifyBefore]   = useState('3')
   // A tool usually arrives with a certificate already (new, or inspected last
   // month). Recording it here is what the compliance report reads; otherwise
@@ -316,7 +317,7 @@ function MarkDoneDialog({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status:         'completed',
-          completed_date: new Date().toISOString().split('T')[0],
+          completed_date: localToday(),
           performed_by:   performedBy.trim() || undefined,
           certificate_no:  needsCert ? (certNo.trim() || undefined)  : undefined,
           certified_until: needsCert ? (certUntil     || undefined)  : undefined,
@@ -382,7 +383,7 @@ function MarkDoneDialog({
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Completed Date</label>
-              <Input type="date" defaultValue={new Date().toISOString().split('T')[0]} disabled className="bg-slate-50" />
+              <Input type="date" defaultValue={localToday()} disabled className="bg-slate-50" />
             </div>
           </div>
           <div>
@@ -432,10 +433,9 @@ export default function MaintenancePage() {
   const { data, loading, error, refetch } = useApi<{ data: any[] }>('/api/maintenance')
   const schedules = data?.data ?? []
 
-  const today = new Date()
   const withDays = schedules.map((s: any) => ({
     ...s,
-    daysLeft: Math.ceil((new Date(s.scheduled_date).getTime() - today.getTime()) / 86400000),
+    daysLeft: daysFromLocalToday(s.scheduled_date),
   }))
 
   const filtered = withDays.filter((s: any) => {

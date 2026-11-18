@@ -3,6 +3,7 @@ import { isReadOnly } from '@/lib/permissions'
 import { orgHasFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
+import { orgToday } from '@/lib/org-timezone'
 import { isRecurrence, nextDueDate } from '@/lib/maintenance-recurrence'
 
 export async function PATCH(
@@ -65,7 +66,7 @@ export async function PATCH(
     update.completed_at = new Date().toISOString()
     // Default the work date to today if the caller didn't supply one.
     if (!update.completed_date) {
-      update.completed_date = new Date().toISOString().slice(0, 10)
+      update.completed_date = (await orgToday(auth.orgId))
     }
   } else if ('status' in update) {
     // Re-opening clears the sign-off — a record that isn't complete must not

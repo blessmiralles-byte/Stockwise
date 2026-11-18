@@ -5,6 +5,7 @@ import { useApi } from '@/lib/use-api'
 import { Cpu, MapPin, User, AlertCircle, CheckCircle2, Loader2, ChevronLeft, X, Search, WrenchIcon, LogOut, LogIn, Lock } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { localToday } from '@/lib/dates'
 
 // ── Status config ─────────────────────────────────────────────────────────────
 const STATUS_CFG: Record<string, { label: string; dot: string; badge: string; border: string }> = {
@@ -26,7 +27,7 @@ function ReportIssueSheet({
 }) {
   const [title, setTitle]   = useState('')
   const [notes, setNotes]   = useState('')
-  const [date, setDate]     = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate]     = useState(localToday())
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
 

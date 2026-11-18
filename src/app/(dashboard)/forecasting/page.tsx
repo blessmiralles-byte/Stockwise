@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { ExportButtons } from '@/components/reports/export-buttons'
 import { formatDate } from '@/lib/utils'
+import { localToday } from '@/lib/dates'
 
 // ── Status config ─────────────────────────────────────────────────────────────
 const statusConfig = {
@@ -106,7 +107,7 @@ export default function ForecastingPage() {
     return matchStatus && matchSearch
   }), [rows, statusFilter, search])
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = localToday()
   const needsReorder = filtered.filter(r => r.suggested_reorder > 0)
 
   const buildSheets = () => [{

@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/api-auth'
 import { createNotification } from '@/lib/notify'
 import { orgHasFeature } from '@/lib/entitlements-server'
 import { assetCompliance, checkoutBlock } from '@/lib/asset-compliance'
+import { orgToday } from '@/lib/org-timezone'
 import { resolveHolder, approvalNeeded } from '@/lib/checkout-rules'
 
 /**
@@ -54,7 +55,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .select('block_checkout_when_overdue, restrict_checkout_to_self, checkout_approval_over')
       .eq('id', auth.orgId).maybeSingle(),
   ])
-  const compliance = assetCompliance((checks ?? []) as any[])
+  // The company's today: a certificate "valid until the 30th" works all of their 30th.
+  const compliance = assetCompliance((checks ?? []) as any[], await orgToday(auth.orgId))
   const guard = checkoutBlock(compliance, { blockWhenOverdue: (orgRow as any)?.block_checkout_when_overdue })
   if (guard.blocked) {
     return NextResponse.json({ error: guard.reason, compliance }, { status: 409 })

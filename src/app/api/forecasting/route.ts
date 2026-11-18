@@ -3,6 +3,7 @@ import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { fetchAllPaged } from '@/lib/fetch-paged'
 import { requireAuth } from '@/lib/api-auth'
+import { orgToday } from '@/lib/org-timezone'
 import { forecastItem } from '@/lib/forecast'
 
 /**
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
   const forecastDays = Math.max(7,  Math.min(180, parseInt(searchParams.get('forecast_days') ?? '30')))
 
   const supabase = createServiceClient()
-  const today = new Date().toISOString().slice(0, 10)
+  const today = (await orgToday(auth.orgId))
   const startDate = new Date(Date.now() - daysBack * 86_400_000)
 
   // ── 1. Usage in the lookback window ───────────────────────────────────────

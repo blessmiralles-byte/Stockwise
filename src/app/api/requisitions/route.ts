@@ -3,6 +3,7 @@ import { resolveJobCode } from '@/lib/job-codes'
 import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
+import { orgToday } from '@/lib/org-timezone'
 import { isReadOnly } from '@/lib/permissions'
 import { startChain, loadTrails, loadMember, myAction } from '@/lib/approval-chain'
 import { requisitionAmounts, applyRequisitionApproval } from '@/lib/requisition-fulfilment'
@@ -118,7 +119,7 @@ export async function POST(req: NextRequest) {
   const supabase = createServiceClient()
 
   // H-3: Atomic DB sequence prevents duplicate requisition numbers under concurrency
-  const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+  const datePart = (await orgToday(auth.orgId)).replace(/-/g, '')
   const { data: seqVal, error: seqErr } = await supabase
     .rpc('next_ref_number', { p_seq: 'public.requisition_seq' })
   if (seqErr || seqVal == null) {

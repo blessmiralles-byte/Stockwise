@@ -3,6 +3,7 @@ import { isReadOnly } from '@/lib/permissions'
 import { requireFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
+import { orgToday } from '@/lib/org-timezone'
 import { isRecurrence } from '@/lib/maintenance-recurrence'
 import { isScheduleKind, producesCertificate } from '@/lib/asset-compliance'
 
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
     asset_id,
     title: title.trim(),
     description: description?.trim() || null,
-    scheduled_date: scheduled_date || new Date().toISOString().split('T')[0],
+    scheduled_date: scheduled_date || (await orgToday(auth.orgId)),
     status: status ?? (scheduled_date ? 'scheduled' : 'overdue'),
     notify_days_before: notify_days_before ?? 1,
     reported_by: auth.userId,

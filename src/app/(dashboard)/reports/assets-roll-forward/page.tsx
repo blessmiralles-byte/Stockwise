@@ -8,6 +8,7 @@ import {
   ChevronDown, ChevronRight, Info, Printer,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { localToday } from '@/lib/dates'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface CategoryRow {
@@ -208,7 +209,7 @@ function CategorySection({ cat, isLast }: { cat: CategoryRow; isLast: boolean })
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function AssetsRollForwardPage() {
-  const today    = new Date().toISOString().slice(0, 10)
+  const today    = localToday()
   const firstDom = today.slice(0, 8) + '01'
 
   const [from, setFrom]       = useState(firstDom)

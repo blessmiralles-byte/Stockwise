@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
+import { dayRangeInZone, isIsoDay } from '@/lib/dates'
+import { getOrgTimeZone } from '@/lib/org-timezone'
 import {
   inventoryPosting, depreciationPosting, assetPurchasePosting,
   invoiceReceiptPosting, ppvPosting, computeDisposal, disposalLegs, JOURNAL_SCOPE,
@@ -62,8 +64,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'from and to params are required (YYYY-MM-DD)' }, { status: 400 })
   }
 
-  const fromDate = new Date(from)
-  const toDate   = new Date(to); toDate.setHours(23, 59, 59, 999)
+  // Days are the company's: midnight to midnight on their clock, not UTC's.
+  const range    = isIsoDay(from) && isIsoDay(to)
+    ? dayRangeInZone(from, to, await getOrgTimeZone(createServiceClient(), auth.orgId))
+    : null
+  const fromDate = new Date(range?.fromTs ?? NaN)
+  const toDate   = new Date(range?.toTs ?? NaN)
 
   if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
     return NextResponse.json({ error: 'Invalid date format' }, { status: 400 })

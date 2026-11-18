@@ -173,6 +173,26 @@ live or on business registration.
 
 ### A6 — Dates use UTC, not the customer's day (extends Step 5.3)
 
+**DONE 2026-11-18 (code). Owner: run `scripts/migrate-org-timezone.sql`.** Also closes Step 5.3.
+- `src/lib/dates.ts`: `localToday()`/`localDay()` for the browser, `todayInZone()`,
+  `dayRangeInZone()` for the server; `src/lib/org-timezone.ts`: `getOrgTimeZone()`, `orgToday()`.
+- New `organizations.timezone` (IANA). Filled in automatically by the first browser that opens
+  the app (`TimeZoneSync` → `POST /api/org/timezone`, only while empty); owner can change it in
+  Settings → General → Time zone. Missing column or empty value = UTC (old behaviour), never an
+  error: every read of the column is separate and tolerant.
+- Browser forms and report pickers use the device's date (also fixed "This month" on cost
+  analysis / accounting export starting on the last day of the previous month east of UTC).
+  "Due in N days" labels count calendar days. Server: default dates, document-number dates,
+  dashboard due/overdue, batch expiry, tool-certificate check at check-out, reminder emails, and
+  every report range (parseRange, expenses, cost analysis, valuation, journal, roll-forward,
+  accounting journal/payables, audit log, tool check-outs) use the company's day.
+- Checked on a production build: a page drawn on the server with a different date shows the
+  browser's date after loading, with no console errors, and requests the browser's range.
+- Guard: `tests/dates.test.ts` fails if `toISOString().slice(0, 10)` (or split('T')[0]) comes back
+  outside lib/dates and the date-only arithmetic files.
+- Left alone on purpose: depreciation, recurrence, forecast, lead-time and trial-day arithmetic
+  (date to date, no "today" involved).
+
 > Seen live: at 01:00 in Manila the Schedule Maintenance form defaulted to yesterday's date.
 > 56 places build "today" with `new Date().toISOString().split('T')[0]` (or `.slice(0, 10)`).
 > Add one helper for "today in the organization's time zone" (the browser's local date on

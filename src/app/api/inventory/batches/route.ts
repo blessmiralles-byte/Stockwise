@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
+import { todayInZone, addDays } from '@/lib/dates'
+import { getOrgTimeZone } from '@/lib/org-timezone'
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth()
@@ -27,10 +29,11 @@ export async function GET(req: NextRequest) {
 
   if (productId)      query = query.eq('product_id', productId)
 
+  // The company's calendar day, so "expires today" flips at their midnight.
+  const todayStr = todayInZone(await getOrgTimeZone(supabase, auth.orgId))
+
   if (expiringDays > 0) {
-    const cutoff = new Date()
-    cutoff.setDate(cutoff.getDate() + expiringDays)
-    query = query.lte('expiration_date', cutoff.toISOString().split('T')[0])
+    query = query.lte('expiration_date', addDays(todayStr, expiringDays))
     query = query.not('expiration_date', 'is', null)
   }
 
@@ -40,13 +43,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to fetch batches' }, { status: 500 })
   }
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  const todayMs = Date.parse(todayStr + 'T00:00:00Z')
 
   const rows = (data ?? []).map((b: any) => {
     if (!b.expiration_date) return { ...b, expiry_status: 'none' }
-    const exp = new Date(b.expiration_date)
-    const daysLeft = Math.ceil((exp.getTime() - today.getTime()) / 86_400_000)
+    const daysLeft = Math.round((Date.parse(String(b.expiration_date).slice(0, 10) + 'T00:00:00Z') - todayMs) / 86_400_000)
     const expiry_status =
       daysLeft < 0   ? 'expired'  :
       daysLeft <= 7  ? 'critical' :

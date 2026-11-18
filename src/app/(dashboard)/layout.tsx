@@ -9,6 +9,7 @@ import { enforceTrialClaim } from '@/lib/trial-claims'
 import { CurrencyProvider } from '@/lib/use-currency'
 import { isToolsPlan } from '@/lib/entitlements'
 import { ToolsGate } from '@/components/layout/tools-gate'
+import { TimeZoneSync } from '@/components/layout/timezone-sync'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   // Access gate: an org whose trial has ended or whose subscription was
@@ -19,6 +20,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   let plan: string | null = null
   let role: string | null = null
   let currency: string | null = null
+  let needsTimeZone = false
 
   if (user) {
     const service = createServiceClient()
@@ -39,6 +41,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
       if (org) {
         plan = org.plan
         currency = (org as any).currency ?? null
+        // Read on its own so a database without the column (not yet
+        // migrated) can never break the billing check above.
+        const { data: tzRow, error: tzErr } = await service
+          .from('organizations').select('timezone').eq('id', profile.org_id).maybeSingle()
+        needsTimeZone = !tzErr && !(tzRow as any)?.timezone
 
         // One free trial per person: a repeat signup (same email, new account
         // after deleting the old one) starts with its trial already expired.
@@ -72,6 +79,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           {isToolsPlan(plan) ? <ToolsGate>{children}</ToolsGate> : children}
         </main>
         <SupportChat />
+        {needsTimeZone && <TimeZoneSync />}
       </div>
     </CurrencyProvider>
   )

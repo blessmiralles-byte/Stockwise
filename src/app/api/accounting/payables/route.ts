@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { dayRangeInZone, isIsoDay } from '@/lib/dates'
+import { getOrgTimeZone } from '@/lib/org-timezone'
 import { requireAuth } from '@/lib/api-auth'
 import { apiKeyFromHeader } from '@/lib/api-keys'
 import { authenticateApiKey } from '@/lib/api-keys-server'
@@ -50,6 +52,7 @@ export async function GET(req: NextRequest) {
   const to   = searchParams.get('to')
 
   const supabase = createServiceClient()
+  const tz = await getOrgTimeZone(supabase, orgId)
 
   let query = supabase
     .from('purchase_orders')
@@ -67,8 +70,8 @@ export async function GET(req: NextRequest) {
     .order('created_at', { ascending: false })
     .limit(200)
 
-  if (from) query = query.gte('created_at', `${from}T00:00:00.000Z`)
-  if (to)   query = query.lte('created_at', `${to}T23:59:59.999Z`)
+  if (isIsoDay(from)) query = query.gte('created_at', dayRangeInZone(from, from, tz).fromTs)
+  if (isIsoDay(to))   query = query.lte('created_at', dayRangeInZone(to, to, tz).toTs)
 
   const { data: pos } = await query
 

@@ -1,5 +1,7 @@
 'use client'
 
+import { localToday } from '@/lib/dates'
+
 /**
  * Report exports — Excel (.xlsx) and CSV from the same rows.
  *
@@ -44,7 +46,7 @@ export function columnWidths(rows: Row[]): { wch: number }[] {
 
 /** A filename without the characters Windows refuses, plus today's date. */
 export function exportFilename(base: string, ext: 'xlsx' | 'csv'): string {
-  const stamp = new Date().toISOString().slice(0, 10)
+  const stamp = localToday()
   const clean = base
     .replace(/[\\/:*?"<>|]/g, '-')
     .replace(/\s+/g, '-')

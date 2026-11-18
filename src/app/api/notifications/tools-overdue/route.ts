@@ -83,6 +83,9 @@ async function run(scopedOrgId: string | null) {
       .in('org_id', orgIds).in('role', ['owner', 'admin', 'operations', 'manager']).eq('is_active', true),
   ])
   const orgName = new Map((orgs ?? []).map((o: any) => [o.id, o.name as string]))
+  // Read apart from the names so a database without the column can't stop the reminders.
+  const { data: zones } = await supabase.from('organizations').select('id, timezone').in('id', orgIds)
+  const orgZone = new Map((zones ?? []).map((o: any) => [o.id, (o.timezone as string | null) ?? null]))
   // The email is part of paid plans; the in-app notice goes to everyone.
   const emailsOn = new Set((orgs ?? []).filter((o: any) => planHasFeature(o.plan, 'tool_reminders')).map((o: any) => o.id))
   const staffByOrg = new Map<string, any[]>()
@@ -136,6 +139,7 @@ async function run(scopedOrgId: string | null) {
         await sendToolsOverdue({
           to,
           businessName: orgName.get(orgId) ?? 'your team',
+          timeZone: orgZone.get(orgId),
           tools: list.map(c => ({
             name: c.asset?.name ?? 'Tool',
             asset_tag: c.asset?.asset_tag ?? null,

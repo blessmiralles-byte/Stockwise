@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isReadOnly } from '@/lib/permissions'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireAnyRole } from '@/lib/api-auth'
+import { orgToday } from '@/lib/org-timezone'
 import { logAudit } from '@/lib/audit'
 import { createNotification } from '@/lib/notify'
 
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest) {
       asset_id,
       checkout_id:      asset.current_checkout_id ?? null,
       kind,
-      occurred_on:      occurred_on || new Date().toISOString().slice(0, 10),
+      occurred_on:      occurred_on || (await orgToday(auth.orgId)),
       last_seen:        last_seen?.trim() || null,
       description:      description?.trim() || null,
       police_report_no: police_report_no?.trim() || null,

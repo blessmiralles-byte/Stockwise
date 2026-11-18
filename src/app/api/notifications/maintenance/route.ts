@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
 import { sendMaintenanceAlert, type MaintenanceAlert } from '@/lib/email'
+import { todayInZone } from '@/lib/dates'
 
 /**
  * POST /api/notifications/maintenance
@@ -59,8 +60,6 @@ async function run(scopedOrgId: string | null) {
   }
 
   const supabase = createServiceClient()
-  const today    = new Date()
-  const daysLeft = (d: string) => Math.ceil((new Date(d).getTime() - today.getTime()) / 86400000)
 
   const select = 'id, org_id, title, scheduled_date, notify_days_before, cost, performed_by, asset:fixed_assets(asset_tag, name)'
 
@@ -73,12 +72,24 @@ async function run(scopedOrgId: string | null) {
 
   const [{ data: overdue }, { data: upcoming }] = await Promise.all([overdueQ, upcomingQ])
 
+  // Days are counted from each company's own "today", not the server's (UTC).
+  const scheduleOrgIds = [...new Set([...(overdue ?? []), ...(upcoming ?? [])].map((s: any) => s.org_id).filter(Boolean))]
+  const { data: zones } = scheduleOrgIds.length
+    ? await supabase.from('organizations').select('id, timezone').in('id', scheduleOrgIds)
+    : { data: [] as { id: string; timezone: string | null }[] }
+  const todayByOrg = new Map((zones ?? []).map((o: any) => [o.id as string, todayInZone(o.timezone)]))
+  const now = new Date()
+  const daysLeftFor = (orgId: string, d: string) => {
+    const today = todayByOrg.get(orgId) ?? todayInZone(null, now)
+    return Math.round((Date.parse(String(d).slice(0, 10) + 'T00:00:00Z') - Date.parse(today + 'T00:00:00Z')) / 86400000)
+  }
+
   const toAlert = (s: any, status: 'overdue' | 'scheduled'): MaintenanceAlert => ({
     asset_name:     s.asset?.name      ?? 'Unknown Asset',
     asset_tag:      s.asset?.asset_tag ?? '—',
     title:          s.title,
     scheduled_date: s.scheduled_date,
-    days_left:      daysLeft(s.scheduled_date),
+    days_left:      daysLeftFor(s.org_id, s.scheduled_date),
     performed_by:   s.performed_by,
     cost:           s.cost,
     status,
@@ -95,7 +106,7 @@ async function run(scopedOrgId: string | null) {
 
   for (const s of (overdue ?? []) as any[]) push(s.org_id, toAlert(s, 'overdue'))
   for (const s of (upcoming ?? []) as any[]) {
-    const left = daysLeft(s.scheduled_date)
+    const left = daysLeftFor(s.org_id, s.scheduled_date)
     if (left >= 0 && left <= (s.notify_days_before ?? 7)) push(s.org_id, toAlert(s, 'scheduled'))
   }
 

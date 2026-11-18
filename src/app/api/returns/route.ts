@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { countFreezeRefusal } from '@/lib/count-freeze-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
+import { orgToday } from '@/lib/org-timezone'
 import { canMove, movementDenied } from '@/lib/permissions'
 import { fetchAllPaged } from '@/lib/fetch-paged'
 import { movementRefusal } from '@/lib/movement-errors'
@@ -240,7 +241,7 @@ export async function POST(req: NextRequest) {
     }
 
     const newQty = plan.line
-    const stamp = new Date().toISOString().slice(0, 10)
+    const stamp = (await orgToday(auth.orgId))
     const lineNote = `${qty} returned to vendor ${stamp} (${outcome === 'credit' ? 'credit due' : 'replacement due'})`
     const { error: lineErr } = await supabase
       .from('purchase_order_lines')

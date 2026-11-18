@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireAnyRole } from '@/lib/api-auth'
+import { orgToday } from '@/lib/org-timezone'
 import { createNotification } from '@/lib/notify'
 
 // GET /api/purchase-orders?status=draft&supplier_id=xxx
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
   }
 
   // H-3: Use atomic DB sequence to prevent duplicate PO numbers under concurrency
-  const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+  const datePart = (await orgToday(auth.orgId)).replace(/-/g, '')
   const { data: seqVal, error: seqErr } = await supabase
     .rpc('next_ref_number', { p_seq: 'public.po_seq' })
   if (seqErr || seqVal == null) {

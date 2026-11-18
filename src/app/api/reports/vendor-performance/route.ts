@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
 import { loadPurchaseOrders, loadReceiptDates, parseRange } from '@/lib/report-data'
+import { getOrgTimeZone } from '@/lib/org-timezone'
 import { vendorPerformance } from '@/lib/procurement-reports'
 
 /**
@@ -15,8 +16,8 @@ export async function GET(req: NextRequest) {
   const auth = await requireAnyRole('owner', 'procurement', 'operations', 'manager', 'finance')
   if (auth.error) return auth.error
 
-  const range = parseRange(req, 365)
   const supabase = createServiceClient()
+  const range = parseRange(req, 365, await getOrgTimeZone(supabase, auth.orgId))
 
   const { rows: pos, truncated, error } = await loadPurchaseOrders(supabase, auth.orgId, {
     statuses: ['approved', 'sent', 'partial', 'received'],

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { dayRangeInZone } from '@/lib/dates'
+import { getOrgTimeZone } from '@/lib/org-timezone'
 import { requireAuth } from '@/lib/api-auth'
 import { requireFeature } from '@/lib/entitlements-server'
 
@@ -54,8 +56,10 @@ export async function GET(req: NextRequest) {
   const from = sp.get('from')
   const to   = sp.get('to')
   const isDate = (v: string | null): v is string => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v)
-  if (isDate(from)) query = query.gte('checked_out_at', `${from}T00:00:00.000Z`)
-  if (isDate(to))   query = query.lte('checked_out_at', `${to}T23:59:59.999Z`)
+  // The company's days, so an early-morning check-out lands on the day it happened.
+  const tz = isDate(from) || isDate(to) ? await getOrgTimeZone(supabase, auth.orgId) : null
+  if (isDate(from)) query = query.gte('checked_out_at', dayRangeInZone(from, from, tz).fromTs)
+  if (isDate(to))   query = query.lte('checked_out_at', dayRangeInZone(to, to, tz).toTs)
 
   const { data, error } = await query
   if (error) {

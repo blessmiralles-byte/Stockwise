@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireAnyRole } from '@/lib/api-auth'
+import { orgToday } from '@/lib/org-timezone'
 import { createNotification } from '@/lib/notify'
 import { belowReorderPoint, groupByVendor, type StockLine, type ReorderCandidate } from '@/lib/reorder'
 
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { vendors, unassigned } = groupByVendor(candidates)
-  const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+  const datePart = (await orgToday(auth.orgId)).replace(/-/g, '')
   const created: { id: string; po_number: string; vendor: string | null; lines: number }[] = []
 
   // One draft per vendor; items with no preferred vendor go on a single
@@ -112,7 +113,7 @@ export async function POST(req: NextRequest) {
         po_number,
         supplier_id: batch.vendor_id,
         status: 'draft',
-        order_date: new Date().toISOString().slice(0, 10),
+        order_date: (await orgToday(auth.orgId)),
         notes: 'Raised from reorder points - check quantities and prices before sending',
         created_by: auth.userId,
       })

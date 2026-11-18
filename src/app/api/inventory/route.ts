@@ -4,6 +4,7 @@ import { movementDenied } from '@/lib/permissions'
 import { orgHasFeature } from '@/lib/entitlements-server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth, requireRole } from '@/lib/api-auth'
+import { orgToday } from '@/lib/org-timezone'
 import { movementRefusal } from '@/lib/movement-errors'
 import { resolveJobCode } from '@/lib/job-codes'
 import { createNotification } from '@/lib/notify'
@@ -300,7 +301,7 @@ export async function POST(req: NextRequest) {
     await supabase.from('inventory_batches').insert({
       product_id,
       location_id: to_location_id,
-      purchase_date: new Date().toISOString().split('T')[0],
+      purchase_date: (await orgToday(auth.orgId)),
       quantity_remaining: qty,
       unit_cost: cost,
       reference_no: reference_no ?? null,

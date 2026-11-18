@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
 import { lookupBarcode } from '@/lib/barcode-lookup'
 import { generateItemCode } from '@/lib/item-code'
+import { getOrgTimeZone } from '@/lib/org-timezone'
 
 /**
  * POST /api/products/from-barcode
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
   const name = suppliedName || external?.name || `Unknown item ${barcode}`
   const source = external?.found ? 'global' : 'manual'
 
-  const sku = generateItemCode()
+  const sku = generateItemCode(new Date(), Math.random, await getOrgTimeZone(supabase, auth.orgId))
 
   // Optional details supplied by the field "Add Item" form (fall back to
   // sensible defaults for the pure scan-at-the-dock case).

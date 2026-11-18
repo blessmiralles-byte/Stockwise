@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAnyRole } from '@/lib/api-auth'
+import { dayInZone, isIsoDay } from '@/lib/dates'
+import { getOrgTimeZone } from '@/lib/org-timezone'
 
 /**
  * GET /api/reports/assets/roll-forward?from=YYYY-MM-DD&to=YYYY-MM-DD
@@ -36,18 +38,16 @@ export async function GET(req: NextRequest) {
     )
   }
 
-  const fromDate = new Date(from)
-  const toDate   = new Date(to)
-  toDate.setHours(23, 59, 59, 999)
-
-  if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+  if (!isIsoDay(from) || !isIsoDay(to)) {
     return NextResponse.json({ error: 'Invalid date format' }, { status: 400 })
   }
-  if (fromDate > toDate) {
+  if (from > to) {
     return NextResponse.json({ error: 'from must be before to' }, { status: 400 })
   }
 
   const supabase = createServiceClient()
+  const timeZone = await getOrgTimeZone(supabase, auth.orgId)
+  const asDay = (v: string) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : dayInZone(v, timeZone))
 
   // ── Load all assets relevant to the period ─────────────────────────────────
   // Relevant = existed at any point up to period_end
@@ -112,31 +112,32 @@ export async function GET(req: NextRequest) {
     const currentValue = Number(a.current_value ?? cost)
     const catId        = a.category?.id   ?? '__none__'
     const catName      = a.category?.name ?? 'Uncategorised'
-    const purchaseDate = a.purchase_date ? new Date(a.purchase_date) : null
+    // Everything is compared as calendar days ('YYYY-MM-DD' strings sort as
+    // dates): a stored date as written, a timestamp as the company's day.
+    const purchaseDate = a.purchase_date ? asDay(a.purchase_date) : null
     // Treat retired_at and sold_at the same as disposed_at — asset is off the books
-    const endOfLifeAt  = (a.disposed_at ?? a.retired_at ?? a.sold_at)
-                           ? new Date(a.disposed_at ?? a.retired_at ?? a.sold_at)
-                           : null
+    const endRaw       = a.disposed_at ?? a.retired_at ?? a.sold_at
+    const endOfLifeAt  = endRaw ? asDay(endRaw) : null
 
     // Was the asset on the books at period start?
     //   Purchased before period start AND not yet disposed/retired/sold at period start
     const isBeginning = purchaseDate !== null
-      && purchaseDate < fromDate
-      && (endOfLifeAt === null || endOfLifeAt >= fromDate)
+      && purchaseDate < from
+      && (endOfLifeAt === null || endOfLifeAt >= from)
 
     // Was it added during the period?
     const isAddition  = purchaseDate !== null
-      && purchaseDate >= fromDate
-      && purchaseDate <= toDate
+      && purchaseDate >= from
+      && purchaseDate <= to
 
     // Was it disposed/retired/sold during the period?
     const isDisposalInPeriod = endOfLifeAt !== null
-      && endOfLifeAt >= fromDate
-      && endOfLifeAt <= toDate
+      && endOfLifeAt >= from
+      && endOfLifeAt <= to
 
     // Is it on the books at period end?
-    const isEndingBalance = (purchaseDate !== null && purchaseDate <= toDate)
-      && (endOfLifeAt === null || endOfLifeAt > toDate)
+    const isEndingBalance = (purchaseDate !== null && purchaseDate <= to)
+      && (endOfLifeAt === null || endOfLifeAt > to)
 
     const periodDepr = deprByAsset[a.id] ?? 0
 
