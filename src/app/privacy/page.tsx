@@ -1,14 +1,15 @@
 import Link from 'next/link'
 import { Package } from 'lucide-react'
+import { LEGAL_ENTITY, LEGAL_EFFECTIVE_DATE, operatorName } from '@/lib/legal'
 
 export const metadata = {
   title: 'Privacy Policy — Stocked',
   description: 'How Stocked collects, uses, and protects your data.',
 }
 
-const EFFECTIVE_DATE = 'June 2, 2026'
+const EFFECTIVE_DATE = LEGAL_EFFECTIVE_DATE
 const CONTACT_EMAIL  = 'privacy@stocked.tech'
-const COMPANY_NAME   = 'Stocked'
+const COMPANY_NAME   = operatorName()
 
 export default function PrivacyPage() {
   return (
@@ -40,6 +41,9 @@ export default function PrivacyPage() {
               Policy explains how we collect, use, disclose, and safeguard your information when
               you use our service.
             </p>
+            {LEGAL_ENTITY.address && (
+              <p className="text-slate-600 mt-3">Registered address: {LEGAL_ENTITY.address}</p>
+            )}
           </section>
 
           <section>
@@ -59,6 +63,13 @@ export default function PrivacyPage() {
               Squeezy handles payment data under their own privacy policy and PCI-DSS compliance.</p>
               <p><strong>Communications.</strong> If you contact us by email, we retain that
               correspondence to assist you and improve support.</p>
+              <p><strong>Support chat.</strong> Messages you type into the in-app Help assistant
+              are sent to Anthropic, which generates the reply. We do not store the conversation;
+              it is not used to train Anthropic&apos;s models. Please don&apos;t type passwords or
+              card numbers into the chat.</p>
+              <p><strong>Error reports.</strong> When something breaks, an error report (the page,
+              the error and your browser type) is sent to Sentry so we can fix it. We do not record
+              your screen or sessions.</p>
             </div>
           </section>
 
@@ -114,6 +125,21 @@ export default function PrivacyPage() {
                     <td className="px-3 py-2">Vercel</td>
                     <td className="px-3 py-2">Application hosting and CDN</td>
                     <td className="px-3 py-2">Global (US primary)</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2">Sentry (Functional Software, Inc.)</td>
+                    <td className="px-3 py-2">Error reports and performance monitoring</td>
+                    <td className="px-3 py-2">US</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2">Anthropic</td>
+                    <td className="px-3 py-2">AI replies in the in-app support chat (only the messages you type there)</td>
+                    <td className="px-3 py-2">US</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2">Upstash</td>
+                    <td className="px-3 py-2">Rate limiting (counters keyed by account ID or IP address, kept for minutes)</td>
+                    <td className="px-3 py-2">US</td>
                   </tr>
                 </tbody>
               </table>

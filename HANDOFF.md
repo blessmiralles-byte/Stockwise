@@ -23,6 +23,7 @@ only ones blocking anything.
 - **A3 is DONE (2026-11-17)**: per-organization API keys (`api_keys` table, `scripts/migrate-api-keys.sql`, run). Keys are created, shown once and revoked in Settings → API keys (owner, full Stocked). POS and JobLedger keys need Enterprise, accounting keys need Pro. `POS_API_KEY`, `ACCOUNTING_API_KEY` and `JOBLEDGER_API_KEY` are no longer read; the owner deletes them from Vercel. JobLedger needs no code change: paste a JobLedger key into its `STOCKWISE_API_KEY`. Test: `node scripts/test-api-keys.js [baseUrl]` (36 checks, purges its companies).
 - Fixed alongside A3: `/settings` and `/setup` never started (dead page, "Viewer" in the top bar) when opened directly, refreshed, or returned to from Lemon Squeezy checkout; their `<Suspense>` + `useSearchParams` boundary never hydrated. They now read the URL after mount. Also `next.config.ts` pins `turbopack.root`: a `package-lock.json` in the home folder made `next dev` watch the whole home folder and reload pages in a loop.
 - **A4 is DONE (2026-11-17)**: `src/app/robots.ts` and `sitemap.ts`; `/api/health` is public (exempt in `proxy.ts`) and no longer returns database error text; `next.config.ts` sends a Content-Security-Policy, `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy` and `Permissions-Policy` (camera for self only) and drops `X-Powered-By`; unknown URLs reach `src/app/not-found.tsx` instead of the login page (signed-in prefixes live in `src/lib/route-access.ts`, and `tests/route-access.test.ts` fails if a new `(dashboard)`/`(field)` folder is missing from it); `(dashboard)/error.tsx` and `global-error.tsx` report to Sentry; `/one-pager`, `/luxury-preview` and the default `public/` SVGs are removed. **If a new page needs another outside host (fonts, images, an iframe, an analytics script), add it to the CSP in `next.config.ts` or the browser will block it.** If `npm run build` fails locally on `.next/dev/types` naming a deleted page, delete `.next/dev/types` (stale dev-server output). Start at A5.
+- **A5–A8 are DONE (2026-11-18)**, see each item below. A8 left the legal entity details **pending from the owner** (`src/lib/legal.ts`). Start at A9.
 
 ## Rules for whoever runs these steps
 
@@ -244,6 +245,22 @@ live or on business registration.
 >    live site with a throwaway company.
 
 ### A8 — Privacy policy and terms
+
+**DONE 2026-11-18 (code); registration details PENDING FROM OWNER.** Privacy now lists Sentry
+(error reports, no session replay: the client config has no replay integration and no
+`setUser`), Anthropic (support chat only, not stored) and Upstash (rate-limit counters keyed by
+user id or IP), with a paragraph each. The entity lives in **`src/lib/legal.ts`**
+(`LEGAL_ENTITY.name`, `address`, `governingLaw`, `venue`, plus `LEGAL_EFFECTIVE_DATE`); while
+they are null the pages read "Stocked" and "the jurisdiction in which Stocked is incorporated".
+Also fixed: §10 said "STOCKWISE"; §4 said an ended trial becomes "read-only" (it is paused,
+with export and the Tools Free switch). **If a new outside service receives customer data, add
+it to the sub-processor table in `src/app/privacy/page.tsx` and bump `LEGAL_EFFECTIVE_DATE`.**
+
+> **Pending from owner — business registration.** When registered, send: registered name,
+> registered address (one line), governing law (e.g. "the Republic of the Philippines") and
+> the court venue (e.g. "the courts of Makati City"). Fill them in `src/lib/legal.ts`, bump
+> `LEGAL_EFFECTIVE_DATE`, push. The same registration also unblocks Lemon Squeezy live mode
+> and Google Play verification.
 
 > 1. `src/app/privacy/page.tsx` lists Supabase, Vercel, Resend and Lemon Squeezy but not Sentry
 >    (error reports), Anthropic (the support chat sends the customer's messages there) or

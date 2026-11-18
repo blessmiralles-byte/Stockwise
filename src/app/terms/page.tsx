@@ -1,13 +1,17 @@
 import Link from 'next/link'
 import { Package } from 'lucide-react'
+import { LEGAL_ENTITY, LEGAL_EFFECTIVE_DATE, operatorName } from '@/lib/legal'
 
 export const metadata = {
   title: 'Terms of Service — Stocked',
   description: 'The terms and conditions for using Stocked.',
 }
 
-const EFFECTIVE_DATE = 'June 2, 2026'
+const EFFECTIVE_DATE = LEGAL_EFFECTIVE_DATE
 const CONTACT_EMAIL  = 'legal@stocked.tech'
+const PARTY          = LEGAL_ENTITY.name ?? 'Stocked'
+const GOVERNING_LAW  = LEGAL_ENTITY.governingLaw ?? 'the jurisdiction in which Stocked is incorporated'
+const VENUE          = LEGAL_ENTITY.venue ?? (LEGAL_ENTITY.governingLaw ? `the courts of ${LEGAL_ENTITY.governingLaw}` : 'the courts of that jurisdiction')
 
 export default function TermsPage() {
   return (
@@ -38,6 +42,10 @@ export default function TermsPage() {
               Service (&quot;Terms&quot;). If you are accepting on behalf of a company or other legal entity,
               you represent that you have the authority to bind that entity. If you do not agree to
               these Terms, do not use the Service.
+            </p>
+            <p className="text-slate-600 mt-3">
+              The Service is provided by {operatorName()}
+              {LEGAL_ENTITY.address ? `, ${LEGAL_ENTITY.address}` : ''} (&quot;we&quot;, &quot;us&quot;).
             </p>
           </section>
 
@@ -81,8 +89,9 @@ export default function TermsPage() {
               <p>
                 <strong>Free trial.</strong> New accounts receive a 14-day free trial with full
                 access to all features. No credit card is required to start a trial. At the end of
-                the trial, the account is downgraded to a read-only state unless a paid plan is
-                activated.
+                the trial the account is paused until a paid plan is chosen. While paused you can
+                still download a copy of your data, or switch to the free Stocked Tools plan, and
+                your data is kept as described in section 12.
               </p>
               <p>
                 <strong>Cancellations.</strong> You may cancel your subscription at any time via
@@ -134,7 +143,7 @@ export default function TermsPage() {
             <h2 className="text-lg font-semibold text-slate-800 mb-3">7. Intellectual property</h2>
             <p className="text-slate-600">
               The Service, including its software, design, and content (excluding Customer Data),
-              is the exclusive property of Stocked and is protected by copyright, trademark, and
+              is the exclusive property of {PARTY} and is protected by copyright, trademark, and
               other intellectual property laws. You may not copy, modify, or distribute any part
               of the Service without our prior written consent.
             </p>
@@ -163,7 +172,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-slate-800 mb-3">10. Limitation of liability</h2>
             <p className="text-slate-600">
-              TO THE MAXIMUM EXTENT PERMITTED BY LAW, STOCKWISE SHALL NOT BE LIABLE FOR ANY
+              TO THE MAXIMUM EXTENT PERMITTED BY LAW, {PARTY.toUpperCase()} SHALL NOT BE LIABLE FOR ANY
               INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING OUT OF
               OR RELATED TO YOUR USE OF THE SERVICE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
               DAMAGES. OUR TOTAL CUMULATIVE LIABILITY TO YOU SHALL NOT EXCEED THE AMOUNTS PAID
@@ -174,7 +183,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-slate-800 mb-3">11. Indemnification</h2>
             <p className="text-slate-600">
-              You agree to indemnify and hold harmless Stocked and its officers, directors,
+              You agree to indemnify and hold harmless {PARTY} and its officers, directors,
               employees, and agents from any claims, damages, or expenses (including reasonable
               attorneys&apos; fees) arising from your use of the Service, violation of these Terms, or
               infringement of any third-party rights by you or your team members.
@@ -197,9 +206,9 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-slate-800 mb-3">13. Governing law</h2>
             <p className="text-slate-600">
-              These Terms are governed by and construed in accordance with the laws of the
-              jurisdiction in which Stocked is incorporated, without regard to conflict of law
-              principles. Any disputes shall be resolved in the courts of that jurisdiction.
+              These Terms are governed by and construed in accordance with the laws of{' '}
+              {GOVERNING_LAW}, without regard to conflict of law principles. Any disputes shall be
+              resolved in {VENUE}.
             </p>
           </section>
 
