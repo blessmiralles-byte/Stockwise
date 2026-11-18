@@ -4,7 +4,9 @@
  * Platform-level health dashboard for support/operations.
  * Returns per-org activity metrics, DAU/WAU counts, and plan distribution.
  *
- * Access: Owner role only. Protected by proxy auth layer + requireRole check.
+ * Access: people in PLATFORM_ADMIN_EMAILS only (404 for everyone else). This
+ * used to be an owner-role check, and every customer is the owner of their
+ * own company, so any customer could list every company and owner email.
  *
  * Response shape:
  * {
@@ -18,14 +20,14 @@
  */
 
 import { NextResponse } from 'next/server'
-import { requireRole }  from '@/lib/api-auth'
+import { requirePlatformAdmin } from '@/lib/platform-admin'
 import { createServiceClient } from '@/lib/supabase/service'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  const auth = await requireRole('owner')
-  if (auth.error) return auth.error
+  const admin = await requirePlatformAdmin()
+  if (admin.error) return admin.error
 
   const service = createServiceClient()
 

@@ -1524,18 +1524,10 @@ function SettingsInner() {
           description="Sends email alerts for overdue and upcoming maintenance"
         >
           <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-slate-700 block mb-1">Notification Email</label>
-              <Input
-                type="email"
-                placeholder="admin@company.com"
-                defaultValue={process.env.NEXT_PUBLIC_NOTIFICATION_EMAIL ?? ''}
-                disabled={!isAdmin}
-              />
-              <p className="text-xs text-slate-400 mt-1">
-                Set <code className="bg-slate-100 px-1 rounded">NOTIFICATION_EMAIL</code> in your <code className="bg-slate-100 px-1 rounded">.env.local</code>
-              </p>
-            </div>
+            <p className="text-sm text-slate-600">
+              Alerts are emailed once a day to your company&apos;s owners, at the address they
+              sign in with.
+            </p>
 
             <div className="flex items-center gap-3">
               <Button

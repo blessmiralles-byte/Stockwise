@@ -32,7 +32,8 @@ function routeFiles(dir: string): string[] {
  */
 const EXEMPT: Record<string, string> = {
   'account/route.ts':            'deletes the caller’s own account, keyed by their user id',
-  'admin/metrics/route.ts':      'cross-org metrics for the operator, gated on an admin secret',
+  'admin/metrics/route.ts':      'cross-org metrics for the operator, gated on PLATFORM_ADMIN_EMAILS (lib/platform-admin)',
+  'admin/config-check/route.ts': 'reads no tables; gated on PLATFORM_ADMIN_EMAILS',
   'health/route.ts':             'uptime ping — counts rows to prove the database answers, reads no tenant data',
   'billing/webhook/route.ts':    'Lemon Squeezy webhook — resolves the org from signed payload data',
   'notifications/maintenance/route.ts': 'nightly cron; loops every org and groups alerts by org_id',

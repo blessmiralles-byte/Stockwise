@@ -35,7 +35,7 @@ async function toolsPlanRefusal(plan: string | null | undefined): Promise<NextRe
  * header (mobile app / API clients) or the session cookie (web). Returns the
  * user id, or null if neither is valid.
  */
-async function resolveUserId(): Promise<string | null> {
+export async function resolveUserId(): Promise<string | null> {
   // 1. Bearer token — used by the Expo mobile app
   try {
     const h = await headers()

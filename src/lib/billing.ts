@@ -18,7 +18,7 @@ export interface BillingState {
   locked:        boolean       // block the app until they pay
   reason:        BillingReason
   onTrial:       boolean
-  pastDue:       boolean       // soft warning; not locked (Stripe still retrying)
+  pastDue:       boolean       // soft warning; not locked (Lemon Squeezy still retrying)
   trialDaysLeft: number | null // when on trial
 }
 

@@ -23,7 +23,7 @@ only ones blocking anything.
 - **A3 is DONE (2026-11-17)**: per-organization API keys (`api_keys` table, `scripts/migrate-api-keys.sql`, run). Keys are created, shown once and revoked in Settings → API keys (owner, full Stocked). POS and JobLedger keys need Enterprise, accounting keys need Pro. `POS_API_KEY`, `ACCOUNTING_API_KEY` and `JOBLEDGER_API_KEY` are no longer read; the owner deletes them from Vercel. JobLedger needs no code change: paste a JobLedger key into its `STOCKWISE_API_KEY`. Test: `node scripts/test-api-keys.js [baseUrl]` (36 checks, purges its companies).
 - Fixed alongside A3: `/settings` and `/setup` never started (dead page, "Viewer" in the top bar) when opened directly, refreshed, or returned to from Lemon Squeezy checkout; their `<Suspense>` + `useSearchParams` boundary never hydrated. They now read the URL after mount. Also `next.config.ts` pins `turbopack.root`: a `package-lock.json` in the home folder made `next dev` watch the whole home folder and reload pages in a loop.
 - **A4 is DONE (2026-11-17)**: `src/app/robots.ts` and `sitemap.ts`; `/api/health` is public (exempt in `proxy.ts`) and no longer returns database error text; `next.config.ts` sends a Content-Security-Policy, `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy` and `Permissions-Policy` (camera for self only) and drops `X-Powered-By`; unknown URLs reach `src/app/not-found.tsx` instead of the login page (signed-in prefixes live in `src/lib/route-access.ts`, and `tests/route-access.test.ts` fails if a new `(dashboard)`/`(field)` folder is missing from it); `(dashboard)/error.tsx` and `global-error.tsx` report to Sentry; `/one-pager`, `/luxury-preview` and the default `public/` SVGs are removed. **If a new page needs another outside host (fonts, images, an iframe, an analytics script), add it to the CSP in `next.config.ts` or the browser will block it.** If `npm run build` fails locally on `.next/dev/types` naming a deleted page, delete `.next/dev/types` (stale dev-server output). Start at A5.
-- **A5–A8 are DONE (2026-11-18)**, see each item below. A8 left the legal entity details **pending from the owner** (`src/lib/legal.ts`). Start at A9.
+- **A5–A8 are DONE (2026-11-18)**, see each item below. A8 left the legal entity details **pending from the owner** (`src/lib/legal.ts`). A9 code done 2026-11-18 (admin metrics leak closed; owner sets `PLATFORM_ADMIN_EMAILS` and reads `/api/admin/config-check`). Start at A10.
 
 ## Rules for whoever runs these steps
 
@@ -270,6 +270,28 @@ it to the sub-processor table in `src/app/privacy/page.tsx` and bump `LEGAL_EFFE
 >    the owner fills one place once registration is done (owner checklist item).
 
 ### A9 — Vercel environment variables to confirm (owner reads them off, Opus compares)
+
+**Code DONE 2026-11-18; owner steps pending.** Every variable the code reads is in
+`src/lib/env-vars.json` (required / recommended / optional / obsolete), and
+`tests/env-vars.test.ts` fails if the code reads one that is not listed. Check a file with
+`node scripts/check-env.js [file] [--production]`; check the live site at
+`https://www.stocked.tech/api/admin/config-check` (names, set/unset, public values only).
+**Found and fixed: `/api/admin/metrics` was open to any customer** (every sign-up is an owner)
+and returned every company's name, plan and owner email; proven live before the fix.
+`/api/admin/*` now needs `src/lib/platform-admin.ts` → `PLATFORM_ADMIN_EMAILS` (404 for
+everyone else; enforced by a test). Check: `node scripts/test-admin-gate.js <url>` (add
+`--admin` only against a local server started with
+`PLATFORM_ADMIN_EMAILS=platform-admin-test@example.com`). Also: the fake "Notification Email"
+field in Settings (disabled, told customers to edit `.env.local`) is replaced by a line saying
+alerts go to the company's owners; `.env.example` rewritten and now tracked; `.env.local` lost
+its five unused lines; the billing.ts Stripe comment fixed (account-export's `stripe` column
+filter stays as a safety net).
+
+> **Owner to do in Vercel (Production):** add `PLATFORM_ADMIN_EMAILS` = your sign-in email,
+> redeploy, open `/api/admin/config-check` signed in, and fix whatever `problems` lists
+> (delete leftovers such as `POS_API_KEY`, `ACCOUNTING_API_KEY`, `JOBLEDGER_API_KEY`, any
+> `STRIPE_*`). Then Vercel → Project → Settings → Cron Jobs (or Logs filtered to
+> `/api/notifications`): confirm each of the five jobs ran last night with status 200.
 
 > Used by the code: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
 > `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SITE_URL` (must be `https://www.stocked.tech`),
