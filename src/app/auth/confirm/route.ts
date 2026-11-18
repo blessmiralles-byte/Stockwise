@@ -28,6 +28,11 @@ export async function GET(request: NextRequest) {
     console.error('[auth/confirm] verifyOtp', error.message)
   }
 
-  const reason = type === 'recovery' ? 'reset_link_invalid' : 'invite_link_invalid'
+  // Tell the sign-in page which kind of link failed so it can say what to do.
+  const reason =
+    type === 'recovery'                       ? 'reset_link_invalid' :
+    type === 'invite' || type === 'magiclink' ? 'invite_link_invalid' :   // magiclink = resent invite
+    type === 'signup' || type === 'email'     ? 'confirm_link_invalid' :
+                                                'auth_callback_failed'
   return NextResponse.redirect(`${origin}/login?error=${reason}`)
 }

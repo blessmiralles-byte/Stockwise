@@ -1,7 +1,9 @@
 <!--
   Supabase → Authentication → Emails → Templates → "Confirm signup"
   Subject: Confirm your Stocked account
-  Uses the Supabase variable {{ .ConfirmationURL }}
+  Links to our own /auth/confirm with the token hash (not {{ .ConfirmationURL }}),
+  so the link works in any browser or device, not only the one that signed up.
+  After confirming, /dashboard sends a new account on to /onboarding.
 -->
 <!DOCTYPE html>
 <html>
@@ -33,10 +35,10 @@
         Thanks for signing up for Stocked. Confirm your email address to activate your
         account and start your <strong>14-day free trial</strong> — no credit card required.
       </p>
-      <a href="{{ .ConfirmationURL }}" class="btn">Confirm my email &rarr;</a>
+      <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/dashboard" class="btn">Confirm my email &rarr;</a>
       <p class="fallback">
         Or paste this link into your browser:<br/>
-        {{ .ConfirmationURL }}
+        {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/dashboard
       </p>
     </div>
     <div class="footer">

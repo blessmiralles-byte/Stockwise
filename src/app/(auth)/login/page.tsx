@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Eye, EyeOff, LogIn } from 'lucide-react'
+import { ResendConfirmation } from '@/components/auth/resend-confirmation'
 
 function LoginForm() {
   const router = useRouter()
@@ -21,17 +22,27 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notConfirmed, setNotConfirmed] = useState(false)
+  const linkError = searchParams.get('error')
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setNotConfirmed(false)
 
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
-      setError(error.message)
+      // Signed up but never clicked the confirmation link: say so in plain
+      // words and offer a fresh link below instead of a dead end.
+      const unconfirmed = (error as { code?: string }).code === 'email_not_confirmed'
+        || /email not confirmed/i.test(error.message)
+      setNotConfirmed(unconfirmed)
+      setError(unconfirmed
+        ? 'Please confirm your email first. Use the link we sent when you signed up.'
+        : error.message)
       setLoading(false)
       return
     }
@@ -45,17 +56,24 @@ function LoginForm() {
       {error && (
         <div className="bg-red-50 text-red-700 text-sm px-3 py-2.5 rounded-lg border border-red-100">
           {error}
+          {notConfirmed && <ResendConfirmation email={email} className="mt-2" />}
         </div>
       )}
-      {!error && searchParams.get('error') && (
+      {!error && linkError && (
         <div className="bg-amber-50 text-amber-800 text-sm px-3 py-2.5 rounded-lg border border-amber-100">
-          {searchParams.get('error') === 'reset_link_invalid' ? (
+          {linkError === 'confirm_link_invalid' ? (
+            <>
+              That confirmation link has expired or was already used. If you already confirmed your
+              email, just sign in below. If not, type your email below, then ask for a new link here.
+              <ResendConfirmation email={email} className="mt-2" />
+            </>
+          ) : linkError === 'reset_link_invalid' ? (
             <>
               That password reset link didn&apos;t work. It may have expired, been used already, or been opened in a different browser from the one that requested it.{' '}
               <Link href="/forgot-password" className="font-semibold underline">Send a new one</Link>
               {' '}and open it on this device.
             </>
-          ) : searchParams.get('error') === 'invite_link_invalid' ? (
+          ) : linkError === 'invite_link_invalid' ? (
             'That invite link has expired or was already used. Ask your admin to resend the invite.'
           ) : (
             'That sign-in link has expired or was already used. Please sign in, or request a new link.'

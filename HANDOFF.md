@@ -138,6 +138,24 @@ live or on business registration.
 
 ### A5 — Email links
 
+**Part 1 DONE 2026-11-18 (code); owner to paste templates.**
+- `docs/email-templates/` now has confirm-signup (changed to `token_hash&type=email&next=/dashboard`),
+  invite, magic-link and change-email, all linking to `/auth/confirm` like reset-password.
+  The app's own invite and resent-invite emails already used `/auth/confirm`; the Supabase Invite
+  template is only a fallback when RESEND_API_KEY is unset. The app never sends magic-link or
+  change-email emails; those templates are there in case one is sent from the dashboard.
+- `/auth/confirm` failure now says which link failed: `confirm_link_invalid` (sign-up / magic link)
+  gets its own sign-in banner ("already confirmed? just sign in" + resend).
+- New "Resend the confirmation email" (`src/components/auth/resend-confirmation.tsx`) on the
+  "Check your email" screen and on sign-in when Supabase says "Email not confirmed". Before, a
+  customer whose link expired was stuck.
+- `node scripts/test-email-links.js [baseUrl]` checks every link type opened with no session
+  (= another device): lands where it should, signs in, new account goes to onboarding, second
+  click explained, off-site `next` refused. The change-email link to the NEW address can't be
+  made by `generateLink` (always "expired"), so only the current-address half is checked.
+- Owner: paste confirm-signup, invite, magic-link and change-email into Supabase → Authentication
+  → Emails (subjects are in each file's top comment). Parts 2 and 3 below are still open.
+
 > 1. `docs/email-templates/confirm-signup.html` still uses `{{ .ConfirmationURL }}`: a new
 >    customer who opens the confirmation on a different device lands on the sign-in page with
 >    an error. Change it to `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/dashboard`

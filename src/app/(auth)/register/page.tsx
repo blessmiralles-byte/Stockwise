@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Eye, EyeOff, UserPlus, Mail } from 'lucide-react'
 import { captureAttribution, getAttribution } from '@/lib/attribution'
 import { isPaidPlan, FREE_TOOL_LIMIT } from '@/lib/plan-config'
+import { ResendConfirmation } from '@/components/auth/resend-confirmation'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -133,9 +134,10 @@ export default function RegisterPage() {
             <h2 className="text-lg font-semibold text-slate-900">Check your email</h2>
             <p className="text-sm text-slate-500 mt-1">
               We sent a confirmation link to <span className="font-medium text-slate-700">{email}</span>.
-              Click it to activate your account, then come back to sign in.
+              Click it to activate your account. It works on any device and signs you straight in.
             </p>
           </div>
+          <ResendConfirmation email={email} />
           <Link href="/login">
             <Button variant="outline" className="w-full">Go to sign in</Button>
           </Link>
