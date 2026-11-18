@@ -222,6 +222,11 @@ live or on business registration.
    - Scan for Tools: wording and legend are tools and locations only, the lookup no longer
      returns products/POs/requisitions/counts or the global catalog to a Tools account, and the
      result card drops Category/Cost/Book value (a Tools account can't enter them).
+5. Live (`node scripts/test-tools-free.js https://www.stocked.tech`, ALL PASSED): an ended trial
+   switches, a second click is harmless, tools open, purchase orders 403, scan finds a location
+   but not a leftover product, and an active paid plan is refused with its plan unchanged.
+   Not done: clicking the paywall button itself on the live site (needs a real sign-in there);
+   the same button was clicked on a local copy earlier.
 
 > 1. Tools accounts can add locations (inline, on Add Tool) but cannot rename or remove one:
 >    `/locations` is allowed by `TOOLS_PAGES_ALLOWED` in `src/lib/entitlements.ts` but is not in
