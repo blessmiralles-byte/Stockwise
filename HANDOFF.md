@@ -173,7 +173,7 @@ live or on business registration.
 
 ### A6 — Dates use UTC, not the customer's day (extends Step 5.3)
 
-**DONE 2026-11-18 (code). Owner: run `scripts/migrate-org-timezone.sql`.** Also closes Step 5.3.
+**DONE 2026-11-18; migration run; `node scripts/test-timezone.js <url>` ALL PASSED live.** Also closes Step 5.3.
 - `src/lib/dates.ts`: `localToday()`/`localDay()` for the browser, `todayInZone()`,
   `dayRangeInZone()` for the server; `src/lib/org-timezone.ts`: `getOrgTimeZone()`, `orgToday()`.
 - New `organizations.timezone` (IANA). Filled in automatically by the first browser that opens
