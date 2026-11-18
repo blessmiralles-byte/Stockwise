@@ -10,6 +10,8 @@ import {
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { usePlan } from '@/lib/use-plan'
+import { isToolsPlan } from '@/lib/entitlements'
 
 // ── Type configs ──────────────────────────────────────────────────────────────
 const TYPE_CFG: Record<string, { icon: any; color: string; label: string }> = {
@@ -98,7 +100,13 @@ function PrintDialog({ code, label, onClose }: { code: string; label: string; on
 }
 
 // ── Result Card ───────────────────────────────────────────────────────────────
-function ResultCard({ result, onPrint }: { result: any; onPrint: () => void }) {
+/** How a match is described: "matched on tag", not on a column name. */
+const MATCH_LABEL: Record<string, string> = {
+  asset_tag: 'tag', barcode: 'barcode', sku: 'item code', code: 'code',
+  req_number: 'request number', po_number: 'PO number', count_number: 'count number', global_catalog: 'global catalog',
+}
+
+function ResultCard({ result, onPrint, toolsOnly }: { result: any; onPrint: () => void; toolsOnly?: boolean }) {
   const cfg   = TYPE_CFG[result.type] ?? TYPE_CFG.product
   const Icon  = cfg.icon
   const d     = result.data
@@ -113,7 +121,7 @@ function ResultCard({ result, onPrint }: { result: any; onPrint: () => void }) {
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-slate-900 text-sm truncate">{result.display}</p>
           <p className="text-xs text-slate-400 mt-0.5">
-            {cfg.label} · matched on <span className="font-mono">{result.match_field}</span>
+            {toolsOnly && result.type === 'asset' ? 'Tool' : cfg.label} · matched on {MATCH_LABEL[result.match_field] ?? result.match_field}
           </p>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -197,12 +205,15 @@ function ResultCard({ result, onPrint }: { result: any; onPrint: () => void }) {
             {[
               ['Tag',      d.asset_tag],
               ['Status',   d.status],
-              ['Category', d.category ?? '—'],
+              // A Tools account records none of these, so they'd only ever show "—".
+              ...(toolsOnly ? [] : [['Category', d.category ?? '—']]),
               ['Location', d.location ?? '—'],
               ['S/N',      d.serial_number ?? '—'],
               ['Accountable', d.accountable_person ?? '—'],
-              ['Cost',     d.purchase_cost > 0 ? fmt(d.purchase_cost) : '—'],
-              ['Book Value', d.current_value > 0 ? fmt(d.current_value) : '—'],
+              ...(toolsOnly ? [] : [
+                ['Cost',     d.purchase_cost > 0 ? fmt(d.purchase_cost) : '—'],
+                ['Book Value', d.current_value > 0 ? fmt(d.current_value) : '—'],
+              ]),
             ].map(([label, value]) => (
               <div key={label} className="bg-slate-50 rounded-lg p-2.5">
                 <p className="text-[10px] text-slate-400 uppercase tracking-wide">{label}</p>
@@ -215,8 +226,7 @@ function ResultCard({ result, onPrint }: { result: any; onPrint: () => void }) {
         {result.type === 'location' && (
           <div className="grid grid-cols-2 gap-3">
             {[
-              ['Code',    d.code],
-              ['Type',    d.type ?? '—'],
+              ...(toolsOnly ? [] : [['Code', d.code], ['Type', d.type ?? '—']]),
               ['Address', d.address ?? '—'],
             ].map(([label, value]) => (
               <div key={label} className="bg-slate-50 rounded-lg p-2.5">
@@ -249,6 +259,12 @@ function ResultCard({ result, onPrint }: { result: any; onPrint: () => void }) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function ScanResolvePage() {
+  const { plan } = usePlan()
+  const toolsOnly = isToolsPlan(plan)
+  // What a Tools account can look up: its tools and its places.
+  const legend = Object.entries(TYPE_CFG)
+    .filter(([type]) => !toolsOnly || type === 'asset' || type === 'location')
+    .map(([type, cfg]) => [type, toolsOnly && type === 'asset' ? { ...cfg, label: 'Tool' } : cfg] as const)
   const [query, setQuery]       = useState('')
   const [result, setResult]     = useState<any>(null)
   const [loading, setLoading]   = useState(false)
@@ -288,10 +304,12 @@ export default function ScanResolvePage() {
         {/* Search box */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
           <p className="text-xs text-slate-500 mb-3">
-            Enter any code — product SKU, asset tag, barcode, location code, PO number, requisition number, or stock count number.
+            {toolsOnly
+              ? 'Scan a tool’s QR label or type its tag or barcode, or a location code.'
+              : 'Enter any code — product SKU, asset tag, barcode, location code, PO number, requisition number, or stock count number.'}
           </p>
           <div className="flex gap-2">
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-0">
               <ScanBarcode className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 ref={inputRef}
@@ -306,7 +324,7 @@ export default function ScanResolvePage() {
             <button
               onClick={() => resolve(query)}
               disabled={loading || !query.trim()}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+              className="flex-shrink-0 flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors">
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
               Look Up
             </button>
@@ -320,7 +338,7 @@ export default function ScanResolvePage() {
 
           {/* Supported types legend */}
           <div className="flex flex-wrap gap-2 mt-3">
-            {Object.entries(TYPE_CFG).map(([type, cfg]) => (
+            {legend.map(([type, cfg]) => (
               <span key={type} className={`flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${cfg.color}`}>
                 <cfg.icon className="w-3 h-3" />{cfg.label}
               </span>
@@ -338,6 +356,7 @@ export default function ScanResolvePage() {
         {result && (
           <ResultCard
             result={result}
+            toolsOnly={toolsOnly}
             onPrint={() => setPrint(true)}
           />
         )}

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Bell, Search, LogOut, Settings, ChevronDown, Shield, X } from 'lucide-react'
+import { MobileNavButton } from '@/components/layout/sidebar'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -87,7 +88,7 @@ function NotificationPanel({ onClose, onRead }: { onClose: () => void; onRead: (
   const unread = notifs.filter(n => !n.read_at).length
 
   return (
-    <div className="absolute right-0 top-full mt-1 w-80 bg-white rounded-xl border border-slate-200 shadow-xl z-50 overflow-hidden">
+    <div className="absolute right-0 top-full mt-1 w-80 max-w-[calc(100vw-1.5rem)] bg-white rounded-xl border border-slate-200 shadow-xl z-50 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-slate-900">Notifications</span>
@@ -195,8 +196,12 @@ export function Topbar({ title }: TopbarProps) {
   const rb = roleBadge[profile?.role ?? 'viewer'] ?? { label: 'Viewer', variant: 'outline' }
 
   return (
-    <header className="h-14 border-b border-slate-100 bg-white flex items-center justify-between px-6 sticky top-0 z-10">
-      <h1 className="text-[17px] font-semibold text-slate-900 tracking-tight">{title}</h1>
+    <header className="h-14 border-b border-slate-100 bg-white flex items-center justify-between gap-2 px-3 md:px-6 sticky top-0 z-10">
+      <div className="flex items-center gap-1.5 min-w-0">
+        {/* Phones have no room for the sidebar: open it from here. */}
+        <MobileNavButton />
+        <h1 className="text-[17px] font-semibold text-slate-900 tracking-tight truncate">{title}</h1>
+      </div>
 
       <div className="flex items-center gap-2">
         <div className="relative hidden md:block">

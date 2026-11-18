@@ -83,7 +83,7 @@ export function SupportChat() {
         <button
           onClick={() => setOpen(true)}
           aria-label="Open support chat"
-          className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-lg hover:bg-indigo-700 transition-colors"
+          className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-lg hover:bg-indigo-700 transition-colors"
         >
           <MessageCircle className="w-5 h-5" />
           Help

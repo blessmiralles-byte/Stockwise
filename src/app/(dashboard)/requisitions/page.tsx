@@ -9,6 +9,7 @@ import {
   CalendarDays, FileText, MapPin, User, Tag, Briefcase,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { MobileNavButton } from '@/components/layout/sidebar'
 import { ApprovalTrail, approveLabel, type TrailStep } from '@/components/approvals/approval-trail'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -1177,10 +1178,13 @@ export default function RequisitionsPage() {
   return (
     <div className="p-6 max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <div className="flex items-start gap-1.5 min-w-0">
+          <MobileNavButton className="mt-[-2px]" />
+          <div>
           <h1 className="text-xl font-bold text-slate-900">Requisitions</h1>
           <p className="text-sm text-slate-500 mt-0.5">Asset checkout, inventory requests, and new purchase requests</p>
+          </div>
         </div>
         <button onClick={() => setShowNew(true)}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200">

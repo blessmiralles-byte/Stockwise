@@ -11,6 +11,8 @@ import { CardSkeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/lib/use-api'
 import { canIssueToOthers, approvalNeeded } from '@/lib/checkout-rules'
 import { planHasFeature, isToolsPlan } from '@/lib/entitlements'
+import { createNamedLocation } from '@/lib/location-code'
+import { SCHEDULE_KINDS, KIND_LABEL, producesCertificate, type ScheduleKind } from '@/lib/asset-compliance'
 import { usePlan } from '@/lib/use-plan'
 import { toolLimit } from '@/lib/plan-config'
 import { formatDate } from '@/lib/utils'
@@ -559,23 +561,11 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons, toolsOnly = false 
     setNewLocSaving(true); setNewLocError('')
     try {
       // Codes are required and unique per org; nobody here needs to pick one.
-      const base = locName.toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 6) || 'LOC'
-      for (let attempt = 0; attempt < 4; attempt++) {
-        const code = `${base}-${Math.floor(100 + Math.random() * 900)}`
-        const res  = await fetch('/api/locations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: locName, code, type: 'other' }),
-        })
-        const json = await res.json().catch(() => ({}))
-        if (res.status === 409) continue
-        if (!res.ok) { setNewLocError(json.error ?? 'Could not add the location'); return }
-        setAddedLocs(prev => [...prev, json.data])
-        setLocationId(json.data.id)
-        setNewLocOpen(false); setNewLocName('')
-        return
-      }
-      setNewLocError('Could not add the location. Please try again.')
+      const made = await createNamedLocation(locName)
+      if ('error' in made) { setNewLocError(made.error); return }
+      setAddedLocs(prev => [...prev, made.data])
+      setLocationId(made.data.id)
+      setNewLocOpen(false); setNewLocName('')
     } catch {
       setNewLocError('Network error. Please try again.')
     } finally {
@@ -619,6 +609,18 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons, toolsOnly = false 
   const [maintDate,        setMaintDate]        = useState('')
   const [maintNotes,       setMaintNotes]       = useState('')
   const [maintNotify,      setMaintNotify]      = useState('3')
+  // Inspections and calibration carry a certificate (same fields as Maintenance → Schedule).
+  const [maintKind,        setMaintKind]        = useState<ScheduleKind>('maintenance')
+  const [certNo,           setCertNo]           = useState('')
+  const [certUntil,        setCertUntil]        = useState('')
+  const KIND_TITLE: Record<ScheduleKind, string> = {
+    maintenance: 'Initial Service / Commissioning', inspection: 'Safety inspection', calibration: 'Calibration',
+  }
+  const chooseKind = (k: ScheduleKind) => {
+    // Swap a suggested title for the new type's; keep one the user typed.
+    if (Object.values(KIND_TITLE).includes(maintTitle) || !maintTitle.trim()) setMaintTitle(KIND_TITLE[k])
+    setMaintKind(k)
+  }
 
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState('')
@@ -638,7 +640,7 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons, toolsOnly = false 
 
   async function handleSubmit() {
     if (!name.trim()) { setError(toolsOnly ? 'Tool name is required' : 'Asset name is required'); setTab('info'); return }
-    if (schedMaint && !maintDate) { setError('Select a date for the maintenance task'); setTab('maintenance'); return }
+    if (schedMaint && !maintDate) { setError(`Select a date for the ${maintKind === 'maintenance' ? 'maintenance task' : KIND_LABEL[maintKind].toLowerCase()}`); setTab('maintenance'); return }
 
     setSaving(true); setError('')
     try {
@@ -686,6 +688,11 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons, toolsOnly = false 
             scheduled_date:     maintDate,
             notify_days_before: Number(maintNotify) || 3,
             status:             'scheduled',
+            kind:               maintKind,
+            ...(producesCertificate(maintKind) ? {
+              certificate_no:  certNo.trim() || undefined,
+              certified_until: certUntil || undefined,
+            } : {}),
           }),
         })
       }
@@ -1062,13 +1069,33 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons, toolsOnly = false 
                   className="w-4 h-4 rounded text-indigo-600"
                 />
                 <div>
-                  <p className="text-sm font-medium text-slate-900">Schedule a maintenance task for this {toolsOnly ? 'tool' : 'asset'}</p>
-                  <p className="text-xs text-slate-400">Create the first service record right now</p>
+                  <p className="text-sm font-medium text-slate-900">Schedule maintenance, an inspection or a calibration</p>
+                  <p className="text-xs text-slate-400">Set up the first check for this {toolsOnly ? 'tool' : 'asset'} now</p>
                 </div>
               </label>
 
               {schedMaint && (
                 <div className="space-y-3 pt-1">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Type</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {SCHEDULE_KINDS.map(k => (
+                        <button
+                          key={k.value}
+                          type="button"
+                          onClick={() => chooseKind(k.value)}
+                          className={cn(
+                            'py-2 px-2 rounded-lg border text-left transition-colors',
+                            maintKind === k.value ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'
+                          )}
+                        >
+                          <span className={cn('block text-sm font-medium', maintKind === k.value ? 'text-indigo-700' : 'text-slate-700')}>{k.label}</span>
+                          <span className="block text-[11px] text-slate-400 leading-tight mt-0.5">{k.blurb}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-xs font-medium text-slate-600 mb-1">Task Title <span className="text-red-500">*</span></label>
                     <Input
@@ -1076,7 +1103,7 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons, toolsOnly = false 
                       onChange={e => setMaintTitle(e.target.value)}
                       placeholder="e.g. Initial service, Commissioning check, 1st 500hr service"
                     />
-                    <div className="flex flex-wrap gap-1.5 mt-2">
+                    {maintKind === 'maintenance' && <div className="flex flex-wrap gap-1.5 mt-2">
                       {['Initial Service / Commissioning', 'First 500hr Service', 'Pre-deployment Inspection', 'Annual Service'].map(p => (
                         <button
                           key={p}
@@ -1087,12 +1114,30 @@ function AddAssetDialog({ onClose, onSaved, canManagePersons, toolsOnly = false 
                           {p}
                         </button>
                       ))}
-                    </div>
+                    </div>}
                   </div>
+
+                  {producesCertificate(maintKind) && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 space-y-2">
+                      <p className="text-xs text-slate-500">
+                        The certificate this {toolsOnly ? 'tool' : 'asset'} has now, if any. It appears on the Tool compliance report.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Certificate no.</label>
+                          <Input value={certNo} onChange={e => setCertNo(e.target.value)} placeholder="e.g. INS-2026-0142" maxLength={100} />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-600 mb-1">Valid until</label>
+                          <Input type="date" value={certUntil} onChange={e => setCertUntil(e.target.value)} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-xs font-medium text-slate-600 mb-1">
-                      Scheduled Date <span className="text-red-500">*</span>
+                      {maintKind === 'maintenance' ? 'Scheduled Date' : `Next ${KIND_LABEL[maintKind].toLowerCase()} due`} <span className="text-red-500">*</span>
                     </label>
                     <Input
                       type="date"
@@ -1698,7 +1743,7 @@ export default function AssetsPage() {
               ))}
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {/* The scan screen here is the stock-movement one; Tools accounts scan from /scan. */}
             <Link href={toolsOnly ? '/scan' : '/transactions/new'}>
               <Button variant="outline" className="gap-2"><ScanBarcode className="w-4 h-4" />Scan</Button>

@@ -491,16 +491,16 @@ export default function MaintenancePage() {
                 </button>
               </div>
             )}
-            <div className="relative flex-1 max-w-sm">
+            <div className="relative flex-1 min-w-0 w-full sm:max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                placeholder="Search asset or maintenance type..."
+                placeholder="Search by tool, asset or task…"
                 className="pl-9"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
-            <div className="flex gap-1">
+            <div className="flex gap-1 flex-wrap">
               {(['all', 'maintenance', 'inspection', 'calibration'] as const).map(k => (
                 <Button key={k} size="sm" variant={kindFilter === k ? 'default' : 'outline'}
                   onClick={() => setKindFilter(k)} className="text-xs">
@@ -508,7 +508,7 @@ export default function MaintenancePage() {
                 </Button>
               ))}
             </div>
-            <div className="flex gap-1">
+            <div className="flex gap-1 flex-wrap">
               {['all', 'scheduled', 'overdue', 'completed'].map(s => (
                 <Button key={s} size="sm" variant={statusFilter === s ? 'default' : 'outline'}
                   onClick={() => setStatusFilter(s)} className="capitalize text-xs">

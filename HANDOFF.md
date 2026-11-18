@@ -202,6 +202,27 @@ live or on business registration.
 
 ### A7 — Stocked Tools gaps found while testing the free plan
 
+**DONE 2026-11-18 (items 1-4 on a local production build; item 5 on the live site, see below).**
+1. Tools sidebar has Locations. The page is names-only for Tools (code made automatically by
+   `src/lib/location-code.ts`, shared with Add Tool's inline "new location"); no stock figures;
+   edit/delete buttons visible on touch screens. Delete wording now says what it does (hides it;
+   records keep the name) for every plan.
+2. Add Tool → Maintenance: Type (maintenance / inspection / calibration), certificate no. and
+   valid-until for the two that carry one, "Next inspection due" label. Checked: saved row has
+   kind, certificate_no and certified_until, and shows on Tool Compliance as "In date".
+3. `/api/billing/tools-free` on an account already on Tools Free returns 200 `{ already: true }`
+   (the paywall then just goes to Tools) instead of the "cancel your plan" 409.
+4. Walked Tools, Locations, Maintenance, Reports + the four tool reports, Audit Log, Settings,
+   Scan at 375px (Tools Free) and desktop (paid Tools): no link to a closed page. Fixed on the way:
+   - Phones: the sidebar is now a slide-in menu (top bar ☰ button, `MobileNavButton`, also on
+     Requisitions, the one page without the top bar); it was always open and took most of
+     the screen on every plan.
+   - Maintenance filters and search wrap; Settings tabs scroll; Tools page buttons wrap;
+     Help button sits under dialogs (was covering their Save button).
+   - Scan for Tools: wording and legend are tools and locations only, the lookup no longer
+     returns products/POs/requisitions/counts or the global catalog to a Tools account, and the
+     result card drops Category/Cost/Book value (a Tools account can't enter them).
+
 > 1. Tools accounts can add locations (inline, on Add Tool) but cannot rename or remove one:
 >    `/locations` is allowed by `TOOLS_PAGES_ALLOWED` in `src/lib/entitlements.ts` but is not in
 >    their sidebar. Add a simple Locations entry to the Tools sidebar (names only, no codes).

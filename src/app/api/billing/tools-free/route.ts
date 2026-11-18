@@ -26,6 +26,12 @@ export async function POST() {
     .single()
   if (!org) return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
 
+  // Already there (a second click, or another tab): nothing to change, and
+  // nothing wrong. The page just carries on to the tool tracker.
+  if ((org as any).plan === 'tools_free') {
+    return NextResponse.json({ ok: true, already: true })
+  }
+
   if (!canSwitchToToolsFree(org as any)) {
     return NextResponse.json(
       { error: 'Your account is on an active plan. Cancel it under Settings → Billing before switching to Stocked Tools Free.' },

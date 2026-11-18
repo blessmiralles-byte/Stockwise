@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
 import { lookupBarcode } from '@/lib/barcode-lookup'
+import { isToolsPlan } from '@/lib/entitlements'
 
 /**
  * GET /api/scan/resolve?q=<any_code>
@@ -39,8 +40,14 @@ export async function GET(req: NextRequest) {
   const supabase = createServiceClient()
   const upper    = q.toUpperCase()
 
+  // A Stocked Tools account looks up tools and places only: products, orders
+  // and counts from an earlier full plan stay out of reach, like their pages.
+  const { data: orgRow } = await supabase.from('organizations').select('plan').eq('id', auth.orgId).maybeSingle()
+  const toolsOnly = isToolsPlan((orgRow as any)?.plan)
+  const notFound  = () => NextResponse.json({ error: 'No record found' }, { status: 404 })
+
   // ── 1 & 2: Products (barcode OR SKU) ──────────────────────────────────────
-  const { data: productByBarcode } = await supabase
+  const { data: productByBarcode } = toolsOnly ? { data: null } : await supabase
     .from('products')
     .select(`
       id, sku, barcode, name, unit_of_measure, is_active,
@@ -58,7 +65,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ data: formatProduct(productByBarcode, q, 'barcode') })
   }
 
-  const { data: productBySku } = await supabase
+  const { data: productBySku } = toolsOnly ? { data: null } : await supabase
     .from('products')
     .select(`
       id, sku, barcode, name, unit_of_measure, is_active,
@@ -132,6 +139,8 @@ export async function GET(req: NextRequest) {
       }
     })
   }
+
+  if (toolsOnly) return notFound()
 
   // ── 6: Requisition ────────────────────────────────────────────────────────
   const { data: requisition } = await supabase

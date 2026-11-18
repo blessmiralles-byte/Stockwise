@@ -9,6 +9,9 @@ import { Input } from '@/components/ui/input'
 import { CardSkeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/lib/use-api'
 import { cn } from '@/lib/utils'
+import { usePlan } from '@/lib/use-plan'
+import { isToolsPlan } from '@/lib/entitlements'
+import { createNamedLocation } from '@/lib/location-code'
 import {
   Search, Plus, MapPin, Package, DollarSign,
   ChevronRight, ChevronDown, Layers, BookOpen, Archive,
@@ -60,11 +63,14 @@ function LocationDialog({
   allLocs,
   onClose,
   onSaved,
+  simple,
 }: {
   editing:  Loc | null          // null = add mode
   allLocs:  Loc[]
   onClose:  () => void
   onSaved:  () => void
+  /** Stocked Tools: a name (and address) only; the code is made for them. */
+  simple?:  boolean
 }) {
   const isEdit = !!editing
 
@@ -89,9 +95,18 @@ function LocationDialog({
 
   const save = async () => {
     if (!name.trim()) { setError('Name is required'); return }
-    if (!code.trim()) { setError('Code is required'); return }
+    if (!simple && !code.trim()) { setError('Code is required'); return }
 
     setSaving(true); setError('')
+
+    // New place on a Tools account: the code is picked automatically.
+    if (simple && !isEdit) {
+      const made = await createNamedLocation(name.trim(), { address: address.trim() })
+      setSaving(false)
+      if ('error' in made) { setError(made.error); return }
+      onSaved()
+      return
+    }
 
     const body = {
       name:      name.trim(),
@@ -138,13 +153,13 @@ function LocationDialog({
             <Input
               value={name}
               onChange={e => handleNameChange(e.target.value)}
-              placeholder="e.g. Main Warehouse, Shelf A1"
+              placeholder={simple ? 'e.g. Main yard, Van 2, Site office' : 'e.g. Main Warehouse, Shelf A1'}
               autoFocus
             />
           </div>
 
           {/* Code + Type */}
-          <div className="grid grid-cols-2 gap-3">
+          {!simple && <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
                 Code <span className="text-red-500">*</span>
@@ -170,10 +185,10 @@ function LocationDialog({
                 ))}
               </select>
             </div>
-          </div>
+          </div>}
 
           {/* Parent */}
-          <div>
+          {!simple && <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">
               Parent Location <span className="text-slate-400 font-normal">(optional — leave blank for top-level)</span>
             </label>
@@ -189,7 +204,7 @@ function LocationDialog({
                 </option>
               ))}
             </select>
-          </div>
+          </div>}
 
           {/* Address (top-level only hint) */}
           <div>
@@ -228,8 +243,9 @@ function LocationDialog({
 // ── Location row ──────────────────────────────────────────────────────────────
 function LocationRow({
   loc, children, depth, search,
-  onEdit, onDelete,
+  onEdit, onDelete, simple,
 }: {
+  simple?:  boolean
   loc:      Loc
   children: Record<string, Loc[]>
   depth:    number
@@ -286,10 +302,10 @@ function LocationRow({
         >
           <div className="flex items-center gap-2">
             <p className="font-medium text-slate-900 text-sm">{loc.name}</p>
-            <span className="text-xs font-mono text-slate-400 hidden md:inline">{loc.code}</span>
-            <span className={`text-xs px-1.5 py-0.5 rounded capitalize hidden sm:inline ${colorClass}`}>
+            {!simple && <span className="text-xs font-mono text-slate-400 hidden md:inline">{loc.code}</span>}
+            {!simple && <span className={`text-xs px-1.5 py-0.5 rounded capitalize hidden sm:inline ${colorClass}`}>
               {loc.type}
-            </span>
+            </span>}
           </div>
           {loc.address && depth === 0 && (
             <p className="text-xs text-slate-400 truncate">{loc.address}</p>
@@ -297,7 +313,7 @@ function LocationRow({
         </div>
 
         {/* Stats */}
-        {depth === 0 && loc.items !== undefined && (
+        {!simple && depth === 0 && loc.items !== undefined && (
           <div className="hidden md:flex items-center gap-6 flex-shrink-0">
             <div className="text-right">
               <p className="text-xs text-slate-400">Items</p>
@@ -318,7 +334,7 @@ function LocationRow({
         )}
 
         {/* Action buttons (appear on hover) */}
-        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+        <div className="flex gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity flex-shrink-0">
           <button
             onClick={() => onEdit(loc)}
             className="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
@@ -348,6 +364,7 @@ function LocationRow({
               search={search}
               onEdit={onEdit}
               onDelete={onDelete}
+              simple={simple}
             />
           ))}
         </div>
@@ -357,7 +374,7 @@ function LocationRow({
 }
 
 // ── Delete confirm ────────────────────────────────────────────────────────────
-function DeleteConfirm({ loc, onClose, onDeleted }: { loc: Loc; onClose: () => void; onDeleted: () => void }) {
+function DeleteConfirm({ loc, onClose, onDeleted, simple }: { loc: Loc; onClose: () => void; onDeleted: () => void; simple?: boolean }) {
   const [deleting, setDeleting] = useState(false)
   const [error,    setError]    = useState('')
 
@@ -375,8 +392,8 @@ function DeleteConfirm({ loc, onClose, onDeleted }: { loc: Loc; onClose: () => v
       <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4">
         <h3 className="font-semibold text-slate-900">Delete location?</h3>
         <p className="text-sm text-slate-600">
-          <strong>{loc.name}</strong> ({loc.code}) will be deactivated.
-          This cannot be undone if the location has associated records.
+          <strong>{loc.name}</strong>{simple ? '' : ` (${loc.code})`} will be removed from your list.
+          Tools and history that already mention it keep the name.
         </p>
         {error && (
           <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 flex items-start gap-1.5">
@@ -401,6 +418,8 @@ function DeleteConfirm({ loc, onClose, onDeleted }: { loc: Loc; onClose: () => v
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function LocationsPage() {
+  const { plan } = usePlan()
+  const simple = isToolsPlan(plan)
   const [search,    setSearch]    = useState('')
   const [showAdd,   setShowAdd]   = useState(false)
   const [editing,   setEditing]   = useState<Loc | null>(null)
@@ -409,7 +428,8 @@ export default function LocationsPage() {
   const { data, loading, error, refetch } = useApi<{ data: Loc[] }>('/api/locations?all=true')
   const allLocs = data?.data ?? []
 
-  const { data: statsData, refetch: refetchStats } = useApi<{ data: Loc[] }>('/api/locations')
+  // Stock figures per place; a Tools account has no stock to show.
+  const { data: statsData, refetch: refetchStats } = useApi<{ data: Loc[] }>(simple ? null : '/api/locations')
   const statsById = Object.fromEntries((statsData?.data ?? []).map(l => [l.id, l]))
 
   const locsWithStats = allLocs.map(l =>
@@ -480,6 +500,7 @@ export default function LocationsPage() {
                     search={search}
                     onEdit={setEditing}
                     onDelete={setDeleting}
+                    simple={simple}
                   />
                 ))
             }
@@ -488,7 +509,9 @@ export default function LocationsPage() {
 
         <p className="text-xs text-slate-400 flex items-center gap-1.5">
           <Layers className="w-3.5 h-3.5" />
-          Tip: nest locations by selecting a Parent — e.g. Shelf A1 → Zone A → Main Warehouse
+          {simple
+            ? 'Places your tools are kept or sent: the yard, a van, a site office. Pick one when you add a tool.'
+            : 'Tip: nest locations by selecting a Parent — e.g. Shelf A1 → Zone A → Main Warehouse'}
         </p>
       </div>
 
@@ -499,6 +522,7 @@ export default function LocationsPage() {
           allLocs={allLocs}
           onClose={() => setShowAdd(false)}
           onSaved={handleSaved}
+          simple={simple}
         />
       )}
 
@@ -509,6 +533,7 @@ export default function LocationsPage() {
           allLocs={allLocs}
           onClose={() => setEditing(null)}
           onSaved={handleSaved}
+          simple={simple}
         />
       )}
 
@@ -518,6 +543,7 @@ export default function LocationsPage() {
           loc={deleting}
           onClose={() => setDeleting(null)}
           onDeleted={handleDeleted}
+          simple={simple}
         />
       )}
     </div>

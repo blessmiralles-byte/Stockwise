@@ -10,7 +10,24 @@ import {
   Shield, Sliders,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { X, Menu } from 'lucide-react'
+
+/** Fired by the top bar's menu button on phones to open the sidebar. */
+export const OPEN_NAV_EVENT = 'stocked:open-nav'
+
+/** The phone-only menu button that opens the sidebar. Put it before a page title. */
+export function MobileNavButton({ className = '' }: { className?: string }) {
+  return (
+    <button
+      onClick={() => window.dispatchEvent(new Event(OPEN_NAV_EVENT))}
+      aria-label="Open menu"
+      className={cn('md:hidden -ml-1 h-9 w-9 flex-shrink-0 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100', className)}
+    >
+      <Menu className="w-5 h-5" />
+    </button>
+  )
+}
 import { type Feature, FEATURES, planHasFeature, isToolsPlan, toolsPageAllowed } from '@/lib/entitlements'
 import { PlanBadge } from '@/components/billing/upgrade-prompt'
 import { canSeePage } from '@/lib/permissions'
@@ -35,6 +52,7 @@ const navItems: { href: string; icon: any; label: string; feature?: Feature }[] 
 
 /** What a Stocked Tools account calls things: it has tools, not fixed assets. */
 const TOOLS_LABELS: Record<string, string> = { '/assets': 'Tools' }
+const TOOLS_LOCATIONS: (typeof navItems)[number] = { href: '/locations', icon: MapPin, label: 'Locations' }
 
 const fieldItems = [
   { href: '/field', icon: ScanBarcode, label: 'Field View' },
@@ -48,16 +66,52 @@ export function Sidebar({ plan, role }: { plan?: string | null; role?: string | 
   // the rest; the upgrade lives in Settings.
   const toolsOnly = isToolsPlan(plan)
   const forPlan = toolsOnly
-    ? navItems.filter(i => toolsPageAllowed(i.href)).map(i => ({ ...i, label: TOOLS_LABELS[i.href] ?? i.label }))
+    ? navItems
+        .filter(i => toolsPageAllowed(i.href))
+        .map(i => ({ ...i, label: TOOLS_LABELS[i.href] ?? i.label }))
+        // Full Stocked reaches Locations through Setup; Tools has no Setup page.
+        .flatMap(i => i.href === '/assets' ? [i, TOOLS_LOCATIONS] : [i])
     : navItems
   // Nor a page the role can't open (lib/permissions): no link to a 403.
   const items = forPlan.filter(i => canSeePage(role, i.href))
 
+  // Phones: the sidebar is a slide-in panel opened from the top bar's menu
+  // button (see Topbar), closed by picking a page or tapping outside.
+  const [mobileOpen, setMobileOpen] = useState(false)
+  useEffect(() => {
+    const open = () => setMobileOpen(true)
+    window.addEventListener(OPEN_NAV_EVENT, open)
+    return () => window.removeEventListener(OPEN_NAV_EVENT, open)
+  }, [])
+  useEffect(() => { setMobileOpen(false) }, [pathname])
+
+  return (
+    <>
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 flex md:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
+          <div className="relative w-64 max-w-[80%] h-full overflow-y-auto shadow-xl">
+            {panel(false, true)}
+          </div>
+          <button
+            onClick={() => setMobileOpen(false)}
+            aria-label="Close menu"
+            className="relative ml-2 mt-3 h-9 w-9 rounded-full bg-white/90 flex items-center justify-center shadow"
+          >
+            <X className="w-4 h-4 text-slate-700" />
+          </button>
+        </div>
+      )}
+      <div className="hidden md:flex">{panel(collapsed, false)}</div>
+    </>
+  )
+
+  function panel(collapsed: boolean, mobile: boolean) {
   return (
     <aside
       className={cn(
         'relative flex flex-col bg-slate-950 text-white transition-all duration-300 min-h-screen border-r border-slate-800/60',
-        collapsed ? 'w-16' : 'w-60'
+        mobile ? 'w-full' : collapsed ? 'w-16' : 'w-60'
       )}
     >
       {/* Logo */}
@@ -138,7 +192,7 @@ export function Sidebar({ plan, role }: { plan?: string | null; role?: string | 
       </nav>
 
       {/* Collapse toggle */}
-      <button
+      {!mobile && <button
         onClick={() => setCollapsed(!collapsed)}
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-slate-800 rounded-full flex items-center justify-center hover:bg-slate-700 transition-colors border border-slate-700 shadow-sm"
@@ -147,7 +201,8 @@ export function Sidebar({ plan, role }: { plan?: string | null; role?: string | 
           ? <ChevronRight className="w-3 h-3 text-slate-400" />
           : <ChevronLeft  className="w-3 h-3 text-slate-400" />
         }
-      </button>
+      </button>}
     </aside>
   )
+  }
 }
