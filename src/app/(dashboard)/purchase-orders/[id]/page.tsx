@@ -746,6 +746,147 @@ function OrderLinesCard({ po, products, categories, poId, onUpdated, onProductCr
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
+// ── Three-way match ─────────────────────────────────────────────────────────
+function ThreeWayMatch({ po, onUpdated }: { po: any; onUpdated: () => void }) {
+  const { money } = useMoney()
+  const lines      = (po.lines ?? []) as any[]
+  const poValue    = lines.reduce((s: number, l: any) => s + l.quantity_ordered  * l.unit_cost, 0)
+  const grnValue   = lines.reduce((s: number, l: any) => s + l.quantity_received * l.unit_cost, 0)
+  const invoiceAmt = po.supplier_invoice_amount ?? null
+
+  const [editing,     setEditing]     = useState(false)
+  const [invNo,       setInvNo]       = useState(po.supplier_invoice_no     ?? '')
+  const [invDate,     setInvDate]     = useState(po.supplier_invoice_date   ?? '')
+  const [invAmt,      setInvAmt]      = useState(String(po.supplier_invoice_amount ?? ''))
+  const [saving,      setSaving]      = useState(false)
+  const [saveErr,     setSaveErr]     = useState('')
+
+  const variance  = invoiceAmt !== null ? invoiceAmt - grnValue : null
+  const matched   = variance !== null && Math.abs(variance) <= 0.01
+  const overInv   = variance !== null && variance > 0.01
+  const underInv  = variance !== null && variance < -0.01
+  const noInvoice = grnValue > 0 && invoiceAmt === null
+  const pending   = grnValue === 0
+
+  const matchColor = matched   ? 'bg-green-50  border-green-200  text-green-700'
+                   : overInv   ? 'bg-red-50    border-red-200    text-red-700'
+                   : underInv  ? 'bg-amber-50  border-amber-200  text-amber-700'
+                   : noInvoice ? 'bg-blue-50   border-blue-200   text-blue-700'
+                   :             'bg-slate-50  border-slate-200  text-slate-500'
+
+  const matchLabel = matched   ? '✓ Matched'
+                   : overInv   ? '⚠ Over-invoiced'
+                   : underInv  ? '⚠ Under-invoiced'
+                   : noInvoice ? 'Awaiting invoice'
+                   :             'Awaiting GRN'
+
+  const save = async () => {
+    if (!invNo.trim() || !invDate || !invAmt) { setSaveErr('All invoice fields required'); return }
+    setSaving(true); setSaveErr('')
+    const res  = await fetch(`/api/accounting/match/${po.id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invoice_no: invNo.trim(), invoice_date: invDate, invoice_amount: Number(invAmt) }),
+    })
+    const json = await res.json()
+    setSaving(false)
+    if (!res.ok) { setSaveErr(json.error ?? 'Failed'); return }
+    setEditing(false); onUpdated()
+  }
+
+  const clear = async () => {
+    await fetch(`/api/accounting/match/${po.id}`, { method: 'DELETE' })
+    setInvNo(''); setInvDate(''); setInvAmt(''); onUpdated()
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Scale className="w-4 h-4 text-indigo-500" />
+            Three-Way Match
+          </CardTitle>
+          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${matchColor}`}>{matchLabel}</span>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Comparison row */}
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: 'PO Amount',       value: poValue,    note: `${lines.reduce((s: number, l: any) => s + l.quantity_ordered, 0)} units ordered`,   color: 'text-slate-900' },
+            { label: 'GRN Received',    value: grnValue,   note: `${lines.reduce((s: number, l: any) => s + l.quantity_received, 0)} units received`,  color: 'text-green-700' },
+            { label: 'Vendor Invoice',value: invoiceAmt, note: invoiceAmt !== null ? po.supplier_invoice_no : 'Not recorded yet',                    color: invoiceAmt !== null ? (matched ? 'text-green-700' : overInv ? 'text-red-600' : 'text-amber-600') : 'text-slate-400' },
+          ].map(col => (
+            <div key={col.label} className="bg-slate-50 rounded-xl p-3 text-center">
+              <p className="text-xs text-slate-500 mb-1">{col.label}</p>
+              <p className={`text-lg font-bold ${col.color}`}>
+                {col.value !== null ? money(col.value) : '—'}
+              </p>
+              <p className="text-xs text-slate-400 mt-0.5">{col.note}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Variance */}
+        {variance !== null && (
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border ${matchColor}`}>
+            {matched
+              ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+              : <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            }
+            {matched
+              ? 'Invoice matches goods received — cleared for payment.'
+              : `Variance: ${money(Math.abs(variance))} ${overInv ? '(invoice exceeds GRN — query with vendor before paying)' : '(invoice below GRN — partial invoice or credit note expected)'}`
+            }
+          </div>
+        )}
+
+        {/* Invoice recording */}
+        {editing ? (
+          <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50">
+            <p className="text-xs font-semibold text-slate-700">Record Vendor Invoice</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Invoice No.</label>
+                <Input value={invNo} onChange={e => setInvNo(e.target.value)} placeholder="INV-2026-001" autoFocus />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Invoice Date</label>
+                <Input type="date" value={invDate} onChange={e => setInvDate(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">Invoice Amount</label>
+                <Input type="number" min="0" step="0.01" value={invAmt} onChange={e => setInvAmt(e.target.value)} placeholder="0.00" />
+              </div>
+            </div>
+            {saveErr && <p className="text-xs text-red-600">{saveErr}</p>}
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => setEditing(false)}>Cancel</Button>
+              <Button size="sm" onClick={save} disabled={saving} className="gap-1.5">
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                Save Invoice
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setEditing(true)}>
+              <FileText className="w-3.5 h-3.5" />
+              {invoiceAmt !== null ? 'Edit Invoice' : 'Record Invoice'}
+            </Button>
+            {invoiceAmt !== null && (
+              <Button variant="outline" size="sm" className="gap-1.5 text-red-600 hover:text-red-700" onClick={clear}>
+                <X className="w-3.5 h-3.5" /> Clear
+              </Button>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function PODetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { money } = useMoney()
   const { id } = use(params)
@@ -797,147 +938,6 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
     </div>
   )
 
-  // ── component defined here so it closes over po / refetch ─────────────────
-
-  // ── Three-way match component ──────────────────────────────────────────────
-  function ThreeWayMatch({ po, onUpdated }: { po: any; onUpdated: () => void }) {
-    const lines      = (po.lines ?? []) as any[]
-    const poValue    = lines.reduce((s: number, l: any) => s + l.quantity_ordered  * l.unit_cost, 0)
-    const grnValue   = lines.reduce((s: number, l: any) => s + l.quantity_received * l.unit_cost, 0)
-    const invoiceAmt = po.supplier_invoice_amount ?? null
-
-    const [editing,     setEditing]     = useState(false)
-    const [invNo,       setInvNo]       = useState(po.supplier_invoice_no     ?? '')
-    const [invDate,     setInvDate]     = useState(po.supplier_invoice_date   ?? '')
-    const [invAmt,      setInvAmt]      = useState(String(po.supplier_invoice_amount ?? ''))
-    const [saving,      setSaving]      = useState(false)
-    const [saveErr,     setSaveErr]     = useState('')
-
-    const variance  = invoiceAmt !== null ? invoiceAmt - grnValue : null
-    const matched   = variance !== null && Math.abs(variance) <= 0.01
-    const overInv   = variance !== null && variance > 0.01
-    const underInv  = variance !== null && variance < -0.01
-    const noInvoice = grnValue > 0 && invoiceAmt === null
-    const pending   = grnValue === 0
-
-    const matchColor = matched   ? 'bg-green-50  border-green-200  text-green-700'
-                     : overInv   ? 'bg-red-50    border-red-200    text-red-700'
-                     : underInv  ? 'bg-amber-50  border-amber-200  text-amber-700'
-                     : noInvoice ? 'bg-blue-50   border-blue-200   text-blue-700'
-                     :             'bg-slate-50  border-slate-200  text-slate-500'
-
-    const matchLabel = matched   ? '✓ Matched'
-                     : overInv   ? '⚠ Over-invoiced'
-                     : underInv  ? '⚠ Under-invoiced'
-                     : noInvoice ? 'Awaiting invoice'
-                     :             'Awaiting GRN'
-
-    const save = async () => {
-      if (!invNo.trim() || !invDate || !invAmt) { setSaveErr('All invoice fields required'); return }
-      setSaving(true); setSaveErr('')
-      const res  = await fetch(`/api/accounting/match/${po.id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoice_no: invNo.trim(), invoice_date: invDate, invoice_amount: Number(invAmt) }),
-      })
-      const json = await res.json()
-      setSaving(false)
-      if (!res.ok) { setSaveErr(json.error ?? 'Failed'); return }
-      setEditing(false); onUpdated()
-    }
-
-    const clear = async () => {
-      await fetch(`/api/accounting/match/${po.id}`, { method: 'DELETE' })
-      setInvNo(''); setInvDate(''); setInvAmt(''); onUpdated()
-    }
-
-    return (
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Scale className="w-4 h-4 text-indigo-500" />
-              Three-Way Match
-            </CardTitle>
-            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${matchColor}`}>{matchLabel}</span>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Comparison row */}
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: 'PO Amount',       value: poValue,    note: `${lines.reduce((s: number, l: any) => s + l.quantity_ordered, 0)} units ordered`,   color: 'text-slate-900' },
-              { label: 'GRN Received',    value: grnValue,   note: `${lines.reduce((s: number, l: any) => s + l.quantity_received, 0)} units received`,  color: 'text-green-700' },
-              { label: 'Vendor Invoice',value: invoiceAmt, note: invoiceAmt !== null ? po.supplier_invoice_no : 'Not recorded yet',                    color: invoiceAmt !== null ? (matched ? 'text-green-700' : overInv ? 'text-red-600' : 'text-amber-600') : 'text-slate-400' },
-            ].map(col => (
-              <div key={col.label} className="bg-slate-50 rounded-xl p-3 text-center">
-                <p className="text-xs text-slate-500 mb-1">{col.label}</p>
-                <p className={`text-lg font-bold ${col.color}`}>
-                  {col.value !== null ? money(col.value) : '—'}
-                </p>
-                <p className="text-xs text-slate-400 mt-0.5">{col.note}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Variance */}
-          {variance !== null && (
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border ${matchColor}`}>
-              {matched
-                ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                : <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-              }
-              {matched
-                ? 'Invoice matches goods received — cleared for payment.'
-                : `Variance: ${money(Math.abs(variance))} ${overInv ? '(invoice exceeds GRN — query with vendor before paying)' : '(invoice below GRN — partial invoice or credit note expected)'}`
-              }
-            </div>
-          )}
-
-          {/* Invoice recording */}
-          {editing ? (
-            <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50">
-              <p className="text-xs font-semibold text-slate-700">Record Vendor Invoice</p>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Invoice No.</label>
-                  <Input value={invNo} onChange={e => setInvNo(e.target.value)} placeholder="INV-2026-001" autoFocus />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Invoice Date</label>
-                  <Input type="date" value={invDate} onChange={e => setInvDate(e.target.value)} />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 block mb-1">Invoice Amount</label>
-                  <Input type="number" min="0" step="0.01" value={invAmt} onChange={e => setInvAmt(e.target.value)} placeholder="0.00" />
-                </div>
-              </div>
-              {saveErr && <p className="text-xs text-red-600">{saveErr}</p>}
-              <div className="flex gap-2 justify-end">
-                <Button variant="outline" size="sm" onClick={() => setEditing(false)}>Cancel</Button>
-                <Button size="sm" onClick={save} disabled={saving} className="gap-1.5">
-                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                  Save Invoice
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setEditing(true)}>
-                <FileText className="w-3.5 h-3.5" />
-                {invoiceAmt !== null ? 'Edit Invoice' : 'Record Invoice'}
-              </Button>
-              {invoiceAmt !== null && (
-                <Button variant="outline" size="sm" className="gap-1.5 text-red-600 hover:text-red-700" onClick={clear}>
-                  <X className="w-3.5 h-3.5" /> Clear
-                </Button>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    )
-  }
 
   if (error || !po) return (
     <div>

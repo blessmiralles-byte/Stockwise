@@ -30,6 +30,8 @@ export default function GlobalError({ error, retry }: { error: unknown; retry: (
             >
               Try again
             </button>
+            {/* A full page load on purpose: the app shell itself has failed here. */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a href="/" style={{ height: 40, padding: '0 20px', borderRadius: 12, border: '1px solid #cbd5e1', color: '#0f172a', fontWeight: 600, fontSize: 14, display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
               Home page
             </a>

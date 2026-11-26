@@ -1150,6 +1150,7 @@ export default function RequisitionsPage() {
 
   useEffect(() => {
     fetch('/api/user/profile').then(r => r.json()).then(setProfile)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads the list when the page opens or a filter changes
     fetchReqs()
   }, [fetchReqs])
 

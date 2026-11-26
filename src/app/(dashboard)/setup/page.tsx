@@ -5,6 +5,7 @@ import { Topbar } from '@/components/layout/topbar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useApi } from '@/lib/use-api'
+import { useNow } from '@/lib/use-now'
 import { usePlan } from '@/lib/use-plan'
 import { UpgradePrompt } from '@/components/billing/upgrade-prompt'
 import { cn } from '@/lib/utils'
@@ -1216,13 +1217,15 @@ function SetupInner() {
   const [active, setActive] = useState('start')
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get('tab') ?? ''
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the URL after mount (no useSearchParams: dead-page bug)
     if (TABS.some(x => x.id === t)) setActive(t)
   }, [])
   const [bannerDismissed, setBannerDismissed] = useState(false)
 
   const { data: orgData } = useApi<{ data: any }>('/api/org')
+  const now = useNow()
   const createdAt   = orgData?.data?.created_at ? new Date(orgData.data.created_at) : null
-  const daysSince   = createdAt ? Math.floor((Date.now() - createdAt.getTime()) / 86_400_000) : 999
+  const daysSince   = createdAt ? Math.floor((now - createdAt.getTime()) / 86_400_000) : 999
   const inSetupWindow = daysSince <= 30
 
   return (

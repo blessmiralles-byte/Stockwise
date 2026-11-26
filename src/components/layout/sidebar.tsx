@@ -83,7 +83,9 @@ export function Sidebar({ plan, role }: { plan?: string | null; role?: string | 
     window.addEventListener(OPEN_NAV_EVENT, open)
     return () => window.removeEventListener(OPEN_NAV_EVENT, open)
   }, [])
-  useEffect(() => { setMobileOpen(false) }, [pathname])
+  // Close the phone menu when the page changes (adjusted during render, not in an effect).
+  const [navPath, setNavPath] = useState(pathname)
+  if (navPath !== pathname) { setNavPath(pathname); setMobileOpen(false) }
 
   return (
     <>

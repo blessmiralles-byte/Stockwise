@@ -65,6 +65,7 @@ function NotificationPanel({ onClose, onRead }: { onClose: () => void; onRead: (
     } finally { setLoading(false) }
   }, [])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loads notifications when the bar mounts
   useEffect(() => { load() }, [load])
 
   const markOne = async (id: string) => {

@@ -427,6 +427,7 @@ export default function MaintenancePage() {
   // form ready for that kind of check.
   useEffect(() => {
     const k = new URLSearchParams(window.location.search).get('schedule')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the URL after mount (no useSearchParams: dead-page bug)
     if (isScheduleKind(k)) { setScheduleKind(k); setShowSchedule(true) }
   }, [])
 

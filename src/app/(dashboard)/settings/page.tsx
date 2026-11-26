@@ -715,6 +715,7 @@ function BillingSection() {
   useEffect(() => {
     const intended = localStorage.getItem('stocked.intended_plan')
     if (isPaidPlan(intended)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the URL / saved plan choice after mount (browser-only)
       setHighlightPlan(intended)
       localStorage.removeItem('stocked.intended_plan')
     }
@@ -1382,6 +1383,7 @@ function SettingsInner() {
   useEffect(() => {
     const q = new URLSearchParams(window.location.search)
     const t = q.get('tab')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the URL / saved plan choice after mount (browser-only)
     if (t && ['users', 'billing', 'people', 'costcenters', 'periods', 'apikeys'].includes(t)) setActiveTab(t)
     setCheckoutStatus(q.get('checkout'))
   }, [])

@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const actorIds = [...new Set((data ?? []).map(r => r.actor_id).filter(Boolean))]
-  let actorMap: Record<string, { id: string; full_name: string; role: string }> = {}
+  const actorMap: Record<string, { id: string; full_name: string; role: string }> = {}
   if (actorIds.length > 0) {
     const { data: profiles } = await supabase
       .from('user_profiles')

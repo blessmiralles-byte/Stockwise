@@ -169,6 +169,7 @@ function NewPODrawer({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
   const suppliers = suppData?.data ?? []
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clears results when the search box is emptied
     if (prodSearch.length < 1) { setProducts([]); setSearched(false); return }
     const t = setTimeout(async () => {
       const res = await fetch(`/api/products?q=${encodeURIComponent(prodSearch)}`)

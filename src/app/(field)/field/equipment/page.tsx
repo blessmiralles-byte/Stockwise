@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useApi } from '@/lib/use-api'
+import { useNow } from '@/lib/use-now'
 import { Cpu, MapPin, User, AlertCircle, CheckCircle2, Loader2, ChevronLeft, X, Search, WrenchIcon, LogOut, LogIn, Lock } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -148,9 +149,10 @@ function AssetCard({
   busy: boolean
 }) {
   const cfg = STATUS_CFG[asset.status] ?? STATUS_CFG.inactive
+  const now       = useNow()
   const isOut     = !!asset.current_checkout_id
   const isPending = isOut && !asset.checked_out_to
-  const overdue   = asset.checkout_due_at && new Date(asset.checkout_due_at).getTime() < Date.now()
+  const overdue   = asset.checkout_due_at && new Date(asset.checkout_due_at).getTime() < now
   const canCustody = !['disposed', 'retired', 'sold'].includes(asset.status)
 
   return (

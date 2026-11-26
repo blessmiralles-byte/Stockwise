@@ -23,7 +23,7 @@ only ones blocking anything.
 - **A3 is DONE (2026-11-17)**: per-organization API keys (`api_keys` table, `scripts/migrate-api-keys.sql`, run). Keys are created, shown once and revoked in Settings → API keys (owner, full Stocked). POS and JobLedger keys need Enterprise, accounting keys need Pro. `POS_API_KEY`, `ACCOUNTING_API_KEY` and `JOBLEDGER_API_KEY` are no longer read; the owner deletes them from Vercel. JobLedger needs no code change: paste a JobLedger key into its `STOCKWISE_API_KEY`. Test: `node scripts/test-api-keys.js [baseUrl]` (36 checks, purges its companies).
 - Fixed alongside A3: `/settings` and `/setup` never started (dead page, "Viewer" in the top bar) when opened directly, refreshed, or returned to from Lemon Squeezy checkout; their `<Suspense>` + `useSearchParams` boundary never hydrated. They now read the URL after mount. Also `next.config.ts` pins `turbopack.root`: a `package-lock.json` in the home folder made `next dev` watch the whole home folder and reload pages in a loop.
 - **A4 is DONE (2026-11-17)**: `src/app/robots.ts` and `sitemap.ts`; `/api/health` is public (exempt in `proxy.ts`) and no longer returns database error text; `next.config.ts` sends a Content-Security-Policy, `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy` and `Permissions-Policy` (camera for self only) and drops `X-Powered-By`; unknown URLs reach `src/app/not-found.tsx` instead of the login page (signed-in prefixes live in `src/lib/route-access.ts`, and `tests/route-access.test.ts` fails if a new `(dashboard)`/`(field)` folder is missing from it); `(dashboard)/error.tsx` and `global-error.tsx` report to Sentry; `/one-pager`, `/luxury-preview` and the default `public/` SVGs are removed. **If a new page needs another outside host (fonts, images, an iframe, an analytics script), add it to the CSP in `next.config.ts` or the browser will block it.** If `npm run build` fails locally on `.next/dev/types` naming a deleted page, delete `.next/dev/types` (stale dev-server output). Start at A5.
-- **A5–A8 are DONE (2026-11-18)**, see each item below. A8 left the legal entity details **pending from the owner** (`src/lib/legal.ts`). A9 code done 2026-11-18 (admin metrics leak closed; owner sets `PLATFORM_ADMIN_EMAILS` and reads `/api/admin/config-check`). Start at A10.
+- **A5–A8 are DONE (2026-11-18)**, see each item below. A8 left the legal entity details **pending from the owner** (`src/lib/legal.ts`). A9 code done 2026-11-18 (admin metrics leak closed; owner sets `PLATFORM_ADMIN_EMAILS` and reads `/api/admin/config-check`). A10 DONE 2026-11-26 (lint is now part of `npm run build`). The launch audit is finished; remaining work is the owner items listed under A5, A8, A9 and Step 4, then Steps 5-8.
 
 ## Rules for whoever runs these steps
 
@@ -309,6 +309,23 @@ filter stays as a safety net).
 > Stripe. Clean up. Confirm in the Vercel dashboard that each cron ran last night.
 
 ### A10 — Code health (not blocking)
+
+**DONE 2026-11-26.** `npm run build` now runs `eslint --quiet` between the tests and
+`next build` (errors fail the build, on Vercel too; warnings don't). `npm run lint` still shows
+warnings. Config (`eslint.config.mjs`): `no-explicit-any` is a warning (~780 left);
+`no-unescaped-entities` only flags `>` and `}`; `scripts/**/*.js` may use `require`.
+Real fixes: `lib/use-api.ts` works out `loading` from the last finished request instead of
+resetting state in its effect (every page rendered twice per fetch; `loading` is now true on
+the first render); `ThreeWayMatch` on the PO page was declared inside the page, so any page
+re-render wiped a half-typed invoice — moved to module level; `Date.now()` in render →
+`lib/use-now.ts`; the phone menu closes on navigation without an effect; the barcode scanner's
+unmount cleanup no longer refers to a function declared after it; Locations tree prop renamed
+`children` → `tree`; billing redirects use `location.assign`. The 14 remaining
+"setState in effect" sites were reviewed one by one (URL / localStorage read after mount for
+the dead-page bug, load-on-open, clearing search results) and carry an `eslint-disable-next-line`
+with the reason. Walked on a local production build: PO invoice recorded through Three-Way
+Match, nested locations, Settings, Billing tab via `?tab=`, Scan, Setup, Tools, phone menu; no
+console errors.
 
 > `npx eslint src` reports 767 errors and is not part of the build: 718 `no-explicit-any`, 19
 > unescaped entities, and about 25 React hook errors (`set-state-in-effect`, `purity`,

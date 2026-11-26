@@ -32,6 +32,7 @@ function ProductSearch({ onSelect }: { onSelect: (p: any) => void }) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets dependent fields when the search or transaction type changes
     if (q.length < 2) { setResults([]); setOpen(false); return }
     const t = setTimeout(async () => {
       setSearching(true)
@@ -151,6 +152,7 @@ export default function NewTransactionPage() {
 
   // Load pending POs when purchase type is selected
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets dependent fields when the search or transaction type changes
     if (!isPurchase) { setPendingPOs([]); setSelectedPO(null); setSelectedLine(null); return }
     fetch('/api/purchase-orders/pending')
       .then(r => r.json())
@@ -160,6 +162,7 @@ export default function NewTransactionPage() {
 
   // For a return, look up where this item can come back from or go back to
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets dependent fields when the search or transaction type changes
     setReturnOptions(null); setReturnJob(null); setReturnPO('')
     if (!isReturn || !product?.id) return
     let live = true

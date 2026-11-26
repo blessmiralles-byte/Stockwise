@@ -2,26 +2,37 @@
 
 import { useEffect, useState, useCallback } from 'react'
 
+/**
+ * Fetch JSON from `url` (null = don't fetch). The last finished request is kept
+ * together with the url it answered, and `loading` is worked out from that, so
+ * nothing has to be reset inside the effect (which rendered every page twice).
+ *
+ * While a new url loads, the previous data stays on screen, as before; the
+ * error is only shown for the request it belongs to.
+ */
 export function useApi<T>(url: string | null) {
-  const [data, setData] = useState<T | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
+  const [result, setResult] = useState<{ key: string; data: T | null; error: string | null }>(
+    { key: '', data: null, error: null },
+  )
+  const key = url ? `${tick}|${url}` : ''
 
   useEffect(() => {
-    if (!url) { setData(null); setLoading(false); setError(null); return }
+    if (!url) return
     let cancelled = false
-    setLoading(true)
-    setError(null)
     fetch(url)
       .then(r => r.json())
-      .then(json => { if (!cancelled) setData(json) })
-      .catch(e => { if (!cancelled) setError(e.message) })
-      .finally(() => { if (!cancelled) setLoading(false) })
+      .then(json => { if (!cancelled) setResult({ key, data: json, error: null }) })
+      .catch(e => { if (!cancelled) setResult(prev => ({ key, data: prev.data, error: e.message })) })
     return () => { cancelled = true }
-  }, [url, tick])
+  }, [url, key])
 
   const refetch = useCallback(() => setTick(t => t + 1), [])
 
-  return { data, loading, error, refetch }
+  return {
+    data:    url ? result.data : null,
+    loading: !!url && result.key !== key,
+    error:   url && result.key === key ? result.error : null,
+    refetch,
+  }
 }

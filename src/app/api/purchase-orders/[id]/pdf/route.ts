@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { requireAuth } from '@/lib/api-auth'
-// @ts-ignore — pdfkit has types but no default export typing in some setups
 import PDFDocument from 'pdfkit'
 
 export const runtime = 'nodejs'

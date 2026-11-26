@@ -32,6 +32,7 @@ export default function RegisterPage() {
   // billing page to pre-highlight once the user decides to upgrade.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the URL after mount (no useSearchParams: dead-page bug)
     if (params.get('product') === 'tools') setProduct('tools')
     const plan = params.get('plan')
     if (isPaidPlan(plan)) {

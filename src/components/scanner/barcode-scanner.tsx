@@ -43,13 +43,6 @@ export function BarcodeScanner({ onScan, onError, className, id = 'qr-reader' }:
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const scannedRef = useRef(false)
 
-  // Don't enumerate cameras on mount — on mobile that prompts for permission
-  // before the user asks to scan, and often returns an empty list until
-  // permission is granted anyway. We enumerate *after* a successful start.
-  useEffect(() => {
-    return () => { stopScanner() }
-  }, [])
-
   const stopScanner = async () => {
     if (scannerRef.current) {
       try {
@@ -68,6 +61,13 @@ export function BarcodeScanner({ onScan, onError, className, id = 'qr-reader' }:
     setTorchAvailable(false)
     scannedRef.current = false
   }
+
+  // Release the camera when the scanner leaves the page. Don't enumerate
+  // cameras on mount: on mobile that prompts for permission before the user
+  // asks to scan. We enumerate *after* a successful start.
+  const stopRef = useRef(stopScanner)
+  useEffect(() => { stopRef.current = stopScanner })
+  useEffect(() => () => { stopRef.current() }, [])
 
   // Wide, short scan window suits 1D barcodes (which are much wider than tall).
   const qrbox = (vw: number, vh: number) => {

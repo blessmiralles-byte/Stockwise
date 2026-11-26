@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CardSkeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/lib/use-api'
+import { useNow } from '@/lib/use-now'
 import { canIssueToOthers, approvalNeeded } from '@/lib/checkout-rules'
 import { planHasFeature, isToolsPlan } from '@/lib/entitlements'
 import { createNamedLocation } from '@/lib/location-code'
@@ -1294,6 +1295,7 @@ function CheckoutDialog({ asset, onClose, onDone }: { asset: any; onClose: () =>
 
   // Lock the holder to this person once we know the policy applies.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- defaults the holder once the signed-in name arrives; still editable
     if ((selfOnly || onBehalf) && myName) { setHolder(myName); setPersonId('') }
   }, [selfOnly, onBehalf, myName])
 
@@ -1599,7 +1601,8 @@ function ToolCheckoutsPanel({ canApprove, onChange }: { canApprove: boolean; onC
   const { data: outData,     refetch: refetchOut }     = useApi<{ data: any[] }>('/api/assets/checkouts?status=out')
   const pending = pendingData?.data ?? []
   const out     = outData?.data ?? []
-  const overdue = out.filter((c: any) => c.due_at && new Date(c.due_at).getTime() < Date.now())
+  const now     = useNow()
+  const overdue = out.filter((c: any) => c.due_at && new Date(c.due_at).getTime() < now)
 
   const act = async (coId: string, action: 'approve' | 'reject') => {
     let reason: string | undefined

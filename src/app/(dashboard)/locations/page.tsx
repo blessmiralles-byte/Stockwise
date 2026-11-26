@@ -242,12 +242,12 @@ function LocationDialog({
 
 // ── Location row ──────────────────────────────────────────────────────────────
 function LocationRow({
-  loc, children, depth, search,
+  loc, tree, depth, search,
   onEdit, onDelete, simple,
 }: {
   simple?:  boolean
   loc:      Loc
-  children: Record<string, Loc[]>
+  tree: Record<string, Loc[]>
   depth:    number
   search:   string
   onEdit:   (loc: Loc) => void
@@ -255,7 +255,7 @@ function LocationRow({
 }) {
   const { money } = useMoney()
   const [open, setOpen] = useState(depth === 0)
-  const kids = children[loc.id] ?? []
+  const kids = tree[loc.id] ?? []
   const hasKids = kids.length > 0
   const Icon = typeIcons[loc.type] ?? MapPin
   const colorClass = typeColors[loc.type] ?? 'bg-slate-50 text-slate-500'
@@ -359,7 +359,7 @@ function LocationRow({
             <LocationRow
               key={child.id}
               loc={child}
-              children={children}
+              tree={tree}
               depth={depth + 1}
               search={search}
               onEdit={onEdit}
@@ -495,7 +495,7 @@ export default function LocationsPage() {
                   <LocationRow
                     key={root.id}
                     loc={root}
-                    children={tree}
+                    tree={tree}
                     depth={0}
                     search={search}
                     onEdit={setEditing}

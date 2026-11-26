@@ -62,7 +62,7 @@ export function BillingWall({
       })
       const json = await res.json()
       if (!res.ok || !json.url) { setError(json.error ?? 'Could not start checkout'); return }
-      window.location.href = json.url
+      window.location.assign(json.url)
     } catch { setError('Network error — please try again.') }
     finally { setBusy(null) }
   }
@@ -73,7 +73,7 @@ export function BillingWall({
       const res = await fetch('/api/billing/portal', { method: 'POST' })
       const json = await res.json()
       if (!res.ok || !json.url) { setError(json.error ?? 'Could not open billing portal'); return }
-      window.location.href = json.url
+      window.location.assign(json.url)
     } catch { setError('Network error — please try again.') }
     finally { setBusy(null) }
   }

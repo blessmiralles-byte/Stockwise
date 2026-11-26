@@ -67,6 +67,7 @@ export function LocationSelect({ value, onChange, className, placeholder, disabl
     }
     const newSel = ['', '', '', '']
     path.forEach((id, i) => { newSel[i] = id })
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs the cascading pickers from the value prop / loaded locations
     setSelected(newSel)
   }, [value, locations])
 

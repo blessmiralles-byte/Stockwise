@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
 
   // Resolve parent + compute level
   let level     = 0
-  let parent_id = body.parent_id || null
+  const parent_id = body.parent_id || null
 
   if (parent_id) {
     const { data: parent } = await supabase

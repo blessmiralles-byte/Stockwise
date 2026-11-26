@@ -53,6 +53,7 @@ export function ApiKeysSection() {
     }
   }, [])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loads the key list when the section mounts
   useEffect(() => { load() }, [load])
 
   const anyAllowed = API_KEY_SCOPES.some(s => allowed[s])
