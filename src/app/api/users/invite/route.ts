@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
 
   const alreadyRegistered = () =>
     NextResponse.json(
-      { error: 'A Supabase account with that email already exists. Ask them to sign in.' },
+      { error: 'This person already has a Stocked account. Ask them to sign in.' },
       { status: 409 }
     )
 
