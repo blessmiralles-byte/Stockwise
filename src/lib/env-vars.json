@@ -8,7 +8,7 @@
     { "name": "CRON_SECRET",                   "level": "required", "purpose": "The five nightly jobs in vercel.json answer 401 without it", "minLength": 16 },
     { "name": "RESEND_API_KEY",                "level": "required", "purpose": "Invites and notification emails" },
     { "name": "RESEND_FROM_EMAIL",             "level": "required", "purpose": "Sender of app emails", "public": true },
-    { "name": "TRIAL_HASH_PEPPER",             "level": "required", "purpose": "One free trial per email address", "minLength": 16 },
+    { "name": "TRIAL_HASH_PEPPER",             "level": "required", "purpose": "Secret mixed into the one-trial-per-email fingerprints. Set once before launch and never change it: a new value forgets who already had a trial", "minLength": 16 },
     { "name": "LEMONSQUEEZY_API_KEY",          "level": "required", "purpose": "Checkout and customer portal" },
     { "name": "LEMONSQUEEZY_STORE_ID",         "level": "required", "purpose": "Checkout" },
     { "name": "LEMONSQUEEZY_WEBHOOK_SECRET",   "level": "required", "purpose": "Plan changes after payment" },
